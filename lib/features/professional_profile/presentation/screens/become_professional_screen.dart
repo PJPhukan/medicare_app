@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 // ─── Mock categories ─────────────────────────────────────────────────────────
 
@@ -41,16 +43,16 @@ const _kCountryCodes = [
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-class BecomeProfessionalScreen extends StatefulWidget {
+class BecomeProfessionalScreen extends ConsumerStatefulWidget {
   const BecomeProfessionalScreen({super.key, this.isEditing = false});
   final bool isEditing;
 
   @override
-  State<BecomeProfessionalScreen> createState() =>
+  ConsumerState<BecomeProfessionalScreen> createState() =>
       _BecomeProfessionalScreenState();
 }
 
-class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
+class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScreen> {
   int _step = 0;
   bool _submitted = false;
 
@@ -134,9 +136,7 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
   void _advance() {
     final err = _validateStep();
     if (err != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(err, style: AppTypography.bodySm)),
-      );
+      AppSnackbar.error(context, err);
       return;
     }
     if (_step < _totalSteps - 1) {
@@ -162,10 +162,7 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
     final v = _certCtrl.text.trim();
     if (v.isEmpty) return;
     if (_certs.length >= 10) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(AppStrings.maxCertificationsReached,
-            style: AppTypography.bodySm),
-      ));
+      AppSnackbar.error(context, AppStrings.maxCertificationsReached);
       return;
     }
     setState(() => _certs.add(v));
@@ -174,6 +171,9 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Professional Profile');
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -189,7 +189,7 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
                   onPressed: _goBack,
                 ),
           title: Text(_isEditing ? AppStrings.editProfessionalProfile : AppStrings.becomeProfessional,
-              style: AppTypography.h2.copyWith(fontSize: 18)),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           centerTitle: true,
         ),
         body: _submitted ? _buildSubmitted() : _buildWizard(),
@@ -223,18 +223,14 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            Text(
+            AppText.h2(
               isEdit ? AppStrings.profileUpdated : AppStrings.applicationSubmitted,
-              style: AppTypography.h2,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            Text(
-              isEdit
-                  ? AppStrings.profileUpdatedDesc
-                  : AppStrings.applicationPendingDesc,
-              style: AppTypography.bodySm
-                  .copyWith(color: AppColors.textSecondary),
+            AppText.bodySm(
+              isEdit ? AppStrings.profileUpdatedDesc : AppStrings.applicationPendingDesc,
+              color: AppColors.textSecondary,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
@@ -249,7 +245,7 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
                       borderRadius: AppBorderRadius.lgAll),
                 ),
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text(AppStrings.back, style: AppTypography.buttonLg),
+                child: const Text(AppStrings.back, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
               ),
             ),
           ],
@@ -374,13 +370,9 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
           ]),
         ]),
         const SizedBox(height: 28),
-        Text(AppStrings.connectionRates,
-            style: AppTypography.labelMd
-                .copyWith(color: context.primaryText, fontWeight: FontWeight.w600)),
+        AppText.labelMd(AppStrings.connectionRates, color: context.primaryText),
         const SizedBox(height: 4),
-        Text(AppStrings.connectionRatesSubtitle,
-            style: AppTypography.bodyXs
-                .copyWith(color: AppColors.textSecondary)),
+        AppText.bodyXs(AppStrings.connectionRatesSubtitle, color: AppColors.textSecondary),
         const SizedBox(height: 16),
         _WizLabel(AppStrings.hourlyRate),
         const SizedBox(height: 8),
@@ -555,15 +547,12 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            Text(AppStrings.selectCountry, style: AppTypography.h3),
+            AppText.h3(AppStrings.selectCountry),
             const SizedBox(height: 12),
             ..._kCountryCodes.map((c) => ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(c.name,
-                  style: AppTypography.bodyMd
-                      .copyWith(color: context.primaryText)),
-              trailing: Text(c.code,
-                  style: AppTypography.bodyMd.copyWith(color: AppColors.teal)),
+              title: AppText.bodyMd(c.name, color: context.primaryText),
+              trailing: AppText.bodyMd(c.code, color: AppColors.teal),
               onTap: () {
                 setState(() => _countryCode = c.code);
                 Navigator.pop(context);
@@ -582,11 +571,10 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(AppStrings.agreementTitle,
-            style: AppTypography.h2.copyWith(fontSize: 20)),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         Text(AppStrings.agreementPreamble,
-            style: AppTypography.bodySm
-                .copyWith(color: AppColors.textSecondary, height: 1.6)),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
         const SizedBox(height: 16),
         Container(
           width: double.infinity,
@@ -616,8 +604,7 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(bullet,
-                          style: AppTypography.bodySm.copyWith(
-                              color: AppColors.textSecondary, height: 1.6)),
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
                     ),
                   ],
                 ),
@@ -627,10 +614,7 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
         ),
         const SizedBox(height: 16),
         Text(AppStrings.agreementFooter,
-            style: AppTypography.bodySm.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.6,
-                fontStyle: FontStyle.italic)),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6, fontStyle: FontStyle.italic)),
         const SizedBox(height: 24),
         GestureDetector(
           onTap: () => setState(() => _agreed = !_agreed),
@@ -657,8 +641,7 @@ class _BecomeProfessionalScreenState extends State<BecomeProfessionalScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(AppStrings.agreementCheckbox,
-                    style: AppTypography.bodyMd.copyWith(
-                        color: context.primaryText, height: 1.5)),
+                    style: TextStyle(fontSize: 14, color: context.primaryText, height: 1.5)),
               ),
             ],
           ),
@@ -707,7 +690,7 @@ class _NavBar extends StatelessWidget {
                 ),
                 onPressed: onBack,
                 child:
-                    Text(AppStrings.back, style: AppTypography.buttonMd),
+                    const Text(AppStrings.back, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
               ),
             ),
           ),
@@ -727,7 +710,7 @@ class _NavBar extends StatelessWidget {
               onPressed: onAdvance,
               child: Text(
                 step < totalSteps - 1 ? AppStrings.next : submitLabel,
-                style: AppTypography.buttonMd,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2),
               ),
             ),
           ),
@@ -787,7 +770,9 @@ class _StepTabPills extends StatelessWidget {
                 child: Text(
                   _labels[i],
                   textAlign: TextAlign.center,
-                  style: AppTypography.labelSm.copyWith(
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.5,
                     color: active
                         ? AppColors.textInverse
                         : done
@@ -857,7 +842,9 @@ class _StepIndicator extends StatelessWidget {
                       : i == lastIdx
                           ? TextAlign.end
                           : TextAlign.center,
-                  style: AppTypography.labelSm.copyWith(
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.5,
                     color: done
                         ? AppColors.teal
                         : active
@@ -954,9 +941,7 @@ class _PhotoPicker extends StatelessWidget {
                         const Icon(Icons.camera_alt_rounded,
                             color: AppColors.textHint, size: 30),
                         const SizedBox(height: 4),
-                        Text('Upload Photo',
-                            style: AppTypography.bodyXs
-                                .copyWith(color: AppColors.textHint)),
+                        AppText.bodyXs('Upload Photo', color: AppColors.textHint),
                       ],
                     ),
             ),
@@ -1025,10 +1010,8 @@ class _CategoryChips extends StatelessWidget {
                         color: on ? AppColors.teal : context.borderCol),
                     borderRadius: AppBorderRadius.pill,
                   ),
-                  child: Text(cat.label,
-                      style: AppTypography.labelMd.copyWith(
-                        color: on ? AppColors.teal : AppColors.textSecondary,
-                      )),
+                  child: AppText.labelMd(cat.label,
+                      color: on ? AppColors.teal : AppColors.textSecondary),
                 ),
               );
             }).toList(),
@@ -1058,8 +1041,7 @@ class _SecurityBanner extends StatelessWidget {
         const Icon(Icons.lock_rounded, color: AppColors.amber, size: 18),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(AppStrings.secureDataBanner,
-              style: AppTypography.bodySm.copyWith(color: AppColors.amber)),
+          child: AppText.bodySm(AppStrings.secureDataBanner, color: AppColors.amber),
         ),
       ]),
     );
@@ -1095,9 +1077,7 @@ class _PhoneField extends StatelessWidget {
               border: Border(right: BorderSide(color: context.borderCol)),
             ),
             child: Row(children: [
-              Text(countryCode,
-                  style: AppTypography.bodyMd
-                      .copyWith(color: context.primaryText)),
+              AppText.bodyMd(countryCode, color: context.primaryText),
               const SizedBox(width: 4),
               const Icon(Icons.expand_more_rounded,
                   color: AppColors.textSecondary, size: 16),
@@ -1112,12 +1092,10 @@ class _PhoneField extends StatelessWidget {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ],
-            style: AppTypography.bodyMd
-                .copyWith(color: context.primaryText),
+            style: TextStyle(fontSize: 14, color: context.primaryText),
             decoration: InputDecoration(
               hintText: AppStrings.enterPhoneNumber,
-              hintStyle: AppTypography.bodyMd
-                  .copyWith(color: AppColors.textHint),
+              hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
               border: InputBorder.none,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14),
@@ -1171,15 +1149,16 @@ class _ImagePickerBox extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(label,
-                style: AppTypography.labelSm.copyWith(
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
                   color: selected ? color : AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center),
             if (!selected) ...[
               const SizedBox(height: 2),
-              Text(AppStrings.tapToSelect,
-                  style: AppTypography.bodyXs
-                      .copyWith(color: AppColors.textHint)),
+              AppText.bodyXs(AppStrings.tapToSelect, color: AppColors.textHint),
             ],
           ],
         ),
@@ -1242,9 +1221,8 @@ class _CertificationsSection extends StatelessWidget {
               borderRadius: AppBorderRadius.lgAll,
               border: Border.all(color: context.borderCol),
             ),
-            child: Text(AppStrings.noCertificationsYet,
-                style: AppTypography.bodySm
-                    .copyWith(color: AppColors.textHint),
+            child: AppText.bodySm(AppStrings.noCertificationsYet,
+                color: AppColors.textHint,
                 textAlign: TextAlign.center),
           )
         else
@@ -1263,9 +1241,7 @@ class _CertificationsSection extends StatelessWidget {
                         color: AppColors.amber, size: 18),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(e.value,
-                          style: AppTypography.bodyMd
-                              .copyWith(color: context.primaryText)),
+                      child: AppText.bodyMd(e.value, color: context.primaryText),
                     ),
                     GestureDetector(
                       onTap: () => onRemove(e.key),
@@ -1312,13 +1288,11 @@ class _CurrencyPicker extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(AppStrings.currency, style: AppTypography.h3),
+              AppText.h3(AppStrings.currency),
               const SizedBox(height: 12),
               ..._currencies.map((c) => ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(c,
-                    style: AppTypography.bodyMd
-                        .copyWith(color: context.primaryText)),
+                title: AppText.bodyMd(c, color: context.primaryText),
                 trailing: c == value
                     ? const Icon(Icons.check_rounded,
                         color: AppColors.teal)
@@ -1341,9 +1315,7 @@ class _CurrencyPicker extends StatelessWidget {
           border: Border.all(color: context.borderCol),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(value,
-              style: AppTypography.bodyMd
-                  .copyWith(color: context.primaryText)),
+          AppText.bodyMd(value, color: context.primaryText),
           const SizedBox(width: 4),
           const Icon(Icons.expand_more_rounded,
               color: AppColors.textSecondary, size: 16),
@@ -1361,9 +1333,7 @@ class _WizLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(text,
-        style: AppTypography.labelMd
-            .copyWith(color: AppColors.textSecondary));
+    return AppText.labelMd(text, color: AppColors.textSecondary);
   }
 }
 
@@ -1397,16 +1367,14 @@ class _WizField extends StatelessWidget {
       maxLines: maxLines,
       maxLength: maxLength,
       textCapitalization: textCapitalization,
-      style: AppTypography.bodyMd.copyWith(color: context.primaryText),
+      style: TextStyle(fontSize: 14, color: context.primaryText),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle:
-            AppTypography.bodyMd.copyWith(color: AppColors.textHint),
+        hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
         prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
         filled: true,
         fillColor: context.inputBg,
-        counterStyle:
-            AppTypography.bodyXs.copyWith(color: AppColors.textHint),
+        counterStyle: const TextStyle(fontSize: 11, color: AppColors.textHint),
         enabledBorder: OutlineInputBorder(
           borderRadius: AppBorderRadius.lgAll,
           borderSide: BorderSide(color: context.borderCol),

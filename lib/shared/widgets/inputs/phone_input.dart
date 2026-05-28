@@ -97,11 +97,8 @@ class _AppPhoneInputState extends State<AppPhoneInput> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
     final hasError  = widget.error != null && widget.error!.isNotEmpty;
-    final borderCol = hasError
-        ? AppColors.error
-        : (isDark ? context.borderCol : const Color(0xFFE2E8F0));
+    final borderCol = hasError ? AppColors.error : context.borderCol;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,7 +116,7 @@ class _AppPhoneInputState extends State<AppPhoneInput> {
         // ── Field ─────────────────────────────────────────────────────────────
         Container(
           decoration: BoxDecoration(
-            color: isDark ? context.inputBg : Colors.white,
+            color: context.inputBg,
             borderRadius: AppBorderRadius.mdAll,
             border: Border.all(color: borderCol),
           ),
@@ -268,9 +265,8 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark     = Theme.of(context).brightness == Brightness.dark;
-    final bg         = isDark ? context.cardBg : Colors.white;
-    final border     = isDark ? context.borderCol : const Color(0xFFE2E8F0);
+    final bg         = context.cardBg;
+    final border     = context.borderCol;
     final bottomPad  = MediaQuery.paddingOf(context).bottom;
 
     return Container(
@@ -318,9 +314,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Container(
               decoration: BoxDecoration(
-                color: isDark
-                    ? context.inputBg
-                    : const Color(0xFFF1F5F9),
+                color: context.inputBg,
                 borderRadius: AppBorderRadius.mdAll,
                 border: Border.all(color: border),
               ),

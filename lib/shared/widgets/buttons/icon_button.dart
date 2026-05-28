@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_animations.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/extensions/context_extensions.dart';
 
 /// Square or circular icon-only button with press-scale feedback.
 ///
@@ -86,10 +87,8 @@ class _AppIconBtnState extends State<AppIconBtn>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final fg  = widget.color ?? AppColors.textSecondary;
-    final bg  = widget.backgroundColor ??
-        (isDark ? AppColors.dark700 : AppColors.light200);
+    final bg  = widget.backgroundColor ?? context.inputBg;
     final br  = widget.circle
         ? null
         : (widget.borderRadius ?? AppBorderRadius.mdAll);

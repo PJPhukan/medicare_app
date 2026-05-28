@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/validators.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/auth_shell.dart';
-import '../widgets/email_phone_input.dart';
+import '../../../../shared/widgets/inputs/email_phone_input.dart';
 import 'auth_flow.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({
     super.key,
     required this.draft,
@@ -24,13 +27,12 @@ class LoginScreen extends StatefulWidget {
   final VoidCallback? onForgotPassword;
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   late final TextEditingController _idCtrl;
   late final TextEditingController _passCtrl;
-  bool _showPass = false;
   bool _useOtp = false;
   String? _idError;
   String? _passError;
@@ -38,9 +40,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _idCtrl   = TextEditingController(text: widget.draft.identifier);
+    _idCtrl  = TextEditingController(text: widget.draft.identifier);
     _passCtrl = TextEditingController(text: widget.draft.password);
-    _useOtp   = widget.draft.useOtp;
+    _useOtp  = widget.draft.useOtp;
   }
 
   @override
@@ -60,23 +62,31 @@ class _LoginScreenState extends State<LoginScreen> {
     return idErr == null && passErr == null;
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_validate()) return;
-    widget.draft.identifier = _idCtrl.text.trim();
-    widget.draft.password   = _passCtrl.text;
+    final id   = _idCtrl.text.trim();
+    final pass = _passCtrl.text;
+    widget.draft.identifier = id;
+    widget.draft.password   = pass;
     widget.draft.useOtp     = _useOtp;
-    if (_useOtp) {
-      widget.onSentOtp();
-    } else {
-      widget.onLoggedIn?.call();
-    }
+    try {
+      if (_useOtp) {
+        await ref.read(authProvider.notifier).sendOtp(identifier: id, purpose: 'LOGIN');
+        widget.onSentOtp();
+      } else {
+        await ref.read(authProvider.notifier).loginWithPassword(identifier: id, password: pass);
+        widget.onLoggedIn?.call();
+      }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
-    final hintColor = isDark ? AppColors.textHint : const Color(0xFF94A3B8);
+    ref.listen(authProvider, (_, next) {
+      if (next.error != null) AppSnackbar.error(context, next.error!);
+    });
+    final authState = ref.watch(authProvider);
+    final isLoading = authState.isLoading;
 
     return AuthShell(
       showBack: false,
@@ -84,21 +94,15 @@ class _LoginScreenState extends State<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 24),
-          const Center(child: AuthBrand()),
+          const Center(child: AppBrand()),
           const SizedBox(height: 28),
 
           Center(
             child: Column(
               children: [
-                Text(AppStrings.welcomeBack,
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 28, fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF1A202C),
-                      letterSpacing: -0.5,
-                    )),
+                AppText.h1(AppStrings.welcomeBack, fontWeight: FontWeight.w800),
                 const SizedBox(height: 6),
-                Text(AppStrings.loginSubtitle,
-                    style: GoogleFonts.inter(fontSize: 14, color: secondaryColor)),
+                AppText.bodyMd(AppStrings.loginSubtitle, color: AppColors.textSecondary),
               ],
             ),
           ),
@@ -108,10 +112,10 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _idCtrl,
             label: AppStrings.emailOrMobile,
             hint: AppStrings.emailOrMobileHint,
-            error: _idError,
+            error: isLoading ? null : _idError,
+            enabled: !isLoading,
             onChanged: (_) => setState(() => _idError = null),
           ),
-
           const SizedBox(height: 14),
 
           AnimatedSize(
@@ -119,60 +123,44 @@ class _LoginScreenState extends State<LoginScreen> {
             curve: Curves.easeOut,
             child: _useOtp
                 ? const SizedBox.shrink()
-                : AnimatedBuilder(
-                    animation: _passCtrl,
-                    builder: (_, __) => AuthField(
-                      controller: _passCtrl,
-                      label: AppStrings.password,
-                      hint: AppStrings.passwordHint,
-                      obscureText: !_showPass,
-                      error: _passError,
-                      onChanged: (_) => setState(() => _passError = null),
-                      suffix: IconButton(
-                        icon: Icon(
-                          _showPass ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                          size: 18, color: hintColor,
-                        ),
-                        onPressed: () => setState(() => _showPass = !_showPass),
-                      ),
-                    ),
+                : AppTextField(
+                    controller: _passCtrl,
+                    label: AppStrings.password,
+                    hint: AppStrings.passwordHint,
+                    obscureText: true,
+                    enabled: !isLoading,
+                    errorText: isLoading ? null : _passError,
+                    onChanged: (_) => setState(() => _passError = null),
                   ),
           ),
-
           const SizedBox(height: 10),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(
-                onTap: () => setState(() { _useOtp = !_useOtp; _passError = null; }),
-                child: Text(
-                  _useOtp ? AppStrings.usePasswordInstead : AppStrings.useOtpInstead,
-                  style: GoogleFonts.inter(
-                    fontSize: 12, fontWeight: FontWeight.w600,
-                    color: AppColors.teal,
-                  ),
-                ),
+              AppButton.ghost(
+                label: _useOtp ? AppStrings.usePasswordInstead : AppStrings.useOtpInstead,
+                size: AppButtonSize.sm,
+                color: AppColors.teal,
+                onPressed: () => setState(() { _useOtp = !_useOtp; _passError = null; }),
               ),
               if (!_useOtp)
-                GestureDetector(
-                  onTap: widget.onForgotPassword,
-                  child: Text(AppStrings.forgotPassword,
-                      style: GoogleFonts.inter(
-                        fontSize: 12, fontWeight: FontWeight.w600,
-                        color: secondaryColor,
-                      )),
+                AppButton.ghost(
+                  label: AppStrings.forgotPassword,
+                  size: AppButtonSize.sm,
+                  color: AppColors.textSecondary,
+                  onPressed: widget.onForgotPassword,
                 ),
             ],
           ),
-
           const SizedBox(height: 24),
 
           AnimatedBuilder(
             animation: Listenable.merge([_idCtrl, _passCtrl]),
             builder: (_, __) => AuthButton(
               label: _useOtp ? AppStrings.sendOtp : AppStrings.signIn,
-              enabled: _canSubmit,
+              enabled: _canSubmit && !isLoading,
+              loading: isLoading,
               onPressed: _submit,
             ),
           ),
@@ -181,28 +169,37 @@ class _LoginScreenState extends State<LoginScreen> {
           AuthDivider(label: AppStrings.orContinueWith),
           const SizedBox(height: 20),
 
-          SocialButtons(onGoogle: () {}, onApple: () {}),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton.social(
+                  label: 'Google',
+                  logo: const AuthGoogleIcon(),
+                  onPressed: () {},
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AppButton.social(
+                  label: 'Apple',
+                  logo: const AuthAppleIcon(),
+                  onPressed: () {},
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 32),
 
-          Center(
-            child: RichText(
-              text: TextSpan(
-                style: GoogleFonts.inter(fontSize: 14, color: secondaryColor),
-                children: [
-                  TextSpan(text: '${AppStrings.dontHaveAccount} '),
-                  WidgetSpan(
-                    child: GestureDetector(
-                      onTap: widget.onRegister,
-                      child: Text(AppStrings.signUp,
-                          style: GoogleFonts.inter(
-                            fontSize: 14, fontWeight: FontWeight.w700,
-                            color: AppColors.teal,
-                          )),
-                    ),
-                  ),
-                ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AppText.bodyMd('${AppStrings.dontHaveAccount} '),
+              GestureDetector(
+                onTap: widget.onRegister,
+                child: AppText.bodyMd(AppStrings.signUp,
+                    fontWeight: FontWeight.w700, color: AppColors.teal),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 16),
         ],

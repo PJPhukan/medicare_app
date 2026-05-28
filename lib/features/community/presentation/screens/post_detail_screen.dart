@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 // ─── Args ─────────────────────────────────────────────────────────────────────
 
 class PostArgs {
   final String id;
   final String authorName;
-  final Color authorColor;
   final String category;
   final String content;
   final String timeAgo;
@@ -22,7 +23,6 @@ class PostArgs {
   const PostArgs({
     required this.id,
     required this.authorName,
-    required this.authorColor,
     required this.category,
     required this.content,
     required this.timeAgo,
@@ -37,43 +37,41 @@ class PostArgs {
 class _Comment {
   final String id;
   final String authorName;
-  final Color authorColor;
   final String content;
   final String timeAgo;
 
   const _Comment({
     required this.id,
     required this.authorName,
-    required this.authorColor,
     required this.content,
     required this.timeAgo,
   });
 }
 
 final _kComments = [
-  _Comment(id: 'c1', authorName: 'Sita M.', authorColor: AppColors.green,
+  const _Comment(id: 'c1', authorName: 'Sita M.',
       content: 'This is so inspiring! I\'m also working on getting my HbA1c down. What does your daily diet look like?',
       timeAgo: '1h ago'),
-  _Comment(id: 'c2', authorName: 'Dr. Priya N.', authorColor: AppColors.teal,
+  const _Comment(id: 'c2', authorName: 'Dr. Priya N.',
       content: 'Great results! Combining low-carb with regular walks can further improve insulin sensitivity.',
       timeAgo: '1.5h ago'),
-  _Comment(id: 'c3', authorName: 'Rahul K.', authorColor: AppColors.blue,
+  const _Comment(id: 'c3', authorName: 'Rahul K.',
       content: 'I tried something similar. Consistency is key — keep it up!',
       timeAgo: '2h ago'),
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class PostDetailScreen extends StatefulWidget {
+class PostDetailScreen extends ConsumerStatefulWidget {
   final PostArgs post;
 
   const PostDetailScreen({super.key, required this.post});
 
   @override
-  State<PostDetailScreen> createState() => _PostDetailScreenState();
+  ConsumerState<PostDetailScreen> createState() => _PostDetailScreenState();
 }
 
-class _PostDetailScreenState extends State<PostDetailScreen> {
+class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   late int _likes;
   late bool _liked;
   final _comments = List<_Comment>.from(_kComments);
@@ -106,7 +104,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       _comments.insert(0, _Comment(
         id: 'new_${DateTime.now().millisecondsSinceEpoch}',
         authorName: 'You',
-        authorColor: AppColors.teal,
         content: text,
         timeAgo: 'just now',
       ));
@@ -117,6 +114,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Community');
+    }
     final post = widget.post;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -132,19 +132,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     backgroundColor: context.bg,
                     surfaceTintColor: Colors.transparent,
                     pinned: true,
-                    leading: IconButton(
+                    leading: AppIconButton(
                       icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
                       onPressed: () => Navigator.pop(context),
                     ),
-                    title: Text(AppStrings.community, style: AppTypography.h3.copyWith(fontSize: 17)),
+                    title: AppText.h3(AppStrings.community),
                     actions: [
-                      IconButton(
-                        icon: const Icon(Icons.more_horiz_rounded, size: 22),
-                        color: context.primaryText,
+                      AppIconButton(
+                        icon: Icon(Icons.more_horiz_rounded, size: 22, color: context.primaryText),
                         onPressed: () {},
                       ),
                     ],
                   ),
+
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     sliver: SliverList(
@@ -152,39 +152,30 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         // Post header
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundColor: post.authorColor.withValues(alpha: 0.15),
-                              child: Text(post.authorName[0],
-                                  style: AppTypography.h3.copyWith(color: post.authorColor, fontSize: 16)),
-                            ),
+                            AppAvatar(name: post.authorName, size: AppAvatarSize.md),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(post.authorName,
-                                      style: AppTypography.bodyMd.copyWith(color: context.primaryText, fontWeight: FontWeight.w700)),
-                                  Text(post.timeAgo, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
+                                  AppText.bodyMd(post.authorName, fontWeight: FontWeight.w700),
+                                  AppText.bodyXs(post.timeAgo, color: AppColors.textHint),
                                 ],
                               ),
                             ),
-                            Container(
+                            AppContainer.tinted(
+                              color: AppColors.teal,
+                              borderRadius: AppBorderRadius.pill,
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.teal.withValues(alpha: 0.08),
-                                borderRadius: AppBorderRadius.pill,
-                                border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
-                              ),
-                              child: Text(post.category, style: AppTypography.labelXs.copyWith(color: AppColors.teal)),
+                              child: AppText.labelXs(post.category, color: AppColors.teal),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Post content
-                        Text(post.content,
-                            style: AppTypography.bodyMd.copyWith(color: context.primaryText, height: 1.7)),
+
+                        AppText.bodyMd(post.content),
                         const SizedBox(height: 16),
+
                         // Like / comment row
                         Row(
                           children: [
@@ -208,49 +199,40 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                       color: _liked ? AppColors.error : AppColors.textHint,
                                     ),
                                     const SizedBox(width: 6),
-                                    Text('$_likes',
-                                        style: AppTypography.labelSm.copyWith(
-                                          color: _liked ? AppColors.error : AppColors.textSecondary,
-                                        )),
+                                    AppText.labelSm(
+                                      '$_likes',
+                                      color: _liked ? AppColors.error : context.secondaryText,
+                                    ),
                                   ],
                                 ),
                               ),
                             ),
                             const SizedBox(width: 10),
-                            GestureDetector(
+                            AppContainer.outlined(
+                              color: context.cardBg,
+                              borderRadius: AppBorderRadius.pill,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               onTap: () => _focusNode.requestFocus(),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: context.cardBg,
-                                  borderRadius: AppBorderRadius.pill,
-                                  border: Border.all(color: context.borderCol),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.textHint),
-                                    const SizedBox(width: 6),
-                                    Text('${_comments.length}',
-                                        style: AppTypography.labelSm.copyWith(color: AppColors.textSecondary)),
-                                  ],
-                                ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.textHint),
+                                  const SizedBox(width: 6),
+                                  AppText.labelSm('${_comments.length}', color: context.secondaryText),
+                                ],
                               ),
                             ),
                             const Spacer(),
-                            IconButton(
+                            AppIconButton(
                               icon: const Icon(Icons.share_outlined, size: 18, color: AppColors.textHint),
                               onPressed: () {},
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
                             ),
                           ],
                         ),
+
                         Divider(height: 28, color: context.borderCol),
-                        Text(
-                          'COMMENTS',
-                          style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1),
-                        ),
+                        AppText.labelXs('COMMENTS', color: AppColors.textHint, fontWeight: FontWeight.w600),
                         const SizedBox(height: 14),
+
                         if (_comments.isEmpty)
                           Center(
                             child: Padding(
@@ -259,7 +241,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                 children: [
                                   const Icon(Icons.chat_bubble_outline_rounded, size: 36, color: AppColors.textHint),
                                   const SizedBox(height: 10),
-                                  Text(AppStrings.noMessages, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
+                                  AppText.bodySm(AppStrings.noMessages, color: context.secondaryText),
                                 ],
                               ),
                             ),
@@ -272,6 +254,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ),
             ),
+
             // Comment input bar
             Container(
               padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).viewInsets.bottom + 16),
@@ -281,35 +264,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppColors.teal.withValues(alpha: 0.15),
-                    child: Text('AK', style: AppTypography.labelXs.copyWith(color: AppColors.teal, fontSize: 9)),
-                  ),
+                  AppAvatar(name: 'Me', size: AppAvatarSize.xs),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: context.inputBg,
-                        borderRadius: AppBorderRadius.pill,
-                        border: Border.all(color: context.borderCol),
-                      ),
-                      child: TextField(
-                        controller: _commentCtrl,
-                        focusNode: _focusNode,
-                        style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-                        decoration: InputDecoration(
-                          hintText: 'Write a comment…',
-                          hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: true,
-                          fillColor: Colors.transparent,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        ),
-                        onSubmitted: (_) => _submitComment(),
-                      ),
+                    child: AppTextField(
+                      controller: _commentCtrl,
+                      focusNode: _focusNode,
+                      hint: 'Write a comment…',
+                      borderRadius: AppBorderRadius.pill,
+                      onSubmitted: (_) => _submitComment(),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -354,12 +317,7 @@ class _CommentTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: comment.authorColor.withValues(alpha: 0.15),
-              child: Text(comment.authorName[0],
-                  style: AppTypography.labelXs.copyWith(color: comment.authorColor, fontWeight: FontWeight.w700)),
-            ),
+            AppAvatar(name: comment.authorName, size: AppAvatarSize.xs),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -367,15 +325,13 @@ class _CommentTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(comment.authorName,
-                          style: AppTypography.bodySm.copyWith(color: context.primaryText, fontWeight: FontWeight.w700)),
+                      AppText.bodySm(comment.authorName, fontWeight: FontWeight.w700),
                       const Spacer(),
-                      Text(comment.timeAgo, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
+                      AppText.bodyXs(comment.timeAgo, color: AppColors.textHint),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(comment.content,
-                      style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.5)),
+                  AppText.bodySm(comment.content, color: context.secondaryText),
                 ],
               ),
             ),

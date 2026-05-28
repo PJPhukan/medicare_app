@@ -37,16 +37,15 @@ class AppCategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final c      = color ?? AppColors.teal;
 
     final bg = selected
         ? c.withValues(alpha: 0.12)
-        : (isDark ? context.inputBg : const Color(0xFFF1F5F9));
+        : context.inputBg;
 
     final borderColor = selected
         ? c.withValues(alpha: 0.4)
-        : (isDark ? context.borderCol : const Color(0xFFE2E8F0));
+        : context.borderCol;
 
     final contentColor = selected ? c : AppColors.textSecondary;
 

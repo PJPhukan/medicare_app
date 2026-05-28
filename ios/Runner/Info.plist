@@ -4,10 +4,6 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>App Medicare uses your microphone for voice search.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>App Medicare uses speech recognition to search medicines by voice.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -30,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>MediForze uses Face ID to securely unlock your account.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>App Medicare uses your microphone for voice search.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>App Medicare uses speech recognition to search medicines by voice.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -161,14 +161,10 @@ class _AppBaseInputState extends State<AppBaseInput> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     // ── Colour resolution ────────────────────────────────────────────────────
-    final bg = widget.backgroundColor ??
-        (isDark ? AppColors.dark700 : Colors.white);
+    final bg = widget.backgroundColor ?? context.inputBg;
 
-    final defaultBorder = widget.borderColor ??
-        (isDark ? AppColors.dark600 : const Color(0xFFE2E8F0));
+    final defaultBorder = widget.borderColor ?? context.borderCol;
     final focusedBorder = widget.focusedBorderColor ?? AppColors.teal;
     final errorBorder   = widget.errorBorderColor ?? AppColors.error;
 
@@ -194,7 +190,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
           const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       counterText: widget.showCounter ? null : '',
       // Prefix
-      prefixIcon: _buildPrefixIcon(isDark),
+      prefixIcon: _buildPrefixIcon(),
       prefix: widget.prefixText != null
           ? Padding(
               padding: const EdgeInsets.only(left: 2, right: 4),
@@ -206,7 +202,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
             )
           : null,
       // Suffix
-      suffixIcon: _buildSuffixIcon(isDark),
+      suffixIcon: _buildSuffixIcon(),
       suffix: widget.suffixText != null
           ? Padding(
               padding: const EdgeInsets.only(left: 4, right: 2),
@@ -316,7 +312,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
     );
   }
 
-  Widget? _buildPrefixIcon(bool isDark) {
+  Widget? _buildPrefixIcon() {
     if (widget.prefixIcon == null) return null;
     final icon = Icon(widget.prefixIcon,
         size: 18, color: _focused ? AppColors.teal : AppColors.textSecondary);
@@ -326,7 +322,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
     return icon;
   }
 
-  Widget? _buildSuffixIcon(bool isDark) {
+  Widget? _buildSuffixIcon() {
     if (widget.suffixIcon == null) return null;
     final icon = Icon(widget.suffixIcon,
         size: 18, color: AppColors.textSecondary);

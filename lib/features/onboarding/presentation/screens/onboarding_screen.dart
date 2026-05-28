@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -255,12 +254,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         ),
                         label: Text(
                           AppStrings.back,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: isDark
-                                ? AppColors.textHint
-                                : const Color(0xFF94A3B8),
+                          style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w500,
+                            color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
                           ),
                         ),
                         style: TextButton.styleFrom(
@@ -278,12 +274,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         onPressed: isLast ? null : _done,
                         child: Text(
                           AppStrings.onboardingSkip,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: isDark
-                                ? AppColors.textHint
-                                : const Color(0xFF94A3B8),
+                          style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w500,
+                            color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
                           ),
                         ),
                       ),
@@ -347,11 +340,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                   isLast
                                       ? AppStrings.onboardingGetStarted
                                       : AppStrings.onboardingNext,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.2,
+                                  style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w700,
+                                    color: Colors.white, letterSpacing: 0.2,
                                   ),
                                 ),
                                 if (!isLast) ...[
@@ -439,23 +430,18 @@ class _PageContent extends StatelessWidget {
                   Text(
                     page.title,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: titleColor,
-                      height: 1.15,
-                      letterSpacing: -0.3,
+                    style: TextStyle(
+                      fontSize: 30, fontWeight: FontWeight.w800,
+                      color: titleColor, height: 1.15, letterSpacing: -0.3,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     page.body,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                      color: bodyColor,
-                      height: 1.6,
+                    style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w400,
+                      color: bodyColor, height: 1.6,
                     ),
                   ),
                 ],

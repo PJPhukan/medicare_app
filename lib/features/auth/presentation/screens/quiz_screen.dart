@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/utils/validators.dart';
+import '../../../../shared/widgets/widgets.dart';
 import '../widgets/auth_shell.dart';
+import '../widgets/blood_group_grid.dart';
 import 'auth_flow.dart';
-
-const _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({
@@ -52,11 +52,6 @@ class _QuizScreenState extends State<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
-    final borderColor = isDark ? AppColors.dark600 : const Color(0xFFE2E8F0);
-    final bgInput = isDark ? AppColors.dark700 : Colors.white;
-
     return AuthShell(
       showBack: true,
       onBack: widget.onBack,
@@ -64,64 +59,52 @@ class _QuizScreenState extends State<QuizScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          const Center(child: AuthBrand()),
+          const Center(child: AppBrand()),
           const SizedBox(height: 16),
 
-          AuthStepper(steps: const ['Account', 'Health', 'Emergency', 'Plan'], current: 1),
+          AuthStepper(
+              steps: const ['Account', 'Health', 'Emergency', 'Plan'], current: 1),
 
           Center(
             child: Column(
               children: [
-                Text(AppStrings.quizTitle,
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 26, fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF1A202C),
-                      letterSpacing: -0.3,
-                    )),
+                AppText.h1(AppStrings.quizTitle, fontWeight: FontWeight.w800),
                 const SizedBox(height: 6),
-                Text(AppStrings.quizSubtitle,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(fontSize: 13, color: secondaryColor)),
+                AppText.bodyMd(AppStrings.quizSubtitle, color: AppColors.textSecondary, textAlign: TextAlign.center),
               ],
             ),
           ),
           const SizedBox(height: 28),
 
-          Text(AppStrings.yourAge,
-              style: GoogleFonts.inter(
-                fontSize: 12, fontWeight: FontWeight.w600,
-                color: secondaryColor, letterSpacing: 0.3,
-              )),
+          AppText.labelSm(AppStrings.yourAge, color: AppColors.textSecondary),
           const SizedBox(height: 8),
+
           AnimatedBuilder(
             animation: _ageCtrl,
             builder: (_, __) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Intentionally large custom age input — no generic equivalent
                 TextField(
                   controller: _ageCtrl,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
                   maxLength: 3,
                   onChanged: (_) => setState(() => _ageError = null),
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 28, fontWeight: FontWeight.w800,
-                    color: AppColors.teal,
-                  ),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.teal),
                   decoration: InputDecoration(
                     hintText: AppStrings.ageHint,
-                    hintStyle: GoogleFonts.spaceGrotesk(
-                      fontSize: 28, fontWeight: FontWeight.w800,
-                      color: isDark ? AppColors.dark600 : const Color(0xFFCBD5E1),
-                    ),
+                    hintStyle: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.borderCol),
                     filled: true,
-                    fillColor: bgInput,
+                    fillColor: context.inputBg,
                     counterText: '',
                     contentPadding: const EdgeInsets.symmetric(vertical: 18),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: _ageError != null ? AppColors.error : borderColor,
+                        color: _ageError != null
+                            ? AppColors.error
+                            : context.borderCol,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -135,11 +118,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
                 if (_ageError != null) ...[
                   const SizedBox(height: 4),
-                  Text(_ageError!,
-                      style: GoogleFonts.inter(
-                        fontSize: 11, fontWeight: FontWeight.w600,
-                        color: AppColors.error,
-                      )),
+                  AppText.labelSm(_ageError!, color: AppColors.error),
                 ],
               ],
             ),
@@ -148,55 +127,16 @@ class _QuizScreenState extends State<QuizScreen> {
 
           Row(
             children: [
-              Text(AppStrings.bloodGroup,
-                  style: GoogleFonts.inter(
-                    fontSize: 12, fontWeight: FontWeight.w600,
-                    color: secondaryColor, letterSpacing: 0.3,
-                  )),
+              AppText.labelSm(AppStrings.bloodGroup, color: AppColors.textSecondary),
               const SizedBox(width: 8),
-              Text('(${AppStrings.optional})',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: isDark ? AppColors.dark500 : const Color(0xFFCBD5E1),
-                  )),
+              AppText.bodyXs('(${AppStrings.optional})'),
             ],
           ),
           const SizedBox(height: 10),
 
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 2,
-            ),
-            itemCount: _bloodGroups.length,
-            itemBuilder: (_, i) {
-              final bg = _bloodGroups[i];
-              final active = _bloodGroup == bg;
-              return GestureDetector(
-                onTap: () => setState(() => _bloodGroup = active ? '' : bg),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.teal.withValues(alpha: 0.12) : bgInput,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: active ? AppColors.teal.withValues(alpha: 0.5) : borderColor,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(bg,
-                        style: GoogleFonts.inter(
-                          fontSize: 13, fontWeight: FontWeight.w700,
-                          color: active ? AppColors.teal : secondaryColor,
-                        )),
-                  ),
-                ),
-              );
-            },
+          BloodGroupGrid(
+            selected: _bloodGroup,
+            onChanged: (v) => setState(() => _bloodGroup = v),
           ),
           const SizedBox(height: 32),
 

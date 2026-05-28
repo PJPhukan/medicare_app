@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/validators.dart';
+import '../../../../shared/widgets/widgets.dart';
 import '../widgets/auth_shell.dart';
+import '../widgets/blood_group_grid.dart';
 import 'auth_flow.dart';
-
-const _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
 class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({
@@ -62,11 +61,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
-    final borderColor = isDark ? AppColors.dark600 : const Color(0xFFE2E8F0);
-    final bgInput = isDark ? AppColors.dark700 : Colors.white;
-
     return AuthShell(
       showBack: true,
       onBack: widget.onBack,
@@ -74,10 +68,11 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          const Center(child: AuthBrand()),
+          const Center(child: AppBrand()),
           const SizedBox(height: 16),
 
-          AuthStepper(steps: const ['Account', 'Health', 'Emergency', 'Plan'], current: 2),
+          AuthStepper(
+              steps: const ['Account', 'Health', 'Emergency', 'Plan'], current: 2),
 
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,119 +81,54 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFf87171).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFFf87171).withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Text(AppStrings.emergencyBadge,
-                          style: GoogleFonts.inter(
-                            fontSize: 10, fontWeight: FontWeight.w700,
-                            color: const Color(0xFFf87171), letterSpacing: 0.8,
-                          )),
+                    AppBadge(
+                      label: AppStrings.emergencyBadge,
+                      variant: AppBadgeVariant.red,
                     ),
                     const SizedBox(height: 10),
-                    Text(AppStrings.emergencyTitle,
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 24, fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF1A202C),
-                          letterSpacing: -0.3,
-                        )),
+                    AppText.h1(AppStrings.emergencyTitle, fontWeight: FontWeight.w800),
                     const SizedBox(height: 4),
-                    Text(AppStrings.emergencySubtitle,
-                        style: GoogleFonts.inter(fontSize: 13, color: secondaryColor)),
+                    AppText.bodyMd(AppStrings.emergencySubtitle, color: AppColors.textSecondary),
                   ],
                 ),
               ),
-              GestureDetector(
-                onTap: widget.onSkip,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Text(AppStrings.skip,
-                      style: GoogleFonts.inter(
-                        fontSize: 12, fontWeight: FontWeight.w600,
-                        color: secondaryColor,
-                      )),
-                ),
+              AppButton.outline(
+                label: AppStrings.skip,
+                size: AppButtonSize.sm,
+                color: AppColors.textSecondary,
+                onPressed: widget.onSkip,
               ),
             ],
           ),
           const SizedBox(height: 20),
 
-          Text(AppStrings.bloodGroup,
-              style: GoogleFonts.inter(
-                fontSize: 12, fontWeight: FontWeight.w600,
-                color: secondaryColor, letterSpacing: 0.3,
-              )),
+          AppText.labelSm(AppStrings.bloodGroup, color: AppColors.textSecondary),
           const SizedBox(height: 10),
 
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 2,
-            ),
-            itemCount: _bloodGroups.length,
-            itemBuilder: (_, i) {
-              final bg = _bloodGroups[i];
-              final active = _bloodGroup == bg;
-              return GestureDetector(
-                onTap: () => setState(() => _bloodGroup = active ? '' : bg),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.teal.withValues(alpha: 0.12) : bgInput,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: active ? AppColors.teal.withValues(alpha: 0.5) : borderColor,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(bg,
-                        style: GoogleFonts.inter(
-                          fontSize: 13, fontWeight: FontWeight.w700,
-                          color: active ? AppColors.teal : secondaryColor,
-                        )),
-                  ),
-                ),
-              );
-            },
+          BloodGroupGrid(
+            selected: _bloodGroup,
+            onChanged: (v) => setState(() => _bloodGroup = v),
           ),
           const SizedBox(height: 18),
 
-          AuthField(
+          AppTextField(
             controller: _allergiesCtrl,
             label: AppStrings.knownAllergies,
             hint: AppStrings.allergiesHint,
           ),
           const SizedBox(height: 14),
 
-          Text(AppStrings.emergencyContact,
-              style: GoogleFonts.inter(
-                fontSize: 12, fontWeight: FontWeight.w600,
-                color: secondaryColor, letterSpacing: 0.3,
-              )),
+          AppText.labelSm(AppStrings.emergencyContact, color: AppColors.textSecondary),
           const SizedBox(height: 8),
 
-          AuthField(controller: _nameCtrl, hint: AppStrings.contactName),
+          AppTextField(controller: _nameCtrl, hint: AppStrings.contactName),
           const SizedBox(height: 10),
 
-          AuthField(
+          AppTextField(
             controller: _phoneCtrl,
             hint: AppStrings.phoneNumber,
             keyboardType: TextInputType.phone,
-            error: _phoneError,
+            errorText: _phoneError,
             onChanged: (_) => setState(() => _phoneError = null),
           ),
           const SizedBox(height: 24),
@@ -207,14 +137,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           const SizedBox(height: 12),
 
           Center(
-            child: Text(
-              AppStrings.emergencyDataNote,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: isDark ? AppColors.dark500 : const Color(0xFFCBD5E1),
-              ),
-            ),
+            child: AppText.bodyXs(AppStrings.emergencyDataNote, textAlign: TextAlign.center),
           ),
           const SizedBox(height: 16),
         ],

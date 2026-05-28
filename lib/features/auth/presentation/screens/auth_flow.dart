@@ -41,6 +41,7 @@ class AuthDraft {
   String emergencyPhone = '';
   // forgot password
   String resetIdentifier = '';
+  String resetOtp = '';
 }
 
 // ─── Flow coordinator ─────────────────────────────────────────────────────────
@@ -130,13 +131,19 @@ class _AuthFlowState extends State<AuthFlow> {
           onBack: _back,
         );
       case _AuthStep.forgotOtp:
-        return _ForgotOtpScreen(
-          identifier: _draft.resetIdentifier,
+        _draft.identifier = _draft.resetIdentifier;
+        return OtpScreen(
+          draft: _draft,
+          purpose: 'RESET_PASSWORD',
+          verifyWithApi: false,
+          onOtpCollected: (otp) => _draft.resetOtp = otp,
           onVerified: () => _go(_AuthStep.resetPassword),
           onBack: _back,
         );
       case _AuthStep.resetPassword:
         return ResetPasswordScreen(
+          identifier: _draft.resetIdentifier,
+          otp: _draft.resetOtp,
           onReset: () => _go(_AuthStep.login),
           onBack: _back,
         );
@@ -160,30 +167,6 @@ class _AuthFlowState extends State<AuthFlow> {
         );
       },
       child: KeyedSubtree(key: ValueKey(_step), child: _buildStep()),
-    );
-  }
-}
-
-// ─── OTP screen variant for forgot-password flow ──────────────────────────────
-// Reuses the OtpScreen UI but passes a reset-specific identifier and callback.
-
-class _ForgotOtpScreen extends StatelessWidget {
-  const _ForgotOtpScreen({
-    required this.identifier,
-    required this.onVerified,
-    required this.onBack,
-  });
-  final String identifier;
-  final VoidCallback onVerified;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final draft = AuthDraft()..identifier = identifier;
-    return OtpScreen(
-      draft: draft,
-      onVerified: onVerified,
-      onBack: onBack,
     );
   }
 }

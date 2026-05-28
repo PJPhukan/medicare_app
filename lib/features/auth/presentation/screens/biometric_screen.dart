@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
+import '../../../../core/services/biometric_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 import '../widgets/auth_shell.dart';
 
-class BiometricScreen extends StatelessWidget {
+class BiometricScreen extends ConsumerStatefulWidget {
   const BiometricScreen({
     super.key,
     required this.onContinue,
@@ -17,135 +20,169 @@ class BiometricScreen extends StatelessWidget {
   final VoidCallback onBack;
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
-    final borderColor = isDark ? AppColors.dark600 : const Color(0xFFE2E8F0);
-    final bgInput = isDark ? AppColors.dark700 : Colors.white;
+  ConsumerState<BiometricScreen> createState() => _BiometricScreenState();
+}
 
+class _BiometricScreenState extends ConsumerState<BiometricScreen> {
+  bool _checking = true;
+  bool _available = false;
+  bool _enabling = false;
+  List<BiometricType> _types = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final svc = ref.read(biometricServiceProvider);
+    final available = await svc.isAvailable();
+    final types = available ? await svc.availableTypes() : <BiometricType>[];
+    if (mounted) {
+      setState(() {
+        _available = available;
+        _types = types;
+        _checking = false;
+      });
+    }
+  }
+
+  Future<void> _enable() async {
+    setState(() => _enabling = true);
+    final svc = ref.read(biometricServiceProvider);
+    final ok = await svc.authenticate(
+      reason: AppStrings.biometricAuthReason,
+    );
+    if (!mounted) return;
+    if (ok) {
+      await svc.setEnabled(true);
+      widget.onContinue();
+    } else {
+      setState(() => _enabling = false);
+      AppSnackbar.error(context, AppStrings.biometricAuthFailed);
+    }
+  }
+
+  Future<void> _skip() async {
+    await ref.read(biometricServiceProvider).setEnabled(false);
+    widget.onSkip();
+  }
+
+  IconData get _biometricIcon {
+    if (_types.contains(BiometricType.face)) return Icons.face_rounded;
+    if (_types.contains(BiometricType.iris)) return Icons.remove_red_eye_rounded;
+    return Icons.fingerprint_rounded;
+  }
+
+  String get _biometricLabel {
+    if (_types.contains(BiometricType.face)) return AppStrings.biometricFaceId;
+    if (_types.contains(BiometricType.iris)) return AppStrings.biometricIris;
+    return AppStrings.biometricFingerprint;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AuthShell(
       showBack: true,
-      onBack: onBack,
+      onBack: widget.onBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 8),
-          const AuthBrand(),
+          const AppBrand(),
           const SizedBox(height: 32),
 
-          Text(AppStrings.enableBiometrics,
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 26, fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : const Color(0xFF1A202C),
-                letterSpacing: -0.3,
-              )),
+          AppText.h1(AppStrings.enableBiometrics, fontWeight: FontWeight.w800),
           const SizedBox(height: 8),
-          Text(AppStrings.biometricSubtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: secondaryColor)),
+          AppText.bodyMd(
+            _checking
+                ? AppStrings.biometricChecking
+                : _available
+                    ? AppStrings.biometricSubtitle
+                    : AppStrings.biometricNotAvailable,
+            color: AppColors.textSecondary,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 40),
 
-          Container(
-            width: 140, height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.teal.withValues(alpha: 0.08),
-              border: Border.all(color: AppColors.teal.withValues(alpha: 0.25)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.teal.withValues(alpha: 0.10),
-                  blurRadius: 32, spreadRadius: 12,
+          AnimatedOpacity(
+            opacity: _checking ? 0.4 : 1.0,
+            duration: const Duration(milliseconds: 300),
+            child: Container(
+              width: 140, height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (_available ? AppColors.teal : AppColors.textHint)
+                    .withValues(alpha: 0.08),
+                border: Border.all(
+                  color: (_available ? AppColors.teal : AppColors.textHint)
+                      .withValues(alpha: 0.25),
                 ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(Icons.fingerprint_rounded, size: 68, color: AppColors.teal),
+                boxShadow: _available
+                    ? [BoxShadow(
+                        color: AppColors.teal.withValues(alpha: 0.10),
+                        blurRadius: 32, spreadRadius: 12,
+                      )]
+                    : null,
+              ),
+              child: Center(
+                child: _checking
+                    ? const CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.teal)
+                    : Icon(
+                        _biometricIcon, size: 68,
+                        color: _available ? AppColors.teal : AppColors.textHint,
+                      ),
+              ),
             ),
           ),
           const SizedBox(height: 20),
 
-          Text(AppStrings.touchSensor,
-              style: GoogleFonts.inter(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: AppColors.teal,
-              )),
+          if (!_checking)
+            AppText.labelMd(
+              _available ? _biometricLabel : AppStrings.biometricNotAvailableTag,
+              color: _available ? AppColors.teal : AppColors.textHint,
+            ),
           const SizedBox(height: 40),
 
-          AuthButton(label: AppStrings.enableBiometricsBtn, onPressed: onContinue),
+          if (_available)
+            AuthButton(
+              label: _enabling ? AppStrings.biometricVerifying : AppStrings.enableBiometricsBtn,
+              loading: _enabling,
+              onPressed: _enabling ? null : _enable,
+            ),
+
           const SizedBox(height: 12),
 
           Row(
             children: [
               Expanded(
-                child: _GhostBtn(
+                child: AppButton.secondary(
                   label: AppStrings.usePassword,
-                  borderColor: borderColor,
-                  bgColor: bgInput,
-                  textColor: secondaryColor,
-                  onTap: onSkip,
+                  isFullWidth: true,
+                  onPressed: _skip,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _GhostBtn(
+                child: AppButton.secondary(
                   label: AppStrings.useOtp,
-                  borderColor: borderColor,
-                  bgColor: bgInput,
-                  textColor: secondaryColor,
-                  onTap: onSkip,
+                  isFullWidth: true,
+                  onPressed: _skip,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 28),
 
-          TextButton(
-            onPressed: onSkip,
-            child: Text(AppStrings.skipForNow,
-                style: GoogleFonts.inter(
-                  fontSize: 13, fontWeight: FontWeight.w500,
-                  color: secondaryColor,
-                )),
+          AppButton.ghost(
+            label: AppStrings.skipForNow,
+            onPressed: _skip,
+            color: AppColors.textSecondary,
           ),
           const SizedBox(height: 16),
         ],
-      ),
-    );
-  }
-}
-
-class _GhostBtn extends StatelessWidget {
-  const _GhostBtn({
-    required this.label,
-    required this.borderColor,
-    required this.bgColor,
-    required this.textColor,
-    this.onTap,
-  });
-  final String label;
-  final Color borderColor;
-  final Color bgColor;
-  final Color textColor;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor),
-        ),
-        child: Center(
-          child: Text(label,
-              style: GoogleFonts.inter(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: textColor,
-              )),
-        ),
       ),
     );
   }

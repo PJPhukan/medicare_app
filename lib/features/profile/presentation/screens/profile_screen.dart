@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─── Profile data model ───────────────────────────────────────────────────────
 
@@ -67,23 +68,24 @@ class _ProfileData {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late _ProfileData _data;
 
   @override
   void initState() {
     super.initState();
+    final user = ref.read(authProvider).user;
     _data = _ProfileData(
-      name: 'Arjun Kumar',
-      email: 'arjun.kumar@email.com',
-      phone: '+91 98765 43210',
+      name: user?.name ?? '',
+      email: user?.email ?? '',
+      phone: user?.phone ?? '',
       dob: '14 March 1988',
       gender: 'Male',
       location: 'Mumbai, Maharashtra',
@@ -131,7 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               expandedHeight: 96,
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-                title: Text(AppStrings.myProfile, style: AppTypography.h3),
+                title: AppText.h3(AppStrings.myProfile),
               ),
               actions: [
                 Padding(
@@ -139,8 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: TextButton.icon(
                     onPressed: _openEdit,
                     icon: const Icon(Icons.edit_outlined, size: 15, color: AppColors.teal),
-                    label: Text(AppStrings.edit,
-                        style: AppTypography.labelSm.copyWith(color: AppColors.teal)),
+                    label: const Text(AppStrings.edit,
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: AppColors.teal)),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       shape: RoundedRectangleBorder(
@@ -179,11 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 alignment: Alignment.center,
                                 child: Text(
                                   _initials,
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.teal,
-                                  ),
+                                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.teal),
                                 ),
                               ),
                               Positioned(
@@ -210,17 +208,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           SizedBox(height: 14),
                           Text(
                             _data.name,
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: context.primaryText,
-                            ),
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: context.primaryText),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            _data.email,
-                            style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
-                          ),
+                          AppText.bodySm(_data.email, color: AppColors.textSecondary),
                           const SizedBox(height: 10),
                           _Badge(label: 'Member since Jan 2024', color: AppColors.textHint, dim: true),
                         ],
@@ -279,11 +270,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(_data.emergencyName,
-                                    style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w700)),
+                                AppText.labelMd(_data.emergencyName, fontWeight: FontWeight.w700),
                                 const SizedBox(height: 2),
-                                Text('${_data.emergencyRelation}  ·  ${_data.emergencyPhone}',
-                                    style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
+                                AppText.bodySm('${_data.emergencyRelation}  ·  ${_data.emergencyPhone}', color: AppColors.textSecondary),
                               ],
                             ),
                           ),
@@ -419,13 +408,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Edit Profile', style: AppTypography.h3.copyWith(fontSize: 17)),
+                  const Text('Edit Profile', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                   GestureDetector(
                     onTap: _save,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(color: AppColors.teal, borderRadius: AppBorderRadius.lgAll),
-                      child: Text(AppStrings.save, style: AppTypography.buttonSm.copyWith(color: context.bg)),
+                      child: Text(AppStrings.save, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: context.bg)),
                     ),
                   ),
                 ],
@@ -439,7 +428,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet>
               indicatorColor: AppColors.teal,
               labelColor: AppColors.teal,
               unselectedLabelColor: AppColors.textHint,
-              labelStyle: AppTypography.labelSm.copyWith(fontWeight: FontWeight.w600),
+              labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5),
               dividerColor: context.borderCol,
               tabs: const [Tab(text: 'Personal'), Tab(text: 'Health'), Tab(text: 'Emergency')],
             ),
@@ -469,7 +458,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet>
       _EField(label: 'Date of Birth', controller: _dobCtrl, icon: Icons.cake_rounded, hint: 'e.g. 14 March 1988'),
       _EField(label: 'Location', controller: _locationCtrl, icon: Icons.location_on_rounded),
       const SizedBox(height: 4),
-      Text('Gender', style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+      AppText.bodyXs('Gender', color: AppColors.textSecondary, fontWeight: FontWeight.w600),
       const SizedBox(height: 8),
       Row(
         children: ['Male', 'Female', 'Other'].map((g) {
@@ -488,7 +477,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet>
                     border: Border.all(color: sel ? AppColors.teal.withValues(alpha: 0.5) : context.borderCol),
                   ),
                   alignment: Alignment.center,
-                  child: Text(g, style: AppTypography.labelSm.copyWith(
+                  child: Text(g, style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.5,
                     color: sel ? AppColors.teal : AppColors.textSecondary,
                     fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                   )),
@@ -526,8 +517,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet>
         child: Row(children: [
           const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.red),
           const SizedBox(width: 8),
-          Expanded(child: Text('This person will be contacted in an emergency.',
-              style: AppTypography.bodyXs.copyWith(color: AppColors.red))),
+          Expanded(child: AppText.bodyXs('This person will be contacted in an emergency.', color: AppColors.red)),
         ]),
       ),
       _EField(label: 'Contact Name', controller: _emNameCtrl, icon: Icons.person_rounded),
@@ -562,7 +552,7 @@ class _EField extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        AppText.bodyXs(label, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
         SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
@@ -582,10 +572,10 @@ class _EField extends StatelessWidget {
                   controller: controller,
                   keyboardType: keyboardType,
                   maxLines: maxLines,
-                  style: AppTypography.bodyMd.copyWith(color: context.primaryText),
+                  style: TextStyle(fontSize: 14, color: context.primaryText),
                   decoration: InputDecoration(
                     hintText: hint,
-                    hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
+                    hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -617,9 +607,9 @@ class _SectionHeader extends StatelessWidget {
         const Icon(Icons.warning_amber_rounded, size: 12, color: AppColors.red),
         const SizedBox(width: 5),
       ],
-      Text(label.toUpperCase(), style: AppTypography.overline.copyWith(
+      Text(label.toUpperCase(), style: TextStyle(
+        fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 1.0,
         color: danger ? AppColors.red : AppColors.textHint,
-        letterSpacing: 1.0, fontSize: 10,
       )),
     ],
   );
@@ -629,7 +619,7 @@ class _SectionHeader extends StatelessWidget {
 
 class _InfoCard extends StatelessWidget {
   final List<_InfoRow> rows;
-  _InfoCard({required this.rows});
+  const _InfoCard({required this.rows});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -674,10 +664,11 @@ class _InfoRow extends StatelessWidget {
               child: Icon(icon, size: 15, color: color),
             ),
             SizedBox(width: 12),
-            Expanded(child: Text(label, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary))),
+            Expanded(child: AppText.bodySm(label, color: AppColors.textSecondary)),
             Flexible(
-              child: Text(value, style: AppTypography.labelSm.copyWith(
-                color: context.primaryText, fontWeight: FontWeight.w600,
+              child: Text(value, style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5,
+                color: context.primaryText,
               ), textAlign: TextAlign.end),
             ),
           ],
@@ -704,9 +695,9 @@ class _Badge extends StatelessWidget {
       borderRadius: AppBorderRadius.pill,
       border: Border.all(color: color.withValues(alpha: dim ? 0.12 : 0.25)),
     ),
-    child: Text(label, style: AppTypography.labelXs.copyWith(
+    child: Text(label, style: TextStyle(
+      fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0,
       color: dim ? AppColors.textHint : color,
-      fontWeight: FontWeight.w600, letterSpacing: 0,
     )),
   );
 }

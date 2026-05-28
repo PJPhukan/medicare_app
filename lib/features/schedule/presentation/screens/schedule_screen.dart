@@ -1,14 +1,18 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/app_shell_service.dart';
+import '../../../../shared/widgets/widgets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/skeleton/skeleton.dart';
+import '../../../schedule/presentation/providers/schedule_provider.dart';
+import '../../../schedule/data/models/appointment_model.dart' as sched_model;
 import 'add_appointment_screen.dart';
 
-// ─── Mock dose data ───────────────────────────────────────────────────────────
+// ─── Dose model ───────────────────────────────────────────────────────────────
 
 enum _DoseStatus { taken, skipped, pending }
 
@@ -16,18 +20,43 @@ enum _FoodTiming { before, with_, after }
 
 class _Dose {
   _Dose({
+    required this.id,
     required this.name,
     required this.time,
     required this.unit,
     required this.foodTiming,
     required this.status,
   });
+  final String id;
   final String name;
-  final String time; // "08:00"
+  final String time;
   final String unit;
   final _FoodTiming foodTiming;
   _DoseStatus status;
 }
+
+// ─── Adapter ──────────────────────────────────────────────────────────────────
+
+_FoodTiming _parseFoodTiming(String? s) {
+  if (s == null) return _FoodTiming.with_;
+  final u = s.toUpperCase();
+  if (u.contains('BEFORE') || u.contains('EMPTY')) return _FoodTiming.before;
+  if (u.contains('AFTER')) return _FoodTiming.after;
+  return _FoodTiming.with_;
+}
+
+_Dose _toDose(sched_model.TodayDose d) => _Dose(
+      id: d.doseTimeId,
+      name: d.medicineName,
+      time: d.scheduledTime,
+      unit: '${d.quantity?.toStringAsFixed(0) ?? '1'} ${d.unit ?? 'dose'}',
+      foodTiming: _parseFoodTiming(d.foodTiming),
+      status: d.isTaken
+          ? _DoseStatus.taken
+          : d.isSkipped
+              ? _DoseStatus.skipped
+              : _DoseStatus.pending,
+    );
 
 String _foodLabel(_FoodTiming t) => switch (t) {
       _FoodTiming.before => AppStrings.beforeFood,
@@ -45,16 +74,16 @@ String _timeGroup(String hhmm) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ScheduleScreen extends StatefulWidget {
+class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
 
   @override
-  State<ScheduleScreen> createState() => _ScheduleScreenState();
+  ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
+class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
-  late final List<_Dose> _doses;
+  List<_Dose> _doses = [];
   late final List<DateTime> _week;
 
   @override
@@ -62,13 +91,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     super.initState();
     final today = DateTime.now();
     _week = List.generate(14, (i) => today.subtract(const Duration(days: 3)).add(Duration(days: i)));
-    _doses = [
-      _Dose(name: 'Metformin 500mg',  time: '08:00', unit: '1 tablet',  foodTiming: _FoodTiming.after,  status: _DoseStatus.taken),
-      _Dose(name: 'Amlodipine 5mg',   time: '12:00', unit: '1 tablet',  foodTiming: _FoodTiming.with_,  status: _DoseStatus.taken),
-      _Dose(name: 'Vitamin D3',        time: '13:30', unit: '1 capsule', foodTiming: _FoodTiming.after,  status: _DoseStatus.pending),
-      _Dose(name: 'Omega-3 Capsule',   time: '18:00', unit: '2 capsules',foodTiming: _FoodTiming.after,  status: _DoseStatus.pending),
-      _Dose(name: 'Pantoprazole 40mg', time: '21:00', unit: '1 tablet',  foodTiming: _FoodTiming.before, status: _DoseStatus.pending),
-    ];
+    // Populate from provider once loaded
+    ref.listenManual(scheduleProvider, (prev, next) {
+      if (!next.isLoading && (prev?.isLoading ?? true) && mounted) {
+        setState(() => _doses = next.doses.map(_toDose).toList());
+      }
+    });
+    // Sync immediately if provider already has data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final s = ref.read(scheduleProvider);
+      if (!s.isLoading && s.doses.isNotEmpty && mounted) {
+        setState(() => _doses = s.doses.map(_toDose).toList());
+      }
+    });
   }
 
   Future<void> _openAddDose() async {
@@ -76,6 +111,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (input == null || !mounted) return;
     setState(() {
       _doses.add(_Dose(
+        id: 'local-${DateTime.now().millisecondsSinceEpoch}',
         name: input.name,
         time: input.time,
         unit: input.unit,
@@ -88,15 +124,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ));
     });
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.doseAdded,
-            style: GoogleFonts.inter(fontSize: 13, color: context.primaryText)),
-        backgroundColor: context.inputBg,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-      ),
-    );
+    AppSnackbar.success(context, AppStrings.doseAdded);
   }
 
   bool _isToday(DateTime d) {
@@ -119,9 +147,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     };
   }
 
-  void _mark(int i, _DoseStatus s) {
-    setState(() => _doses[i].status = s);
+  void _mark(String id, _DoseStatus s) {
+    setState(() {
+      final idx = _doses.indexWhere((d) => d.id == id);
+      if (idx >= 0) _doses[idx].status = s;
+    });
     if (s == _DoseStatus.taken) _showCelebration();
+    // Only call API for real doses (not locally-added ones)
+    if (!id.startsWith('local-')) {
+      final apiStatus = s == _DoseStatus.taken ? 'TAKEN' : 'SKIPPED';
+      ref.read(scheduleProvider.notifier).markDose(id, apiStatus);
+    }
   }
 
   void _showCelebration() {
@@ -156,7 +192,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Scaffold(
       backgroundColor: bgPage,
-      body: CustomScrollView(
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(scheduleProvider.notifier).load(),
+        child: CustomScrollView(
         slivers: [
           // ── App bar ───────────────────────────────────────────────────────
           SliverAppBar(
@@ -170,7 +208,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               tooltip: 'Menu',
             ),
             title: Text(AppStrings.doseSchedule,
-                style: GoogleFonts.spaceGrotesk(
+                style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w800,
                   color: textColor, letterSpacing: -0.3,
                 )),
@@ -224,7 +262,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                             children: [
                               Text(
                                 ['Mo','Tu','We','Th','Fr','Sa','Su'][day.weekday - 1],
-                                style: GoogleFonts.inter(
+                                style: TextStyle(
                                   fontSize: 10, fontWeight: FontWeight.w600,
                                   color: selected
                                       ? AppColors.textInverse
@@ -233,11 +271,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text('${day.day}',
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: TextStyle(
                                     fontSize: 17, fontWeight: FontWeight.w800,
-                                    color: selected
-                                        ? AppColors.textInverse
-                                        : textColor,
+                                    color: selected ? AppColors.textInverse : textColor,
                                   )),
                             ],
                           ),
@@ -255,11 +291,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       spacing: 8, runSpacing: 8,
                       children: [
                         if (takenCount > 0)
-                          _SummaryChip('✓ $takenCount ${AppStrings.taken}', AppColors.green),
+                          _SummaryChip(Icons.check_rounded, '$takenCount ${AppStrings.taken}', AppColors.green),
                         if (pendingCount > 0)
-                          _SummaryChip('⏳ $pendingCount ${AppStrings.pending}', AppColors.amber),
+                          _SummaryChip(Icons.hourglass_bottom_rounded, '$pendingCount ${AppStrings.pending}', AppColors.amber),
                         if (skippedCount > 0)
-                          _SummaryChip('✕ $skippedCount ${AppStrings.skip}', AppColors.error),
+                          _SummaryChip(Icons.close_rounded, '$skippedCount ${AppStrings.skip}', AppColors.error),
                       ],
                     ),
                   ),
@@ -267,7 +303,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 const SizedBox(height: 16),
 
                 // ── Dose timeline by group ────────────────────────────────────
-                if (_grouped.isEmpty)
+                if (ref.watch(scheduleProvider).isLoading)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: List.generate(4, (_) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: AppSkeleton(
+                          child: Container(
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: bgCard,
+                              borderRadius: AppBorderRadius.lgAll,
+                            ),
+                          ),
+                        ),
+                      )),
+                    ),
+                  )
+                else if (_grouped.isEmpty)
                   _EmptyDoses(isDark: isDark, secondary: secondary, textColor: textColor, onAdd: _openAddDose)
                 else
                   ...() {
@@ -280,7 +334,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         icon: meta.icon,
                         color: meta.color,
                         doses: entry.value,
-                        allDoses: _doses,
                         onMark: _mark,
                         bgCard: bgCard,
                         border: border,
@@ -295,6 +348,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -303,7 +357,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 // ─── Summary chip ─────────────────────────────────────────────────────────────
 
 class _SummaryChip extends StatelessWidget {
-  const _SummaryChip(this.label, this.color);
+  const _SummaryChip(this.icon, this.label, this.color);
+  final IconData icon;
   final String label;
   final Color color;
 
@@ -316,10 +371,14 @@ class _SummaryChip extends StatelessWidget {
         borderRadius: AppBorderRadius.pill,
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
-      child: Text(label,
-          style: GoogleFonts.inter(
-            fontSize: 11, fontWeight: FontWeight.w700, color: color,
-          )),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
     );
   }
 }
@@ -352,12 +411,9 @@ class _EmptyDoses extends StatelessWidget {
             Icon(Icons.medication_outlined, size: 36, color: secondary),
             const SizedBox(height: 12),
             Text(AppStrings.noMedicinesYet,
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 15, fontWeight: FontWeight.w700, color: textColor,
-                )),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
             const SizedBox(height: 4),
-            Text('No doses scheduled for this day.',
-                style: GoogleFonts.inter(fontSize: 12, color: secondary)),
+            AppText.bodySm('No doses scheduled for this day.', color: secondary),
             const SizedBox(height: 16),
             FilledButton.icon(
               icon: const Icon(Icons.add_rounded, size: 16),
@@ -380,7 +436,6 @@ class _GroupSection extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.doses,
-    required this.allDoses,
     required this.onMark,
     required this.bgCard,
     required this.border,
@@ -393,8 +448,7 @@ class _GroupSection extends StatelessWidget {
   final IconData icon;
   final Color color;
   final List<_Dose> doses;
-  final List<_Dose> allDoses;
-  final void Function(int, _DoseStatus) onMark;
+  final void Function(String, _DoseStatus) onMark;
   final Color bgCard;
   final Color border;
   final Color textColor;
@@ -414,13 +468,9 @@ class _GroupSection extends StatelessWidget {
               children: [
                 Icon(icon, size: 14, color: color),
                 const SizedBox(width: 6),
-                Text(group,
-                    style: GoogleFonts.inter(
-                      fontSize: 12, fontWeight: FontWeight.w700, color: color,
-                    )),
+                AppText.bodySm(group, color: color, fontWeight: FontWeight.w700),
                 const SizedBox(width: 6),
-                Text(range,
-                    style: GoogleFonts.inter(fontSize: 11, color: secondary)),
+                AppText.bodyXs(range, color: secondary),
               ],
             ),
           ),
@@ -434,13 +484,12 @@ class _GroupSection extends StatelessWidget {
             child: Column(
               children: List.generate(doses.length, (i) {
                 final dose = doses[i];
-                final globalIndex = allDoses.indexOf(dose);
                 final isLast = i == doses.length - 1;
                 return Column(children: [
                   _DoseRow(
                     dose: dose,
-                    onTake: () => onMark(globalIndex, _DoseStatus.taken),
-                    onSkip: () => onMark(globalIndex, _DoseStatus.skipped),
+                    onTake: () => onMark(dose.id, _DoseStatus.taken),
+                    onSkip: () => onMark(dose.id, _DoseStatus.skipped),
                     textColor: textColor,
                     secondary: secondary,
                   ),
@@ -493,10 +542,7 @@ class _DoseRow extends StatelessWidget {
           // Time
           SizedBox(
             width: 48,
-            child: Text(timeLabel,
-                style: GoogleFonts.inter(
-                  fontSize: 11, fontWeight: FontWeight.w600, color: secondary,
-                )),
+            child: AppText.bodyXs(timeLabel, color: secondary, fontWeight: FontWeight.w600),
           ),
           const SizedBox(width: 10),
 
@@ -516,13 +562,8 @@ class _DoseRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(dose.name,
-                    style: GoogleFonts.inter(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: textColor,
-                    ),
-                    overflow: TextOverflow.ellipsis),
-                Text('${dose.unit} · ${_foodLabel(dose.foodTiming)}',
-                    style: GoogleFonts.inter(fontSize: 11, color: secondary)),
+                AppText.labelMd(dose.name, color: textColor, overflow: TextOverflow.ellipsis),
+                AppText.bodyXs('${dose.unit} · ${_foodLabel(dose.foodTiming)}', color: secondary),
               ],
             ),
           ),
@@ -541,9 +582,7 @@ class _DoseRow extends StatelessWidget {
                 borderRadius: AppBorderRadius.pill,
               ),
               child: Text(statusLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 10, fontWeight: FontWeight.w700, color: statusColor,
-                  )),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
             ),
         ],
       ),
@@ -562,12 +601,12 @@ class _ActionBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 30, height: 30,
+        width: 34, height: 34,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
           borderRadius: AppBorderRadius.smAll,
         ),
-        child: Icon(icon, size: 15, color: color),
+        child: Icon(icon, size: 16, color: color),
       ),
     );
   }

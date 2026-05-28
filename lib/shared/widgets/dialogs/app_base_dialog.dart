@@ -142,8 +142,8 @@ class AppBaseDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark    = Theme.of(context).brightness == Brightness.dark;
-    final bg        = isDark ? context.cardBg : Colors.white;
-    final borderCol = isDark ? context.borderCol : const Color(0xFFE2E8F0);
+    final bg        = context.cardBg;
+    final borderCol = context.borderCol;
 
     return Dialog(
       backgroundColor: Colors.transparent,

@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 // ─── Data args ────────────────────────────────────────────────────────────────
 
@@ -59,32 +59,16 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
     super.dispose();
   }
 
-  void _confirmRemove() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardBg,
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-        title: Text(AppStrings.removeMedicineTitle, style: AppTypography.h3),
-        content: Text(AppStrings.removeMedicineDesc, style: AppTypography.bodyMd),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(AppStrings.cancel,
-                style: AppTypography.buttonMd
-                    .copyWith(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-            },
-            child: Text(AppStrings.remove,
-                style: AppTypography.buttonMd.copyWith(color: AppColors.red)),
-          ),
-        ],
-      ),
+  Future<void> _confirmRemove() async {
+    final confirmed = await AppDialog.confirm(
+      context,
+      title: AppStrings.removeMedicineTitle,
+      message: AppStrings.removeMedicineDesc,
+      confirmLabel: AppStrings.remove,
+      isDanger: true,
     );
+    if (confirmed != true || !mounted) return;
+    Navigator.pop(context);
   }
 
   @override
@@ -108,19 +92,15 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
               child: Icon(Icons.arrow_back_rounded, color: context.primaryText),
             ),
           ),
-          title: Text(m.name, style: AppTypography.h3),
+          title: AppText.h3(m.name),
           actions: [
             TextButton(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Edit coming soon'),
-                  backgroundColor: context.inputBg,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              ),
+              onPressed: () => AppSnackbar.info(context, 'Edit coming soon'),
               child: Text(AppStrings.edit,
-                  style:
-                      AppTypography.labelSm.copyWith(color: AppColors.teal, letterSpacing: 0)),
+                  style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600,
+                    color: AppColors.teal, letterSpacing: 0,
+                  )),
             ),
           ],
           bottom: PreferredSize(
@@ -136,13 +116,10 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
               child: Row(
                 children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.teal.withValues(alpha: 0.10),
-                      borderRadius: AppBorderRadius.mdAll,
-                    ),
+                  AppContainer.tinted(
+                    color: AppColors.teal,
+                    borderRadius: AppBorderRadius.mdAll,
+                    padding: const EdgeInsets.all(12),
                     child: const Icon(Icons.medication_rounded,
                         color: AppColors.teal, size: 28),
                   ),
@@ -151,9 +128,8 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(m.genericName, style: AppTypography.bodyMd),
-                        Text('${m.strength} · ${m.form}',
-                            style: AppTypography.bodySm),
+                        AppText.bodyMd(m.genericName),
+                        AppText.bodySm('${m.strength} · ${m.form}'),
                       ],
                     ),
                   ),
@@ -169,10 +145,12 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
                 controller: _tabs,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                labelStyle: AppTypography.labelSm
-                    .copyWith(color: AppColors.teal, letterSpacing: 0),
-                unselectedLabelStyle: AppTypography.labelSm
-                    .copyWith(color: AppColors.textSecondary, letterSpacing: 0),
+                labelStyle: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600,
+                    color: AppColors.teal, letterSpacing: 0),
+                unselectedLabelStyle: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary, letterSpacing: 0),
                 indicatorColor: AppColors.teal,
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: context.borderCol,
@@ -224,8 +202,9 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: AppBorderRadius.pill,
       ),
       child: Text(label,
-          style:
-              AppTypography.labelXs.copyWith(color: color, letterSpacing: 0.4)),
+          style: TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w600,
+              color: color, letterSpacing: 0.4)),
     );
   }
 }
@@ -245,19 +224,16 @@ class _OverviewTab extends StatelessWidget {
       children: [
         _Section(
           label: AppStrings.primaryUseLabel,
-          child: Text(med.usedFor, style: AppTypography.bodyMd),
+          child: AppText.bodyMd(med.usedFor),
         ),
         const SizedBox(height: 20),
 
         _Section(
           label: AppStrings.scheduleLabel,
           child: med.status == MedStatus.prn
-              ? Text(AppStrings.prnNote,
-                  style: AppTypography.bodyMd
-                      .copyWith(color: AppColors.purple))
+              ? AppText.bodyMd(AppStrings.prnNote, color: AppColors.purple)
               : med.times.isEmpty
-                  ? Text(AppStrings.noScheduleSet,
-                      style: AppTypography.bodySm)
+                  ? AppText.bodySm(AppStrings.noScheduleSet)
                   : Column(
                       children: med.times
                           .map((t) => Padding(
@@ -271,15 +247,10 @@ class _OverviewTab extends StatelessWidget {
                                   ),
                                   child: Row(
                                     children: [
-                                      Text(t,
-                                          style: AppTypography.labelMd
-                                              .copyWith(color: AppColors.teal)),
+                                      AppText.labelMd(t, color: AppColors.teal),
                                       const SizedBox(width: 12),
-                                      Expanded(
-                                          child: Text('1 dose',
-                                              style: AppTypography.bodySm)),
-                                      Text(med.food,
-                                          style: AppTypography.bodySm),
+                                      Expanded(child: AppText.bodySm('1 dose')),
+                                      AppText.bodySm(med.food),
                                     ],
                                   ),
                                 ),
@@ -318,7 +289,9 @@ class _OverviewTab extends StatelessWidget {
                   child: Center(
                     child: Text(
                       e.value,
-                      style: AppTypography.labelXs.copyWith(
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
                         color: isFuture
                             ? AppColors.textHint
                             : isToday
@@ -338,7 +311,7 @@ class _OverviewTab extends StatelessWidget {
         _Section(
           label: AppStrings.instructionsLabel,
           child: Text(med.description,
-              style: AppTypography.bodyMd.copyWith(height: 1.7)),
+              style: const TextStyle(fontSize: 14, height: 1.7)),
         ),
         const SizedBox(height: 24),
 
@@ -347,27 +320,19 @@ class _OverviewTab extends StatelessWidget {
           children: [
             if (med.status != MedStatus.prn) ...[
               Expanded(
-                child: FilledButton(
+                child: AppButton.primary(
+                  label: AppStrings.markTaken,
+                  isFullWidth: true,
                   onPressed: () => Navigator.pop(context),
-                  style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.teal,
-                      padding: const EdgeInsets.symmetric(vertical: 14)),
-                  child: Text(AppStrings.markTaken,
-                      style: AppTypography.buttonMd
-                          .copyWith(color: AppColors.textInverse)),
                 ),
               ),
               const SizedBox(width: 10),
             ],
             Expanded(
-              child: OutlinedButton(
+              child: AppButton.outline(
+                label: AppStrings.restock,
+                isFullWidth: true,
                 onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.teal,
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: Text(AppStrings.restock,
-                    style: AppTypography.buttonMd
-                        .copyWith(color: AppColors.teal)),
               ),
             ),
             const SizedBox(width: 10),
@@ -376,11 +341,10 @@ class _OverviewTab extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.error,
                 side: const BorderSide(color: AppColors.error),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 14),
               ),
-              child:
-                  const Icon(Icons.delete_outline_rounded, size: 18),
+              child: const Icon(Icons.delete_outline_rounded, size: 18),
             ),
           ],
         ),
@@ -401,7 +365,10 @@ class _ScheduleTab extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       children: [
         Text(AppStrings.fullScheduleLabel,
-            style: AppTypography.overline.copyWith(color: AppColors.textHint)),
+            style: const TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w600,
+              color: AppColors.textHint, letterSpacing: 1,
+            )),
         const SizedBox(height: 12),
         if (med.status == MedStatus.prn || med.times.isEmpty)
           Container(
@@ -414,12 +381,10 @@ class _ScheduleTab extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline_rounded,
+                const Icon(Icons.info_outline_rounded,
                     size: 16, color: AppColors.purple),
                 const SizedBox(width: 10),
-                Text(AppStrings.prnNote,
-                    style: AppTypography.bodyMd
-                        .copyWith(color: AppColors.purple)),
+                AppText.bodyMd(AppStrings.prnNote, color: AppColors.purple),
               ],
             ),
           )
@@ -451,9 +416,7 @@ class _ScheduleTab extends StatelessWidget {
                         color: AppColors.teal.withValues(alpha: 0.12),
                         borderRadius: AppBorderRadius.smAll,
                       ),
-                      child: Text(e.value,
-                          style: AppTypography.labelMd
-                              .copyWith(color: AppColors.teal)),
+                      child: AppText.labelMd(e.value, color: AppColors.teal),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -461,10 +424,10 @@ class _ScheduleTab extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(label,
-                              style: AppTypography.labelSm
-                                  .copyWith(letterSpacing: 0)),
-                          Text('1 dose · ${med.food}',
-                              style: AppTypography.bodySm),
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600,
+                                  letterSpacing: 0)),
+                          AppText.bodySm('1 dose · ${med.food}'),
                         ],
                       ),
                     ),
@@ -503,15 +466,15 @@ class _StockTab extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('${med.stock}',
-                      style: AppTypography.statLg
-                          .copyWith(color: context.primaryText, fontSize: 42)),
-                  Text(AppStrings.unitsRemaining,
-                      style: AppTypography.bodySm),
+                      style: TextStyle(
+                        fontSize: 42, fontWeight: FontWeight.w800,
+                        color: context.primaryText,
+                      )),
+                  AppText.bodySm(AppStrings.unitsRemaining),
                   if (med.expiry != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text('Expires: ${med.expiry}',
-                          style: AppTypography.bodyXs),
+                      child: AppText.bodyXs('Expires: ${med.expiry}'),
                     ),
                 ],
               ),
@@ -538,7 +501,10 @@ class _StockTab extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(AppStrings.stockHistoryLabel,
-            style: AppTypography.overline.copyWith(color: AppColors.textHint)),
+            style: const TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w600,
+              color: AppColors.textHint, letterSpacing: 1,
+            )),
         const SizedBox(height: 12),
         ...[
           ('+', 'Restocked', '30 units added', 'May 2026'),
@@ -564,10 +530,8 @@ class _StockTab extends StatelessWidget {
                       borderRadius: AppBorderRadius.smAll,
                     ),
                     child: Center(
-                      child: Text(h.$1,
-                          style: AppTypography.labelMd.copyWith(
-                            color: h.$1 == '+' ? AppColors.teal : AppColors.error,
-                          )),
+                      child: AppText.labelMd(h.$1,
+                          color: h.$1 == '+' ? AppColors.teal : AppColors.error),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -575,27 +539,21 @@ class _StockTab extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(h.$2, style: AppTypography.bodyMd),
-                        Text(h.$3, style: AppTypography.bodySm),
+                        AppText.bodyMd(h.$2),
+                        AppText.bodySm(h.$3),
                       ],
                     ),
                   ),
-                  Text(h.$4, style: AppTypography.bodyXs),
+                  AppText.bodyXs(h.$4),
                 ],
               ),
             )),
         const SizedBox(height: 20),
-        OutlinedButton.icon(
-          onPressed: () {},
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.teal,
-            side: const BorderSide(color: AppColors.teal),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
+        AppButton.outline(
+          label: AppStrings.addStock,
           icon: const Icon(Icons.add_rounded, size: 18),
-          label: Text(AppStrings.addStock,
-              style:
-                  AppTypography.buttonMd.copyWith(color: AppColors.teal)),
+          isFullWidth: true,
+          onPressed: () {},
         ),
       ],
     );
@@ -634,7 +592,8 @@ class _InfoTab extends StatelessWidget {
           ),
           child: Text(
             AppStrings.infoDisclaimer,
-            style: AppTypography.bodySm.copyWith(
+            style: TextStyle(
+              fontSize: 12,
               color: AppColors.warning.withValues(alpha: 0.85),
               height: 1.6,
             ),
@@ -675,8 +634,7 @@ class _AccordionItemState extends State<_AccordionItem> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Row(
                 children: [
-                  Expanded(
-                      child: Text(widget.title, style: AppTypography.labelMd)),
+                  Expanded(child: AppText.labelMd(widget.title)),
                   Icon(
                     _open
                         ? Icons.expand_less_rounded
@@ -692,7 +650,7 @@ class _AccordionItemState extends State<_AccordionItem> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
               child: Text(widget.body,
-                  style: AppTypography.bodyMd.copyWith(height: 1.65)),
+                  style: const TextStyle(fontSize: 14, height: 1.65)),
             ),
         ],
       ),
@@ -712,7 +670,10 @@ class _Section extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: AppTypography.overline.copyWith(color: AppColors.textHint)),
+              style: const TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w600,
+                color: AppColors.textHint, letterSpacing: 1,
+              )),
           const SizedBox(height: 8),
           child,
         ],

@@ -74,12 +74,8 @@ class _AppSearchTextInputState extends State<AppSearchTextInput> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final bg = widget.backgroundColor ??
-        (isDark ? context.inputBg : const Color(0xFFF1F5F9));
-    final border = widget.borderColor ??
-        (isDark ? context.borderCol : const Color(0xFFE2E8F0));
+    final bg = widget.backgroundColor ?? context.inputBg;
+    final border = widget.borderColor ?? context.borderCol;
 
     return Container(
       decoration: BoxDecoration(

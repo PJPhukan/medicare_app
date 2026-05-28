@@ -45,11 +45,8 @@ class AppMultilineInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
     final hasError  = error != null && error!.isNotEmpty;
-    final borderCol = hasError
-        ? AppColors.error
-        : (isDark ? context.borderCol : const Color(0xFFE2E8F0));
+    final borderCol = hasError ? AppColors.error : context.borderCol;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,7 +57,7 @@ class AppMultilineInput extends StatelessWidget {
         ],
         Container(
           decoration: BoxDecoration(
-            color: isDark ? context.inputBg : Colors.white,
+            color: context.inputBg,
             borderRadius: AppBorderRadius.mdAll,
             border: Border.all(color: borderCol),
           ),

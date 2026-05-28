@@ -3,6 +3,7 @@ import '../../../core/theme/app_animations.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/extensions/context_extensions.dart';
 
 /// Icon button with an animated notification badge (dot or count).
 ///
@@ -96,10 +97,8 @@ class _AppBadgeIconButtonState extends State<AppBadgeIconButton>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final fg     = widget.color ?? AppColors.textSecondary;
-    final bg     = widget.backgroundColor ??
-        (isDark ? AppColors.dark700 : AppColors.light200);
+    final bg     = widget.backgroundColor ?? context.inputBg;
     final badge  = widget.badgeColor ?? AppColors.error;
     final iSize  = widget.iconSize ?? widget.size * 0.45;
     final br     = widget.circle ? null : AppBorderRadius.mdAll;

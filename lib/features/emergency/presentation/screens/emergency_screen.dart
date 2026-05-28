@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../domain/entities/emergency_contact_entity.dart';
+import '../providers/emergency_provider.dart';
 
-// ─── Models ───────────────────────────────────────────────────────────────────
+// ─── Health profile model (local static data) ─────────────────────────────────
 
 class _HealthProfile {
   final String bloodGroup;
@@ -25,22 +28,6 @@ class _HealthProfile {
   });
 }
 
-class _EmergencyContact {
-  final String id;
-  final String name;
-  final String relation;
-  final String phone;
-
-  const _EmergencyContact({
-    required this.id,
-    required this.name,
-    required this.relation,
-    required this.phone,
-  });
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
 const _kProfile = _HealthProfile(
   bloodGroup: 'B+',
   allergies: ['Penicillin', 'Aspirin'],
@@ -49,19 +36,14 @@ const _kProfile = _HealthProfile(
   notes: 'Patient uses insulin pump. Do not administer NSAIDs.',
 );
 
-const _kContacts = [
-  _EmergencyContact(id: 'ec1', name: 'Priya Sharma', relation: 'Spouse', phone: '+91 98765 43210'),
-  _EmergencyContact(id: 'ec2', name: 'Amit Sharma', relation: 'Son', phone: '+91 87654 32109'),
-  _EmergencyContact(id: 'ec3', name: 'Dr. R. Patel', relation: 'Family Doctor', phone: '+91 76543 21098'),
-];
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class EmergencyScreen extends StatelessWidget {
+class EmergencyScreen extends ConsumerWidget {
   const EmergencyScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contacts = ref.watch(emergencyProvider).contacts;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -75,7 +57,7 @@ class EmergencyScreen extends StatelessWidget {
               expandedHeight: 96,
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 16, bottom: 14),
-                title: Text(AppStrings.emergency, style: AppTypography.h3),
+                title: AppText.h3(AppStrings.emergency),
               ),
             ),
 
@@ -83,23 +65,14 @@ class EmergencyScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  // Subtitle
-                  Text(
-                    AppStrings.emergencySubtitle2,
-                    style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
-                  ),
+                  AppText.bodySm(AppStrings.emergencySubtitle2,
+                      color: AppColors.textSecondary),
                   const SizedBox(height: 24),
-
-                  // SOS button section
                   _SosCard(),
                   const SizedBox(height: 16),
-
-                  // Health profile
                   _HealthProfileCard(profile: _kProfile),
                   const SizedBox(height: 16),
-
-                  // Emergency contacts
-                  _ContactsCard(contacts: _kContacts),
+                  _ContactsCard(contacts: contacts),
                 ]),
               ),
             ),
@@ -115,14 +88,15 @@ class EmergencyScreen extends StatelessWidget {
 class _SosCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return _Card(
+    return AppCard(
+      padding: const EdgeInsets.all(18),
       child: Column(
         children: [
           Row(
             children: [
               const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.red),
               const SizedBox(width: 8),
-              Text(AppStrings.sosTitle, style: AppTypography.h3.copyWith(color: context.primaryText)),
+              AppText.h3(AppStrings.sosTitle),
             ],
           ),
           const SizedBox(height: 24),
@@ -229,10 +203,9 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
                   alignment: Alignment.center,
                   child: Text(
                     AppStrings.sos,
-                    style: AppTypography.display2.copyWith(
-                      color: Colors.white,
-                      fontSize: 28,
-                      letterSpacing: 2,
+                    style: const TextStyle(
+                      fontSize: 28, fontWeight: FontWeight.w800,
+                      color: Colors.white, letterSpacing: 2,
                     ),
                   ),
                 ),
@@ -258,29 +231,20 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
                   alignment: Alignment.center,
                   child: Text(
                     '$_count',
-                    style: AppTypography.display1.copyWith(color: Colors.white, fontSize: 52),
+                    style: const TextStyle(
+                      fontSize: 52, fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  '${AppStrings.sosSendingIn} $_count…',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
-                ),
+                AppText.bodySm('${AppStrings.sosSendingIn} $_count…',
+                    color: AppColors.textSecondary),
                 const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: _cancel,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: context.inputBg,
-                      borderRadius: AppBorderRadius.lgAll,
-                      border: Border.all(color: context.borderCol),
-                    ),
-                    child: Text(
-                      AppStrings.cancel,
-                      style: AppTypography.buttonSm.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ),
+                AppButton.outline(
+                  label: AppStrings.cancel,
+                  size: AppButtonSize.sm,
+                  onPressed: _cancel,
                 ),
               ],
             ),
@@ -307,29 +271,22 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
                 const SizedBox(height: 12),
                 Text(
                   '🚨 ${AppStrings.sosActivated}',
-                  style: AppTypography.labelLg.copyWith(color: AppColors.red),
+                  style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700,
+                    color: AppColors.red,
+                  ),
                 ),
                 const SizedBox(height: 6),
-                Text(
+                AppText.bodySm(
                   AppStrings.sosContactsNotified,
-                  style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
+                  color: AppColors.textSecondary,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: _dismiss,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: context.inputBg,
-                      borderRadius: AppBorderRadius.lgAll,
-                      border: Border.all(color: context.borderCol),
-                    ),
-                    child: Text(
-                      AppStrings.dismiss,
-                      style: AppTypography.buttonSm.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ),
+                AppButton.outline(
+                  label: AppStrings.dismiss,
+                  size: AppButtonSize.sm,
+                  onPressed: _dismiss,
                 ),
               ],
             ),
@@ -337,11 +294,9 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
 
         if (_state == _SosState.idle) ...[
           const SizedBox(height: 14),
-          Text(
-            AppStrings.sosIdleHint,
-            style: AppTypography.bodySm.copyWith(color: AppColors.textHint),
-            textAlign: TextAlign.center,
-          ),
+          AppText.bodySm(AppStrings.sosIdleHint,
+              color: AppColors.textHint,
+              textAlign: TextAlign.center),
         ],
       ],
     );
@@ -356,11 +311,12 @@ class _HealthProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
+    return AppCard(
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(AppStrings.healthProfileTitle, style: AppTypography.h3),
+          AppText.h3(AppStrings.healthProfileTitle),
           const SizedBox(height: 16),
 
           // Blood group
@@ -380,11 +336,17 @@ class _HealthProfileCard extends StatelessWidget {
                   children: [
                     Text(
                       AppStrings.bloodGroup.toUpperCase(),
-                      style: AppTypography.overline.copyWith(color: AppColors.red, letterSpacing: 1.2),
+                      style: const TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w600,
+                        color: AppColors.red, letterSpacing: 1.2,
+                      ),
                     ),
                     Text(
                       profile.bloodGroup,
-                      style: AppTypography.display2.copyWith(color: context.primaryText, fontSize: 26),
+                      style: TextStyle(
+                        fontSize: 26, fontWeight: FontWeight.w800,
+                        color: context.primaryText,
+                      ),
                     ),
                   ],
                 ),
@@ -416,7 +378,11 @@ class _HealthProfileCard extends StatelessWidget {
               ),
               child: Text(
                 profile.notes!,
-                style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.5),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
               ),
             ),
           ],
@@ -439,7 +405,10 @@ class _TagSection extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: AppTypography.overline.copyWith(color: color, letterSpacing: 1.2),
+          style: TextStyle(
+            fontSize: 10, fontWeight: FontWeight.w600,
+            color: color, letterSpacing: 1.2,
+          ),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -453,10 +422,7 @@ class _TagSection extends StatelessWidget {
                       borderRadius: AppBorderRadius.pill,
                       border: Border.all(color: color.withValues(alpha: 0.2)),
                     ),
-                    child: Text(
-                      t,
-                      style: AppTypography.labelXs.copyWith(color: color, fontWeight: FontWeight.w600),
-                    ),
+                    child: AppText.labelXs(t, color: color, fontWeight: FontWeight.w600),
                   ))
               .toList(),
         ),
@@ -468,36 +434,32 @@ class _TagSection extends StatelessWidget {
 // ─── Contacts Card ────────────────────────────────────────────────────────────
 
 class _ContactsCard extends StatelessWidget {
-  final List<_EmergencyContact> contacts;
+  final List<EmergencyContactEntity> contacts;
   const _ContactsCard({required this.contacts});
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
+    return AppCard(
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(AppStrings.emergencyContacts, style: AppTypography.h3),
+              AppText.h3(AppStrings.emergencyContacts),
               const Spacer(),
               GestureDetector(
                 onTap: () {},
-                child: Container(
+                child: AppContainer.tinted(
+                  color: AppColors.green,
+                  borderRadius: AppBorderRadius.lgAll,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.green.withValues(alpha: 0.1),
-                    borderRadius: AppBorderRadius.lgAll,
-                    border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
-                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.add_rounded, size: 13, color: AppColors.green),
                       const SizedBox(width: 4),
-                      Text(
-                        AppStrings.add,
-                        style: AppTypography.labelSm.copyWith(color: AppColors.green),
-                      ),
+                      AppText.labelSm(AppStrings.add, color: AppColors.green),
                     ],
                   ),
                 ),
@@ -506,10 +468,7 @@ class _ContactsCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           if (contacts.isEmpty)
-            Text(
-              AppStrings.noEmergencyContacts,
-              style: AppTypography.bodySm.copyWith(color: AppColors.textHint),
-            )
+            AppText.bodySm(AppStrings.noEmergencyContacts, color: AppColors.textHint)
           else
             ...contacts.map((c) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -522,60 +481,36 @@ class _ContactsCard extends StatelessWidget {
 }
 
 class _ContactTile extends StatelessWidget {
-  final _EmergencyContact contact;
+  final EmergencyContactEntity contact;
   const _ContactTile({required this.contact});
-
-  String get _initials {
-    final parts = contact.name.split(' ');
-    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.inputBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: context.borderCol),
-      ),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: context.borderCol,
-              borderRadius: AppBorderRadius.lgAll,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              _initials,
-              style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary),
-            ),
-          ),
+          AppAvatar(name: contact.name, size: AppAvatarSize.sm),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(contact.name, style: AppTypography.labelMd),
+                AppText.labelMd(contact.name),
                 const SizedBox(height: 2),
-                Text(contact.relation, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
-                Text(contact.phone, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                if (contact.relationship != null)
+                  AppText.bodySm(contact.relationship!,
+                      color: AppColors.textSecondary),
+                AppText.bodyXs(contact.phone, color: AppColors.textHint),
               ],
             ),
           ),
           GestureDetector(
             onTap: () {},
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.green.withValues(alpha: 0.12),
-                borderRadius: AppBorderRadius.lgAll,
-              ),
-              alignment: Alignment.center,
+            child: AppContainer.tinted(
+              color: AppColors.green,
+              borderRadius: AppBorderRadius.lgAll,
+              padding: const EdgeInsets.all(11),
               child: const Icon(Icons.phone_rounded, size: 18, color: AppColors.green),
             ),
           ),
@@ -583,23 +518,4 @@ class _ContactTile extends StatelessWidget {
       ),
     );
   }
-}
-
-// ─── Shared ───────────────────────────────────────────────────────────────────
-
-class _Card extends StatelessWidget {
-  final Widget child;
-  const _Card({required this.child});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.xlAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: child,
-      );
 }

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../providers/support_provider.dart';
+import '../../../../core/utils/logger.dart';
 
 // ─── FAQ data ─────────────────────────────────────────────────────────────────
 
@@ -56,7 +59,7 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
               expandedHeight: 100,
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 20, bottom: 14),
-                title: Text(AppStrings.support, style: AppTypography.h2.copyWith(fontSize: 22)),
+                title: AppText.h2(AppStrings.support),
                 background: Container(color: context.bg),
               ),
               bottom: PreferredSize(
@@ -69,8 +72,8 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                     indicatorSize: TabBarIndicatorSize.label,
                     labelColor: AppColors.teal,
                     unselectedLabelColor: AppColors.textSecondary,
-                    labelStyle: AppTypography.labelSm.copyWith(fontWeight: FontWeight.w700),
-                    unselectedLabelStyle: AppTypography.labelSm,
+                    labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                    unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5),
                     tabs: const [
                       Tab(text: 'FAQ'),
                       Tab(text: 'Contact'),
@@ -107,9 +110,9 @@ class _FaqTab extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          Text(
+          const Text(
             AppStrings.faq,
-            style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600, letterSpacing: 0.6),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary, letterSpacing: 0.6),
           ),
           const SizedBox(height: 12),
           ...List.generate(_kFaqs.length, (i) {
@@ -134,12 +137,10 @@ class _FaqTab extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
+                            child: AppText.bodySm(
                               faq.q,
-                              style: AppTypography.bodySm.copyWith(
-                                color: isOpen ? AppColors.teal : context.primaryText,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              color: isOpen ? AppColors.teal : context.primaryText,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -156,7 +157,7 @@ class _FaqTab extends StatelessWidget {
                       ),
                       if (isOpen) ...[
                         const SizedBox(height: 10),
-                        Text(faq.a, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.6)),
+                        Text(faq.a, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
                       ],
                     ],
                   ),
@@ -170,17 +171,18 @@ class _FaqTab extends StatelessWidget {
 
 // ─── Contact tab ──────────────────────────────────────────────────────────────
 
-class _ContactTab extends StatefulWidget {
+class _ContactTab extends ConsumerStatefulWidget {
   const _ContactTab();
 
   @override
-  State<_ContactTab> createState() => _ContactTabState();
+  ConsumerState<_ContactTab> createState() => _ContactTabState();
 }
 
-class _ContactTabState extends State<_ContactTab> {
+class _ContactTabState extends ConsumerState<_ContactTab> {
   final _subjectCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
   String _category = AppStrings.catBug;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -189,15 +191,32 @@ class _ContactTabState extends State<_ContactTab> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final subject = _subjectCtrl.text.trim();
     final message = _messageCtrl.text.trim();
     if (subject.isEmpty || message.isEmpty) return;
-    _subjectCtrl.clear();
-    _messageCtrl.clear();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppStrings.ticketSubmitted, style: AppTypography.bodySm)),
-    );
+    AppLogger.i('Ticket submit → category:$_category', tag: 'Support');
+    setState(() => _submitting = true);
+    try {
+      await ref.read(submitTicketProvider).call(
+        subject: subject,
+        body: message,
+        category: _category,
+      );
+      AppLogger.i('Ticket submitted ✓', tag: 'Support');
+      _subjectCtrl.clear();
+      _messageCtrl.clear();
+      if (!mounted) return;
+      await ref.read(supportProvider.notifier).load();
+      if (!mounted) return;
+      AppSnackbar.success(context, AppStrings.ticketSubmitted);
+    } on Exception catch (e) {
+      AppLogger.e('Ticket submit failed', tag: 'Support', error: e);
+      if (!mounted) return;
+      AppSnackbar.error(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -211,11 +230,60 @@ class _ContactTabState extends State<_ContactTab> {
         const SizedBox(height: 8),
         _QuickLink(icon: Icons.chat_bubble_outline_rounded, label: 'Live Chat (9 AM – 6 PM IST)', color: AppColors.blue),
         const SizedBox(height: 20),
-        Text(AppStrings.submitTicket, style: AppTypography.h3.copyWith(fontSize: 16)),
+        // My Tickets
+        Builder(builder: (context) {
+          final ticketSt = ref.watch(supportProvider);
+          if (ticketSt.isLoading) {
+            return const Center(child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2),
+            ));
+          }
+          if (ticketSt.tickets.isEmpty) return const SizedBox.shrink();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('MY TICKETS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 1)),
+              const SizedBox(height: 10),
+              ...ticketSt.tickets.map((t) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.cardBg,
+                  borderRadius: AppBorderRadius.lgAll,
+                  border: Border.all(color: context.borderCol),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: AppText.bodySm(t.subject, color: context.primaryText, fontWeight: FontWeight.w600, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.teal.withValues(alpha: 0.1),
+                            borderRadius: AppBorderRadius.pill,
+                          ),
+                          child: Text(t.status, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: AppColors.teal)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    AppText.bodyXs(t.body, color: AppColors.textSecondary, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 12),
+            ],
+          );
+        }),
+        const Text(AppStrings.submitTicket, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         const SizedBox(height: 14),
 
         // Category
-        Text(AppStrings.ticketCategory, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        AppText.bodyXs(AppStrings.ticketCategory, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8, runSpacing: 8,
@@ -231,7 +299,7 @@ class _ContactTabState extends State<_ContactTab> {
                   borderRadius: AppBorderRadius.pill,
                   border: Border.all(color: sel ? AppColors.teal.withValues(alpha: 0.5) : context.borderCol),
                 ),
-                child: Text(c, style: AppTypography.labelSm.copyWith(color: sel ? AppColors.teal : AppColors.textSecondary, fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
+                child: Text(c, style: TextStyle(fontSize: 11, letterSpacing: 0.5, color: sel ? AppColors.teal : AppColors.textSecondary, fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
               ),
             );
           }).toList(),
@@ -248,7 +316,7 @@ class _ContactTabState extends State<_ContactTab> {
           builder: (_, sv, __) => ValueListenableBuilder<TextEditingValue>(
             valueListenable: _messageCtrl,
             builder: (_, mv, __) {
-              final canSubmit = sv.text.trim().isNotEmpty && mv.text.trim().isNotEmpty;
+              final canSubmit = sv.text.trim().isNotEmpty && mv.text.trim().isNotEmpty && !_submitting;
               return GestureDetector(
                 onTap: canSubmit ? _submit : null,
                 child: AnimatedContainer(
@@ -259,10 +327,12 @@ class _ContactTabState extends State<_ContactTab> {
                     borderRadius: AppBorderRadius.lgAll,
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    AppStrings.submitTicketBtn,
-                    style: AppTypography.buttonMd.copyWith(color: canSubmit ? context.bg : AppColors.textHint),
-                  ),
+                  child: _submitting
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal))
+                      : Text(
+                          AppStrings.submitTicketBtn,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: canSubmit ? context.bg : AppColors.textHint),
+                        ),
                 ),
               );
             },
@@ -291,7 +361,7 @@ class _QuickLink extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 18),
             const SizedBox(width: 12),
-            Text(label, style: AppTypography.bodySm.copyWith(color: context.primaryText)),
+            AppText.bodySm(label, color: context.primaryText),
             const Spacer(),
             const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
           ],
@@ -311,7 +381,7 @@ class _SupportField extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          AppText.bodyXs(label, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
@@ -322,10 +392,10 @@ class _SupportField extends StatelessWidget {
             child: TextField(
               controller: controller,
               maxLines: maxLines,
-              style: AppTypography.bodyMd.copyWith(color: context.primaryText),
+              style: TextStyle(fontSize: 14, color: context.primaryText),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
+                hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -367,11 +437,11 @@ class _AboutTab extends StatelessWidget {
                   child: const Icon(Icons.medical_services_rounded, color: AppColors.teal, size: 34),
                 ),
                 const SizedBox(height: 12),
-                Text('MediForze', style: AppTypography.h2.copyWith(fontSize: 22)),
+                AppText.h2('MediForze'),
                 const SizedBox(height: 4),
-                Text('Your Personal Health Companion', style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
+                AppText.bodyXs('Your Personal Health Companion', color: AppColors.textSecondary),
                 const SizedBox(height: 4),
-                Text('Version 1.0.0', style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                AppText.bodyXs('Version 1.0.0', color: AppColors.textHint),
               ],
             ),
           ),
@@ -383,10 +453,7 @@ class _AboutTab extends StatelessWidget {
           _AboutRow(icon: Icons.description_outlined, label: AppStrings.termsOfService, color: AppColors.purple),
           const SizedBox(height: 24),
           Center(
-            child: Text(
-              '© 2026 MediForze. All rights reserved.',
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint),
-            ),
+            child: AppText.bodyXs('© 2026 MediForze. All rights reserved.', color: AppColors.textHint),
           ),
         ],
       );
@@ -410,7 +477,7 @@ class _AboutRow extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 18),
             const SizedBox(width: 12),
-            Expanded(child: Text(label, style: AppTypography.bodySm.copyWith(color: context.primaryText))),
+            Expanded(child: AppText.bodySm(label, color: context.primaryText)),
             const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
           ],
         ),

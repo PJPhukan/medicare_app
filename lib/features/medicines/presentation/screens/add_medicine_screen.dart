@@ -1,41 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
-
-// ─── Local catalog model ──────────────────────────────────────────────────────
-
-class _CatalogItem {
-  final String name, genericName, strength, form;
-  const _CatalogItem(this.name, this.genericName, this.strength, this.form);
-}
-
-const _catalog = [
-  _CatalogItem('Paracetamol', 'Paracetamol', '500 mg', 'Tablet'),
-  _CatalogItem('Metformin', 'Metformin HCl', '500 mg', 'Tablet'),
-  _CatalogItem('Amlodipine', 'Amlodipine Besylate', '5 mg', 'Tablet'),
-  _CatalogItem('Omeprazole', 'Omeprazole', '20 mg', 'Capsule'),
-  _CatalogItem('Cetirizine', 'Cetirizine HCl', '10 mg', 'Tablet'),
-  _CatalogItem('Azithromycin', 'Azithromycin', '500 mg', 'Tablet'),
-  _CatalogItem('Aspirin', 'Acetylsalicylic Acid', '75 mg', 'Tablet'),
-  _CatalogItem('Pantoprazole', 'Pantoprazole Sodium', '40 mg', 'Tablet'),
-  _CatalogItem('Atorvastatin', 'Atorvastatin Calcium', '20 mg', 'Tablet'),
-  _CatalogItem('Lisinopril', 'Lisinopril', '10 mg', 'Tablet'),
-];
+import '../../../../shared/widgets/widgets.dart';
+import '../../domain/entities/medicine_entity.dart';
+import '../providers/medicines_provider.dart';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class AddMedicineScreen extends StatefulWidget {
+class AddMedicineScreen extends ConsumerStatefulWidget {
   const AddMedicineScreen({super.key});
 
   @override
-  State<AddMedicineScreen> createState() => _AddMedicineScreenState();
+  ConsumerState<AddMedicineScreen> createState() => _AddMedicineScreenState();
 }
 
-class _AddMedicineScreenState extends State<AddMedicineScreen> {
+class _AddMedicineScreenState extends ConsumerState<AddMedicineScreen> {
   int _step = 0;
   final _steps = [
     AppStrings.addMedicineStep1,
@@ -47,7 +30,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   // Step 0
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  _CatalogItem? _selected;
+  CatalogMedicineEntity? _selected;
+  List<CatalogMedicineEntity> _catalogItems = [];
+  bool _catalogLoading = false;
   bool _showRequest = false;
   final _reqNameCtrl = TextEditingController();
 
@@ -77,14 +62,21 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
   bool _saving = false;
 
-  List<_CatalogItem> get _catalogResults {
-    final q = _searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return _catalog.take(5).toList();
-    return _catalog
-        .where((c) =>
-            c.name.toLowerCase().contains(q) ||
-            c.genericName.toLowerCase().contains(q))
-        .toList();
+  @override
+  void initState() {
+    super.initState();
+    _loadCatalog('');
+  }
+
+  Future<void> _loadCatalog(String query) async {
+    setState(() => _catalogLoading = true);
+    try {
+      final results =
+          await ref.read(medicinesRepositoryProvider).searchCatalog(query);
+      if (mounted) setState(() { _catalogItems = results; _catalogLoading = false; });
+    } on Exception catch (_) {
+      if (mounted) setState(() => _catalogLoading = false);
+    }
   }
 
   void _setFreq(String f) {
@@ -109,20 +101,23 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     setState(() => _saving = true);
-    Future.delayed(const Duration(milliseconds: 900), () {
+    try {
+      await ref.read(medicinesProvider.notifier).addMedicine(
+            medicineId: _selected!.id,
+            patientProfileId: _whoMode == 'patient' ? null : null,
+          );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Medicine saved successfully.'),
-            backgroundColor: context.inputBg,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackbar.success(context, 'Medicine added successfully.');
       }
-    });
+    } on Exception catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        AppSnackbar.error(context, e.toString());
+      }
+    }
   }
 
   @override
@@ -152,7 +147,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               child: Icon(Icons.close_rounded, color: context.primaryText),
             ),
           ),
-          title: Text(AppStrings.addMedicine, style: AppTypography.h3),
+          title: AppText.h3(AppStrings.addMedicine),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
             child: Container(height: 1, color: context.borderCol),
@@ -198,11 +193,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                                           size: 12, color: Colors.black)
                                       : Text(
                                           '${i + 1}',
-                                          style: AppTypography.labelXs.copyWith(
-                                            color: active
-                                                ? AppColors.teal
-                                                : AppColors.textHint,
-                                            letterSpacing: 0,
+                                          style: TextStyle(
+                                            fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0,
+                                            color: active ? AppColors.teal : AppColors.textHint,
                                           ),
                                         ),
                                 ),
@@ -210,12 +203,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 e.value,
-                                style: AppTypography.labelXs.copyWith(
-                                  color: active || done
-                                      ? AppColors.teal
-                                      : AppColors.textHint,
-                                  letterSpacing: 0,
-                                  fontSize: 9,
+                                style: TextStyle(
+                                  fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0,
+                                  color: active || done ? AppColors.teal : AppColors.textHint,
                                 ),
                               ),
                             ],
@@ -262,10 +252,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           side: BorderSide(color: context.borderCol),
                         ),
-                        child: Text(
+                        child: const Text(
                           AppStrings.back,
-                          style: AppTypography.buttonMd
-                              .copyWith(color: AppColors.textSecondary),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary),
                         ),
                       ),
                     ),
@@ -287,8 +276,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                             : _step == _steps.length - 1
                                 ? AppStrings.save
                                 : AppStrings.next,
-                        style: AppTypography.buttonLg
-                            .copyWith(color: AppColors.textInverse),
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse),
                       ),
                     ),
                   ),
@@ -331,11 +319,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               Expanded(
                 child: TextField(
                   controller: _searchCtrl,
-                  style: AppTypography.bodyMd,
+                  style: TextStyle(fontSize: 14, color: context.primaryText),
                   decoration: InputDecoration(
                     hintText: AppStrings.searchMedicines,
-                    hintStyle: AppTypography.bodyMd
-                        .copyWith(color: AppColors.textSecondary),
+                    hintStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -344,10 +331,13 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
-                  onChanged: (v) => setState(() {
-                    _searchQuery = v;
-                    _showRequest = false;
-                  }),
+                  onChanged: (v) {
+                    setState(() {
+                      _searchQuery = v;
+                      _showRequest = false;
+                    });
+                    _loadCatalog(v);
+                  },
                 ),
               ),
             ],
@@ -357,18 +347,29 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         const SizedBox(height: 16),
 
         Text(
-          _catalogResults.isEmpty
-              ? AppStrings.noMatchesLabel
-              : _searchQuery.isEmpty
-                  ? AppStrings.popularLabel
-                  : AppStrings.resultsLabel,
-          style: AppTypography.overline.copyWith(color: AppColors.textHint),
+          _catalogLoading
+              ? ''
+              : _catalogItems.isEmpty
+                  ? AppStrings.noMatchesLabel
+                  : _searchQuery.isEmpty
+                      ? AppStrings.popularLabel
+                      : AppStrings.resultsLabel,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: AppColors.textHint),
         ),
 
         const SizedBox(height: 10),
 
-        ..._catalogResults.map((item) {
-          final active = _selected?.name == item.name;
+        if (_catalogLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.teal),
+            ),
+          )
+        else
+          ..._catalogItems.map((item) {
+          final active = _selected?.id == item.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: GestureDetector(
@@ -408,11 +409,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.name, style: AppTypography.labelMd),
-                          Text(
-                            [item.genericName, item.strength, item.form]
+                          AppText.labelMd(item.name),
+                          AppText.bodySm(
+                            [item.genericName, item.strength, item.dosageForm]
                                 .join(' · '),
-                            style: AppTypography.bodySm,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -438,11 +438,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 _showRequest = true;
                 _reqNameCtrl.text = _searchQuery;
               }),
-              child: Text(
-                AppStrings.cantFindIt,
-                style:
-                    AppTypography.bodySm.copyWith(color: AppColors.teal),
-              ),
+              child: AppText.bodySm(AppStrings.cantFindIt, color: AppColors.teal),
             ),
           )
         else
@@ -458,19 +454,15 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               children: [
                 Row(
                   children: [
-                    Expanded(
-                        child: Text(AppStrings.requestMedicine,
-                            style: AppTypography.labelMd)),
+                    Expanded(child: AppText.labelMd(AppStrings.requestMedicine)),
                     GestureDetector(
                       onTap: () => setState(() => _showRequest = false),
-                      child: Text(AppStrings.cancel,
-                          style: AppTypography.bodySm
-                              .copyWith(color: AppColors.textSecondary)),
+                      child: AppText.bodySm(AppStrings.cancel, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(AppStrings.requestDesc, style: AppTypography.bodySm),
+                AppText.bodySm(AppStrings.requestDesc),
                 const SizedBox(height: 14),
                 _FieldRow(
                     label: AppStrings.medicineNameLabel,
@@ -480,20 +472,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 FilledButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(AppStrings.requestSubmitted,
-                            style: AppTypography.bodySm),
-                        backgroundColor: context.inputBg,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    AppSnackbar.success(context, AppStrings.requestSubmitted);
                   },
                   style:
                       FilledButton.styleFrom(backgroundColor: AppColors.teal),
-                  child: Text(AppStrings.submitRequest,
-                      style: AppTypography.buttonMd
-                          .copyWith(color: AppColors.textInverse)),
+                  child: const Text(AppStrings.submitRequest,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
                 ),
               ],
             ),
@@ -554,10 +538,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(opt.$3,
-                            style: AppTypography.labelMd
-                                .copyWith(color: active ? opt.$5 : null)),
-                        Text(opt.$4, style: AppTypography.bodySm),
+                        AppText.labelMd(opt.$3, color: active ? opt.$5 : null),
+                        AppText.bodySm(opt.$4),
                       ],
                     ),
                   ),
@@ -590,8 +572,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Frequency',
-            style: AppTypography.overline.copyWith(color: AppColors.textHint)),
+        const Text('Frequency',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: AppColors.textHint)),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -614,9 +596,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 ),
                 child: Text(
                   f.$2,
-                  style: AppTypography.labelSm.copyWith(
+                  style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0,
                     color: active ? AppColors.teal : AppColors.textSecondary,
-                    letterSpacing: 0,
                   ),
                 ),
               ),
@@ -626,9 +608,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
         if (_freq != 'prn') ...[
           const SizedBox(height: 20),
-          Text('Dose times',
-              style:
-                  AppTypography.overline.copyWith(color: AppColors.textHint)),
+          const Text('Dose times',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: AppColors.textHint)),
           const SizedBox(height: 10),
           ..._times.map((t) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -645,9 +626,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       const Icon(Icons.schedule_rounded,
                           size: 16, color: AppColors.teal),
                       const SizedBox(width: 10),
-                      Text(t,
-                          style: AppTypography.labelMd
-                              .copyWith(color: AppColors.teal)),
+                      AppText.labelMd(t, color: AppColors.teal),
                     ],
                   ),
                 ),
@@ -661,9 +640,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
           const SizedBox(height: 16),
 
-          Text(AppStrings.foodRelation,
-              style:
-                  AppTypography.overline.copyWith(color: AppColors.textHint)),
+          const Text(AppStrings.foodRelation,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: AppColors.textHint)),
           const SizedBox(height: 10),
           Row(
             children: _foodOptions.map((f) {
@@ -688,11 +666,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       child: Center(
                         child: Text(
                           f.$2,
-                          style: AppTypography.labelSm.copyWith(
-                            color: active
-                                ? AppColors.teal
-                                : AppColors.textSecondary,
-                            letterSpacing: 0,
+                          style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0,
+                            color: active ? AppColors.teal : AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -712,11 +688,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               border: Border.all(
                   color: AppColors.purple.withValues(alpha: 0.2)),
             ),
-            child: Text(
-              AppStrings.scheduleOptional,
-              style: AppTypography.bodyMd
-                  .copyWith(color: AppColors.purple.withValues(alpha: 0.9)),
-            ),
+            child: AppText.bodyMd(AppStrings.scheduleOptional, color: AppColors.purple.withValues(alpha: 0.9)),
           ),
         ],
       ],
@@ -729,7 +701,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppStrings.stockOptional, style: AppTypography.bodySm),
+        AppText.bodySm(AppStrings.stockOptional),
         const SizedBox(height: 20),
         _FieldRow(
           label: AppStrings.quantityLabel,
@@ -768,7 +740,7 @@ class _FieldRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
         const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
@@ -779,11 +751,10 @@ class _FieldRow extends StatelessWidget {
           child: TextField(
             controller: controller,
             keyboardType: inputType,
-            style: AppTypography.bodyMd,
+            style: TextStyle(fontSize: 14, color: context.primaryText),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle:
-                  AppTypography.bodyMd.copyWith(color: AppColors.textSecondary),
+              hintStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
               border: InputBorder.none,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

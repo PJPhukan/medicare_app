@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../../core/utils/logger.dart';
+import '../providers/support_provider.dart';
 
-class SubmitTicketScreen extends StatefulWidget {
+class SubmitTicketScreen extends ConsumerStatefulWidget {
   const SubmitTicketScreen({super.key});
 
   @override
-  State<SubmitTicketScreen> createState() => _SubmitTicketScreenState();
+  ConsumerState<SubmitTicketScreen> createState() => _SubmitTicketScreenState();
 }
 
-class _SubmitTicketScreenState extends State<SubmitTicketScreen> {
+class _SubmitTicketScreenState extends ConsumerState<SubmitTicketScreen> {
   final _subjectCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
   String _category = AppStrings.catBug;
@@ -35,19 +38,26 @@ class _SubmitTicketScreenState extends State<SubmitTicketScreen> {
 
   Future<void> _submit() async {
     if (_subjectCtrl.text.trim().isEmpty || _messageCtrl.text.trim().isEmpty) return;
+    AppLogger.i('Ticket submit → category:$_category', tag: 'Support');
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    _subjectCtrl.clear();
-    _messageCtrl.clear();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(AppStrings.ticketSubmitted, style: AppTypography.bodySm),
-      backgroundColor: AppColors.teal.withValues(alpha: 0.9),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-    ));
-    Navigator.pop(context);
+    try {
+      await ref.read(submitTicketProvider).call(
+        subject: _subjectCtrl.text.trim(),
+        body: _messageCtrl.text.trim(),
+        category: _category,
+      );
+      AppLogger.i('Ticket submitted ✓', tag: 'Support');
+      if (!mounted) return;
+      _subjectCtrl.clear();
+      _messageCtrl.clear();
+      AppSnackbar.success(context, AppStrings.ticketSubmitted);
+      Navigator.pop(context);
+    } on Exception catch (e) {
+      AppLogger.e('Ticket submit failed', tag: 'Support', error: e);
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      AppSnackbar.error(context, e.toString());
+    }
   }
 
   @override
@@ -69,7 +79,7 @@ class _SubmitTicketScreenState extends State<SubmitTicketScreen> {
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),
-                title: Text(AppStrings.submitTicket, style: AppTypography.h2.copyWith(fontSize: 22)),
+                title: AppText.h2(AppStrings.submitTicket),
                 background: Container(color: context.bg),
               ),
             ),
@@ -100,9 +110,11 @@ class _SubmitTicketScreenState extends State<SubmitTicketScreen> {
                           ),
                           child: Text(
                             c,
-                            style: AppTypography.labelSm.copyWith(
-                              color: sel ? AppColors.teal : AppColors.textSecondary,
+                            style: TextStyle(
+                              fontSize: 11,
                               fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                              letterSpacing: 0.5,
+                              color: sel ? AppColors.teal : AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -125,9 +137,9 @@ class _SubmitTicketScreenState extends State<SubmitTicketScreen> {
                     maxLines: 6,
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  AppText.bodyXs(
                     'We typically respond within 24 hours on business days.',
-                    style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary),
+                    color: AppColors.textSecondary,
                   ),
                   const SizedBox(height: 28),
                   ValueListenableBuilder<TextEditingValue>(
@@ -150,7 +162,10 @@ class _SubmitTicketScreenState extends State<SubmitTicketScreen> {
                                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal))
                                 : Text(
                                     AppStrings.submitTicketBtn,
-                                    style: AppTypography.buttonMd.copyWith(
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
                                       color: canSubmit ? AppColors.textInverse : AppColors.textHint,
                                     ),
                                   ),
@@ -176,7 +191,7 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 1),
       );
 }
 
@@ -198,7 +213,7 @@ class _QuickLink extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 18),
             const SizedBox(width: 12),
-            Expanded(child: Text(label, style: AppTypography.bodySm.copyWith(color: context.primaryText))),
+            Expanded(child: AppText.bodySm(label, color: context.primaryText)),
             const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
           ],
         ),
@@ -217,7 +232,7 @@ class _SupportField extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          AppText.bodyXs(label, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
@@ -228,10 +243,10 @@ class _SupportField extends StatelessWidget {
             child: TextField(
               controller: controller,
               maxLines: maxLines,
-              style: AppTypography.bodyMd.copyWith(color: context.primaryText),
+              style: TextStyle(fontSize: 14, color: context.primaryText),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
+                hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,

@@ -76,7 +76,6 @@ class AppProfilePictureInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark     = Theme.of(context).brightness == Brightness.dark;
     final accentCol  = color ?? AppColors.teal;
     final hasError   = error != null && error!.isNotEmpty;
     final ringColor  = hasError ? AppColors.error : accentCol;
@@ -117,7 +116,6 @@ class AppProfilePictureInput extends StatelessWidget {
                               initials: initials,
                               size: size,
                               color: accentCol,
-                              isDark: isDark,
                             ),
                     ),
                   ),
@@ -229,7 +227,6 @@ class _ImageView extends StatelessWidget {
       errorBuilder: (_, __, ___) => const _Placeholder(
         size: 0,
         color: AppColors.teal,
-        isDark: false,
       ),
     );
   }
@@ -242,17 +239,15 @@ class _Placeholder extends StatelessWidget {
     this.initials,
     required this.size,
     required this.color,
-    required this.isDark,
   });
 
   final String? initials;
   final double size;
   final Color color;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? color.withValues(alpha: 0.18) : color.withValues(alpha: 0.10);
+    final bg = color.withValues(alpha: 0.12);
 
     return Container(
       color: bg,

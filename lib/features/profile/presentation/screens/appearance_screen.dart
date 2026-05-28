@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 class AppearanceScreen extends StatefulWidget {
   const AppearanceScreen({super.key});
@@ -28,15 +28,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
     ('Green', AppColors.green),
   ];
 
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: AppTypography.bodySm),
-      backgroundColor: context.inputBg,
-      duration: const Duration(seconds: 2),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-    ));
-  }
+  void _snack(String msg) => AppSnackbar.info(context, msg);
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +49,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),
-                title: Text(AppStrings.appearance, style: AppTypography.h2.copyWith(fontSize: 22)),
+                title: AppText.h2(AppStrings.appearance),
                 background: Container(color: context.bg),
               ),
             ),
@@ -105,7 +97,10 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
                               alignment: Alignment.center,
                               child: Text(
                                 s,
-                                style: AppTypography.buttonSm.copyWith(
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.2,
                                   color: sel ? AppColors.teal : AppColors.textSecondary,
                                 ),
                               ),
@@ -146,7 +141,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
                                 child: sel ? const Icon(Icons.check_rounded, color: Colors.white, size: 20) : null,
                               ),
                               const SizedBox(height: 6),
-                              Text(label, style: AppTypography.bodyXs.copyWith(color: sel ? color : AppColors.textSecondary)),
+                              AppText.bodyXs(label, color: sel ? color : AppColors.textSecondary),
                             ],
                           ),
                         );
@@ -190,7 +185,7 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 1),
       );
 }
 
@@ -231,8 +226,8 @@ class _ToggleTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTypography.bodyMd.copyWith(color: context.primaryText, fontWeight: FontWeight.w600)),
-                  Text(subtitle, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
+                  AppText.bodyMd(title, color: context.primaryText, fontWeight: FontWeight.w600),
+                  AppText.bodyXs(subtitle, color: AppColors.textSecondary),
                 ],
               ),
             ),

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 // ─── Public data class returned by this sheet ─────────────────────────────────
 
@@ -145,7 +145,7 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(AppStrings.addDose, style: AppTypography.h3.copyWith(fontSize: 17)),
+                  const Text(AppStrings.addDose, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: const Icon(Icons.close_rounded, color: AppColors.textHint, size: 20),
@@ -184,7 +184,7 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                                 SizedBox(width: 8),
                                 Text(
                                   _timeDisplay,
-                                  style: AppTypography.labelSm.copyWith(color: context.primaryText),
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: context.primaryText),
                                 ),
                               ],
                             ),
@@ -267,9 +267,11 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                       ),
                       child: Text(
                         r,
-                        style: AppTypography.labelSm.copyWith(
-                          color: selected ? AppColors.teal : AppColors.textSecondary,
+                        style: TextStyle(
+                          fontSize: 11,
                           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                          letterSpacing: 0.5,
+                          color: selected ? AppColors.teal : AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -308,7 +310,10 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                               SizedBox(width: 8),
                               Text(
                                 AppStrings.saveDose,
-                                style: AppTypography.buttonMd.copyWith(
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.2,
                                   color: canSave ? context.bg : AppColors.textHint,
                                 ),
                               ),
@@ -366,10 +371,11 @@ class _TimingChip extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   label,
-                  style: AppTypography.labelXs.copyWith(
-                    color: selected ? color : AppColors.textHint,
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    letterSpacing: 0.8,
+                    color: selected ? color : AppColors.textHint,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -390,7 +396,7 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
         children: [
-          Text(text, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          AppText.bodyXs(text, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           if (required) ...[
             const SizedBox(width: 3),
             const Text('*', style: TextStyle(color: AppColors.red, fontSize: 12)),
@@ -414,10 +420,10 @@ class _TextField extends StatelessWidget {
         ),
         child: TextField(
           controller: controller,
-          style: AppTypography.bodyMd.copyWith(color: context.primaryText),
+          style: TextStyle(fontSize: 14, color: context.primaryText),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
+            hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,

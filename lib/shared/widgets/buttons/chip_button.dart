@@ -65,17 +65,16 @@ class _AppChipButtonState extends State<AppChipButton>
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
     final accent  = widget.color ?? AppColors.teal;
     final sel     = widget.selected;
 
     final bgColor = sel
         ? accent.withValues(alpha: 0.15)
-        : (isDark ? AppColors.dark700 : AppColors.light200);
+        : context.inputBg;
     final fgColor = sel ? accent : context.primaryText;
     final borderColor = sel
         ? accent.withValues(alpha: 0.4)
-        : (isDark ? AppColors.dark600 : AppColors.light300);
+        : context.borderCol;
 
     return GestureDetector(
       onTapDown: _disabled ? null : (_) => _ctrl.forward(),

@@ -35,9 +35,8 @@ class AppTimeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
-    final bg        = isDark ? context.inputBg : const Color(0xFFF1F5F9);
-    final border    = isDark ? context.borderCol : const Color(0xFFE2E8F0);
+    final bg        = context.inputBg;
+    final border    = context.borderCol;
     final hour      = int.tryParse(time.split(':').first) ?? 0;
     final isNight   = hour >= 18;
     final iconColor = isNight
@@ -64,7 +63,7 @@ class AppTimeChip extends StatelessWidget {
           Text(
             time,
             style: AppTypography.labelXs.copyWith(
-              color: isDark ? context.primaryText : const Color(0xFF334155),
+              color: context.primaryText,
               letterSpacing: 0.3,
               fontWeight: FontWeight.w600,
             ),

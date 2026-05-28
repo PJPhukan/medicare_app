@@ -46,7 +46,6 @@ class AppImagePickerInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark   = Theme.of(context).brightness == Brightness.dark;
     final hasError = error != null && error!.isNotEmpty;
     final activeCol = color ?? AppColors.teal;
 
@@ -92,18 +91,12 @@ class AppImagePickerInput extends StatelessWidget {
                 clipBehavior: Clip.hardEdge,
                 decoration: BoxDecoration(
                   shape: shape,
-                  color: isDark
-                      ? context.inputBg
-                      : const Color(0xFFF1F5F9),
+                  color: context.inputBg,
                   borderRadius: shape == BoxShape.circle
                       ? null
                       : AppBorderRadius.mdAll,
                   border: Border.all(
-                    color: hasError
-                        ? AppColors.error
-                        : (isDark
-                            ? context.borderCol
-                            : const Color(0xFFE2E8F0)),
+                    color: hasError ? AppColors.error : context.borderCol,
                   ),
                 ),
                 child: _hasImage

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/extensions/context_extensions.dart';
 import 'skeleton_base.dart';
 
 /// Skeleton for a generic content card.
@@ -36,9 +36,8 @@ class AppCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final cardBg  = isDark ? AppColors.dark800 : Colors.white;
-    final border  = isDark ? AppColors.dark600 : AppColors.light300;
+    final cardBg  = context.cardBg;
+    final border  = context.borderCol;
     final br      = BorderRadius.circular(radius);
 
     return SizedBox(
@@ -150,9 +149,8 @@ class AppHorizontalCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? AppColors.dark800 : Colors.white;
-    final border = isDark ? AppColors.dark600 : AppColors.light300;
+    final cardBg = context.cardBg;
+    final border = context.borderCol;
 
     return Container(
       height: height,

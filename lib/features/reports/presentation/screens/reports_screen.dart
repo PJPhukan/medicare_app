@@ -1,11 +1,17 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../../shared/widgets/skeleton/skeleton.dart';
+import '../../presentation/providers/reports_provider.dart';
+import '../../data/models/report_model.dart' as rep_model;
+import '../../../../core/network/connectivity_monitor.dart';
 
 // ─── Report model ─────────────────────────────────────────────────────────────
 
@@ -33,68 +39,28 @@ class _Report {
   });
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Adapter ──────────────────────────────────────────────────────────────────
 
-final _kReports = [
-  _Report(
-    id: 'r1',
-    title: 'Complete Blood Count (CBC)',
-    doctor: 'Dr. Arjun Sharma',
-    reportDate: DateTime(2026, 4, 12),
-    type: _ReportType.lab,
-    tags: ['Lab', 'Blood', 'Routine'],
-    description: 'Routine CBC with differential. Haemoglobin slightly low.',
-    fileSize: '1.2 MB',
-  ),
-  _Report(
-    id: 'r2',
-    title: 'Chest X-Ray',
-    doctor: 'Dr. Priya Nair',
-    reportDate: DateTime(2026, 4, 3),
-    type: _ReportType.imaging,
-    tags: ['Imaging', 'X-Ray'],
-    description: 'PA view chest X-ray. No active lesions.',
-    fileSize: '4.8 MB',
-  ),
-  _Report(
-    id: 'r3',
-    title: 'Metformin Prescription',
-    doctor: 'Dr. Vikram Menon',
-    reportDate: DateTime(2026, 3, 28),
-    type: _ReportType.prescription,
-    tags: ['Prescription', 'Diabetes'],
-    fileSize: '320 KB',
-  ),
-  _Report(
-    id: 'r4',
-    title: 'HbA1c Report',
-    doctor: 'Dr. Arjun Sharma',
-    reportDate: DateTime(2026, 3, 15),
-    type: _ReportType.pdf,
-    tags: ['Lab', 'Diabetes'],
-    description: 'HbA1c: 7.2% — borderline. Reassess in 3 months.',
-    fileSize: '890 KB',
-  ),
-  _Report(
-    id: 'r5',
-    title: 'Echocardiogram',
-    doctor: 'Dr. Deepa Krishnan',
-    reportDate: DateTime(2026, 2, 20),
-    type: _ReportType.imaging,
-    tags: ['Imaging', 'Heart'],
-    description: 'Normal LV function. EF 62%.',
-    fileSize: '6.1 MB',
-  ),
-  _Report(
-    id: 'r6',
-    title: 'Thyroid Profile',
-    doctor: 'Dr. Priya Nair',
-    reportDate: DateTime(2026, 2, 10),
-    type: _ReportType.lab,
-    tags: ['Lab', 'Thyroid'],
-    fileSize: '670 KB',
-  ),
-];
+_Report _toReport(rep_model.MedicalReport r) {
+  final type = r.isPdf
+      ? _ReportType.pdf
+      : r.isImage
+          ? _ReportType.image
+          : _ReportType.other;
+  final date = r.reportDate != null
+      ? DateTime.tryParse(r.reportDate!) ?? r.createdAtDate
+      : r.createdAtDate;
+  return _Report(
+    id: r.id,
+    title: r.title,
+    doctor: '',
+    reportDate: date,
+    type: type,
+    tags: r.tags.map((t) => t.name).toList(),
+    description: r.description,
+    fileSize: '',
+  );
+}
 
 // ─── Type helpers ─────────────────────────────────────────────────────────────
 
@@ -150,18 +116,20 @@ List<({String month, List<_Report> reports})> _groupByMonth(List<_Report> report
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ReportsScreen extends StatefulWidget {
+class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
 
   @override
-  State<ReportsScreen> createState() => _ReportsScreenState();
+  ConsumerState<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
+class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   String _filter = 'All';
-  final _reports = List<_Report>.from(_kReports);
+
+  List<_Report> get _reports =>
+      ref.watch(reportsProvider).reports.map(_toReport).toList();
 
   @override
   void initState() {
@@ -193,15 +161,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         report: report,
         onDelete: () {
           Navigator.pop(context);
-          setState(() => _reports.removeWhere((r) => r.id == report.id));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppStrings.reportDeleted, style: AppTypography.bodySm),
-              backgroundColor: context.inputBg,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-            ),
-          );
+          ref.read(reportsProvider.notifier).deleteReport(report.id);
+          AppSnackbar.info(context, AppStrings.reportDeleted);
         },
       ),
     );
@@ -213,23 +174,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _UploadSheet(
-        onUploaded: (report) {
-          setState(() => _reports.insert(0, report));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppStrings.reportUploaded, style: AppTypography.bodySm),
-              backgroundColor: context.inputBg,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-            ),
-          );
-        },
+        onUploaded: () => AppSnackbar.success(context, AppStrings.reportUploaded),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Reports', showAppBar: false);
+    }
+    final isLoading = ref.watch(reportsProvider).isLoading;
     final filtered = _filtered;
     final timeline = _groupByMonth(filtered);
 
@@ -237,216 +192,167 @@ class _ReportsScreenState extends State<ReportsScreen> {
       value: context.overlayStyle,
       child: Scaffold(
         backgroundColor: context.bg,
-        body: CustomScrollView(
-          slivers: [
-            // ── App bar ──────────────────────────────────────────────────────
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: context.bg,
-              surfaceTintColor: Colors.transparent,
-              expandedHeight: 96,
-              leading: IconButton(
-                icon: const Icon(Icons.menu_rounded, size: 22),
-                onPressed: openAppSidebar,
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-                title: Text(AppStrings.myReports, style: AppTypography.h3),
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: TextButton.icon(
-                    onPressed: _openUpload,
-                    icon: const Icon(Icons.upload_rounded, size: 15, color: AppColors.teal),
-                    label: Text(AppStrings.uploadReport,
-                        style: AppTypography.labelSm.copyWith(color: AppColors.teal)),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppBorderRadius.mdAll,
-                        side: BorderSide(color: AppColors.teal.withValues(alpha: 0.3)),
-                      ),
+        body: RefreshIndicator(
+          onRefresh: () => ref.read(reportsProvider.notifier).load(),
+          child: CustomScrollView(
+            slivers: [
+              // ── App bar ────────────────────────────────────────────────────
+              SliverAppBar(
+                pinned: true,
+                backgroundColor: context.bg,
+                surfaceTintColor: Colors.transparent,
+                expandedHeight: 96,
+                leading: AppIconButton(
+                  icon: const Icon(Icons.menu_rounded, size: 22),
+                  onPressed: openAppSidebar,
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
+                  title: AppText.h3(AppStrings.myReports),
+                ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: AppButton.outline(
+                      label: AppStrings.uploadReport,
+                      icon: const Icon(Icons.upload_rounded, size: 15),
+                      size: AppButtonSize.sm,
+                      color: AppColors.teal,
+                      onPressed: _openUpload,
                     ),
                   ),
-                ),
-              ],
-            ),
-
-            // ── Search bar ───────────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: _SearchBar(controller: _searchCtrl),
+                ],
               ),
-            ),
 
-            // ── Filter chips ─────────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 48,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: _kFilters.length,
-                  separatorBuilder: (_, __) => SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    final f = _kFilters[i];
-                    final active = _filter == f;
-                    return GestureDetector(
-                      onTap: () => setState(() => _filter = f),
-                      child: AnimatedContainer(
-                        duration: Duration(milliseconds: 180),
-                        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: active ? AppColors.teal : context.inputBg,
-                          borderRadius: AppBorderRadius.pill,
-                          border: Border.all(
-                            color: active ? AppColors.teal : context.borderCol,
+              // ── Search bar ─────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: AppSearchField(
+                    controller: _searchCtrl,
+                    hint: AppStrings.searchReports,
+                    onClear: _searchCtrl.clear,
+                  ),
+                ),
+              ),
+
+              // ── Filter chips ───────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 48,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _kFilters.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) {
+                      final f = _kFilters[i];
+                      final active = _filter == f;
+                      return GestureDetector(
+                        onTap: () => setState(() => _filter = f),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: active ? AppColors.teal : context.inputBg,
+                            borderRadius: AppBorderRadius.pill,
+                            border: Border.all(
+                              color: active ? AppColors.teal : context.borderCol,
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          f,
-                          style: AppTypography.labelSm.copyWith(
+                          child: AppText.labelSm(
+                            f,
                             color: active ? context.bg : AppColors.textSecondary,
                             fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
 
-            // ── Content ──────────────────────────────────────────────────────
-            timeline.isEmpty
-                ? SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.description_outlined, size: 52, color: AppColors.textHint),
-                          const SizedBox(height: 16),
-                          Text(
-                            _reports.isEmpty ? AppStrings.noReportsUploaded : AppStrings.noReportsFilter,
-                            style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                            textAlign: TextAlign.center,
-                          ),
-                          if (_reports.isEmpty) ...[
-                            const SizedBox(height: 16),
-                            GestureDetector(
-                              onTap: _openUpload,
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                decoration: BoxDecoration(color: AppColors.teal, borderRadius: AppBorderRadius.lgAll),
-                                child: Text(AppStrings.uploadReport,
-                                    style: AppTypography.buttonSm.copyWith(color: context.bg)),
-                              ),
+              // ── Content ────────────────────────────────────────────────────
+              if (isLoading)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, __) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: AppSkeleton(
+                          child: Container(
+                            height: 96,
+                            decoration: BoxDecoration(
+                              color: context.cardBg,
+                              borderRadius: AppBorderRadius.lgAll,
                             ),
-                          ],
-                        ],
+                          ),
+                        ),
                       ),
-                    ),
-                  )
-                : SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, gi) {
-                          final group = timeline[gi];
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (gi > 0) const SizedBox(height: 20),
-                              // Month header
-                              Padding(
-                                padding: EdgeInsets.only(bottom: 10),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      group.month.toUpperCase(),
-                                      style: AppTypography.overline.copyWith(
-                                        color: AppColors.textHint,
-                                        fontSize: 10,
-                                        letterSpacing: 1.2,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Divider(height: 1, color: context.borderCol)),
-                                  ],
-                                ),
-                              ),
-                              // Report cards
-                              ...group.reports.map((r) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: _ReportCard(report: r, onTap: () => _openDetail(r)),
-                                  )),
-                            ],
-                          );
-                        },
-                        childCount: timeline.length,
-                      ),
+                      childCount: 5,
                     ),
                   ),
-          ],
+                )
+              else if (timeline.isEmpty)
+                SliverFillRemaining(
+                  child: Center(
+                    child: AppEmptyState(
+                      icon: Icons.description_outlined,
+                      title: _reports.isEmpty
+                          ? AppStrings.noReportsUploaded
+                          : AppStrings.noReportsFilter,
+                      action: _reports.isEmpty ? _openUpload : null,
+                      actionLabel: _reports.isEmpty ? AppStrings.uploadReport : null,
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, gi) {
+                        final group = timeline[gi];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (gi > 0) const SizedBox(height: 20),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    group.month.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textHint,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Divider(height: 1, color: context.borderCol)),
+                                ],
+                              ),
+                            ),
+                            ...group.reports.map((r) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: _ReportCard(report: r, onTap: () => _openDetail(r)),
+                                )),
+                          ],
+                        );
+                      },
+                      childCount: timeline.length,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
-}
-
-// ─── Search bar ───────────────────────────────────────────────────────────────
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  _SearchBar({required this.controller});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          color: context.inputBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: Row(
-          children: [
-            Padding(
-              padding: EdgeInsets.only(left: 14),
-              child: Icon(Icons.search_rounded, color: AppColors.textHint, size: 18),
-            ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-                decoration: InputDecoration(
-                  hintText: AppStrings.searchReports,
-                  hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: true,
-                  fillColor: Colors.transparent,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                ),
-              ),
-            ),
-            ValueListenableBuilder(
-              valueListenable: controller,
-              builder: (_, v, __) => v.text.isNotEmpty
-                  ? GestureDetector(
-                      onTap: controller.clear,
-                      child: const Padding(
-                        padding: EdgeInsets.only(right: 12),
-                        child: Icon(Icons.close_rounded, size: 16, color: AppColors.textHint),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ],
-        ),
-      );
 }
 
 // ─── Report card ──────────────────────────────────────────────────────────────
@@ -465,74 +371,64 @@ class _ReportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _typeColor(report.type);
-    return GestureDetector(
+    return AppCard(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: AppBorderRadius.mdAll,
-                border: Border.all(color: color.withValues(alpha: 0.25)),
-              ),
-              alignment: Alignment.center,
-              child: Icon(_typeIcon(report.type), size: 20, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    report.title,
-                    style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w700),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(report.doctor, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
-                  const SizedBox(height: 2),
-                  Text(_fmtDate(report.reportDate), style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
-                  if (report.tags.isNotEmpty) ...[
-                    SizedBox(height: 6),
-                    Wrap(
-                      spacing: 5,
-                      runSpacing: 4,
-                      children: report.tags.take(3).map((tag) => Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: context.inputBg,
-                          borderRadius: AppBorderRadius.pill,
-                          border: Border.all(color: context.borderCol),
-                        ),
-                        child: Text(tag, style: AppTypography.labelXs.copyWith(color: AppColors.textSecondary, fontSize: 10)),
-                      )).toList(),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          AppContainer.tinted(
+            color: color,
+            borderRadius: AppBorderRadius.mdAll,
+            padding: const EdgeInsets.all(12),
+            child: Icon(_typeIcon(report.type), size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (report.fileSize.isNotEmpty)
-                  Text(report.fileSize, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
-                const SizedBox(height: 4),
-                Text('View →', style: AppTypography.labelXs.copyWith(color: AppColors.teal, fontSize: 11)),
+                AppText.labelMd(
+                  report.title,
+                  fontWeight: FontWeight.w700,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                AppText.bodyXs(report.doctor, color: context.secondaryText),
+                const SizedBox(height: 2),
+                AppText.bodyXs(_fmtDate(report.reportDate), color: AppColors.textHint),
+                if (report.tags.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 4,
+                    children: report.tags.take(3).map((tag) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: context.inputBg,
+                        borderRadius: AppBorderRadius.pill,
+                        border: Border.all(color: context.borderCol),
+                      ),
+                      child: AppText.labelXs(tag, color: context.secondaryText),
+                    )).toList(),
+                  ),
+                ],
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (report.fileSize.isNotEmpty)
+                Text(report.fileSize,
+                    style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+              const SizedBox(height: 4),
+              const Text('View →',
+                  style: TextStyle(fontSize: 11, color: AppColors.teal, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -551,32 +447,16 @@ class _ReportDetailSheet extends StatelessWidget {
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppBorderRadius.lgAll,
-          side: BorderSide(color: AppColors.red.withValues(alpha: 0.2)),
-        ),
-        title: Text(AppStrings.deleteReport, style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w700)),
-        content: Text(AppStrings.deleteReportConfirm, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: AppTypography.labelSm.copyWith(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onDelete();
-            },
-            child: Text('Delete', style: AppTypography.labelSm.copyWith(color: AppColors.red)),
-          ),
-        ],
-      ),
+  Future<void> _confirmDelete(BuildContext context) async {
+    final ok = await AppDialog.confirm(
+      context,
+      title: AppStrings.deleteReport,
+      message: AppStrings.deleteReportConfirm,
+      confirmLabel: AppStrings.delete,
+      cancelLabel: AppStrings.cancel,
+      isDanger: true,
     );
+    if (ok == true && context.mounted) onDelete();
   }
 
   @override
@@ -588,7 +468,7 @@ class _ReportDetailSheet extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 20),
       decoration: BoxDecoration(
         color: context.cardBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -607,15 +487,10 @@ class _ReportDetailSheet extends StatelessWidget {
           // Icon + title
           Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: AppBorderRadius.lgAll,
-                  border: Border.all(color: color.withValues(alpha: 0.25)),
-                ),
-                alignment: Alignment.center,
+              AppContainer.tinted(
+                color: color,
+                borderRadius: AppBorderRadius.lgAll,
+                padding: const EdgeInsets.all(14),
                 child: Icon(_typeIcon(report.type), size: 24, color: color),
               ),
               const SizedBox(width: 14),
@@ -623,10 +498,10 @@ class _ReportDetailSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(report.title, style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w700)),
+                    AppText.labelMd(report.title, fontWeight: FontWeight.w700),
                     const SizedBox(height: 3),
-                    Text(report.doctor, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
-                    Text(_fmtDate(report.reportDate), style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                    AppText.bodyXs(report.doctor, color: context.secondaryText),
+                    AppText.bodyXs(_fmtDate(report.reportDate), color: AppColors.textHint),
                   ],
                 ),
               ),
@@ -635,80 +510,63 @@ class _ReportDetailSheet extends StatelessWidget {
 
           if (report.description != null) ...[
             const SizedBox(height: 14),
-            Text(report.description!, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.5)),
+            AppText.bodySm(report.description!, color: context.secondaryText),
           ],
 
           if (report.tags.isNotEmpty) ...[
-            SizedBox(height: 14),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: report.tags.map((tag) => Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: context.inputBg,
                   borderRadius: AppBorderRadius.pill,
                   border: Border.all(color: context.borderCol),
                 ),
-                child: Text(tag, style: AppTypography.labelXs.copyWith(color: AppColors.textSecondary)),
+                child: AppText.labelXs(tag, color: context.secondaryText),
               )).toList(),
             ),
           ],
 
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
           // Action buttons
           Row(
             children: [
               Expanded(
-                child: _ActionBtn(
-                  icon: Icons.visibility_outlined,
+                child: AppButton.outline(
                   label: 'View',
+                  icon: const Icon(Icons.visibility_outlined, size: 15),
                   color: AppColors.teal,
-                  onTap: () {
+                  isFullWidth: true,
+                  onPressed: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Opening ${report.title}…', style: AppTypography.bodySm),
-                        backgroundColor: context.inputBg,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-                      ),
-                    );
+                    AppSnackbar.info(context, 'Opening ${report.title}…');
                   },
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
-                child: _ActionBtn(
-                  icon: Icons.download_rounded,
+                child: AppButton.outline(
                   label: AppStrings.download,
+                  icon: const Icon(Icons.download_rounded, size: 15),
                   color: AppColors.blue,
-                  onTap: () {
+                  isFullWidth: true,
+                  onPressed: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Downloading ${report.title}…', style: AppTypography.bodySm),
-                        backgroundColor: context.inputBg,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-                      ),
-                    );
+                    AppSnackbar.info(context, 'Downloading ${report.title}…');
                   },
                 ),
               ),
               const SizedBox(width: 10),
               GestureDetector(
                 onTap: () => _confirmDelete(context),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.red.withValues(alpha: 0.1),
-                    borderRadius: AppBorderRadius.lgAll,
-                    border: Border.all(color: AppColors.red.withValues(alpha: 0.3)),
-                  ),
-                  alignment: Alignment.center,
+                child: AppContainer.tinted(
+                  color: AppColors.red,
+                  borderRadius: AppBorderRadius.lgAll,
+                  padding: const EdgeInsets.all(13),
                   child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.red),
                 ),
               ),
@@ -720,51 +578,22 @@ class _ReportDetailSheet extends StatelessWidget {
   }
 }
 
-class _ActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ActionBtn({required this.icon, required this.label, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: AppBorderRadius.lgAll,
-            border: Border.all(color: color.withValues(alpha: 0.3)),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: color),
-              const SizedBox(width: 6),
-              Text(label, style: AppTypography.buttonSm.copyWith(color: color)),
-            ],
-          ),
-        ),
-      );
-}
-
 // ─── Upload bottom sheet ──────────────────────────────────────────────────────
 
-class _UploadSheet extends StatefulWidget {
-  final void Function(_Report) onUploaded;
+class _UploadSheet extends ConsumerStatefulWidget {
+  final VoidCallback onUploaded;
   const _UploadSheet({required this.onUploaded});
 
   @override
-  State<_UploadSheet> createState() => _UploadSheetState();
+  ConsumerState<_UploadSheet> createState() => _UploadSheetState();
 }
 
-class _UploadSheetState extends State<_UploadSheet> {
+class _UploadSheetState extends ConsumerState<_UploadSheet> {
   final _titleCtrl = TextEditingController();
   final _tagsCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   DateTime? _selectedDate;
+  String? _filePath;
   bool _hasFile = false;
   bool _uploading = false;
 
@@ -792,25 +621,39 @@ class _UploadSheetState extends State<_UploadSheet> {
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
-  Future<void> _upload() async {
-    if (_titleCtrl.text.trim().isEmpty) return;
-    setState(() => _uploading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-
-    final tags = _tagsCtrl.text.trim().split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-    final report = _Report(
-      id: 'r_${DateTime.now().millisecondsSinceEpoch}',
-      title: _titleCtrl.text.trim(),
-      doctor: 'You',
-      reportDate: _selectedDate ?? DateTime.now(),
-      type: _ReportType.pdf,
-      tags: tags,
-      description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-      fileSize: '1.0 MB',
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
     );
-    Navigator.pop(context);
-    widget.onUploaded(report);
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _filePath = result.files.single.path;
+        _hasFile = true;
+      });
+    }
+  }
+
+  Future<void> _upload() async {
+    if (_titleCtrl.text.trim().isEmpty || _filePath == null) return;
+    setState(() => _uploading = true);
+    try {
+      final tags = _tagsCtrl.text.trim().split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+      await ref.read(reportsProvider.notifier).uploadReport(
+        filePath: _filePath!,
+        title: _titleCtrl.text.trim(),
+        description: _descCtrl.text.trim().isNotEmpty ? _descCtrl.text.trim() : null,
+        reportDate: _selectedDate?.toIso8601String(),
+        tags: tags,
+      );
+      if (!mounted) return;
+      widget.onUploaded();
+      Navigator.pop(context);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      AppSnackbar.error(context, e.toString());
+    }
   }
 
   @override
@@ -824,7 +667,7 @@ class _UploadSheetState extends State<_UploadSheet> {
         padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 20),
         decoration: BoxDecoration(
           color: context.cardBg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -843,27 +686,26 @@ class _UploadSheetState extends State<_UploadSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(AppStrings.uploadReport, style: AppTypography.h3.copyWith(fontSize: 17)),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close_rounded, color: AppColors.textHint, size: 20),
+                  AppText.h3(AppStrings.uploadReport),
+                  AppIconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textHint),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-              // Drop zone (mock)
+              // File picker
               GestureDetector(
-                onTap: () => setState(() => _hasFile = true),
+                onTap: _pickFile,
                 child: AnimatedContainer(
-                  duration: Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 200),
                   height: 100,
                   decoration: BoxDecoration(
                     color: _hasFile ? AppColors.teal.withValues(alpha: 0.06) : context.inputBg,
                     borderRadius: AppBorderRadius.lgAll,
                     border: Border.all(
                       color: _hasFile ? AppColors.teal.withValues(alpha: 0.4) : context.borderCol,
-                      style: BorderStyle.solid,
                     ),
                   ),
                   alignment: Alignment.center,
@@ -876,11 +718,9 @@ class _UploadSheetState extends State<_UploadSheet> {
                         color: _hasFile ? AppColors.teal : AppColors.textHint,
                       ),
                       const SizedBox(height: 6),
-                      Text(
+                      AppText.bodySm(
                         _hasFile ? 'File selected' : 'Tap to choose a file',
-                        style: AppTypography.bodySm.copyWith(
-                          color: _hasFile ? AppColors.teal : AppColors.textSecondary,
-                        ),
+                        color: _hasFile ? AppColors.teal : AppColors.textSecondary,
                       ),
                     ],
                   ),
@@ -891,16 +731,16 @@ class _UploadSheetState extends State<_UploadSheet> {
               // Title
               _FieldLabel(AppStrings.reportTitle, required: true),
               const SizedBox(height: 6),
-              _InputField(controller: _titleCtrl, hint: 'e.g. Blood Test April 2026'),
+              AppTextField(controller: _titleCtrl, hint: 'e.g. Blood Test April 2026'),
               const SizedBox(height: 12),
 
               // Date
               _FieldLabel(AppStrings.reportDate),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               GestureDetector(
                 onTap: _pickDate,
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: context.inputBg,
                     borderRadius: AppBorderRadius.lgAll,
@@ -909,14 +749,12 @@ class _UploadSheetState extends State<_UploadSheet> {
                   child: Row(
                     children: [
                       const Icon(Icons.calendar_today_rounded, size: 15, color: AppColors.textHint),
-                      SizedBox(width: 10),
-                      Text(
+                      const SizedBox(width: 10),
+                      AppText.bodyMd(
                         _selectedDate == null
                             ? 'Select date'
                             : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                        style: AppTypography.bodyMd.copyWith(
-                          color: _selectedDate == null ? AppColors.textHint : context.primaryText,
-                        ),
+                        color: _selectedDate == null ? AppColors.textHint : context.primaryText,
                       ),
                     ],
                   ),
@@ -927,31 +765,23 @@ class _UploadSheetState extends State<_UploadSheet> {
               // Tags
               _FieldLabel(AppStrings.reportTags),
               const SizedBox(height: 6),
-              _InputField(controller: _tagsCtrl, hint: AppStrings.reportTagsHint),
+              AppTextField(controller: _tagsCtrl, hint: AppStrings.reportTagsHint),
               const SizedBox(height: 12),
 
               // Description
               _FieldLabel(AppStrings.reportDescription),
               const SizedBox(height: 6),
-              _InputField(controller: _descCtrl, hint: AppStrings.reportDescHint, maxLines: 3),
-              SizedBox(height: 20),
+              AppTextArea(controller: _descCtrl, hint: AppStrings.reportDescHint, maxLines: 3, minLines: 3),
+              const SizedBox(height: 20),
 
               // Buttons
               Row(
                 children: [
                   Expanded(
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 13),
-                        decoration: BoxDecoration(
-                          color: context.inputBg,
-                          borderRadius: AppBorderRadius.lgAll,
-                          border: Border.all(color: context.borderCol),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('Cancel', style: AppTypography.buttonSm.copyWith(color: AppColors.textSecondary)),
-                      ),
+                    child: AppButton.secondary(
+                      label: AppStrings.cancel,
+                      isFullWidth: true,
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -959,12 +789,12 @@ class _UploadSheetState extends State<_UploadSheet> {
                     child: ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _titleCtrl,
                       builder: (_, v, __) {
-                        final canUpload = v.text.trim().isNotEmpty && !_uploading;
+                        final canUpload = v.text.trim().isNotEmpty && _hasFile && !_uploading;
                         return GestureDetector(
                           onTap: canUpload ? _upload : null,
                           child: AnimatedContainer(
-                            duration: Duration(milliseconds: 200),
-                            padding: EdgeInsets.symmetric(vertical: 13),
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             decoration: BoxDecoration(
                               color: canUpload ? AppColors.teal : context.inputBg,
                               borderRadius: AppBorderRadius.lgAll,
@@ -976,11 +806,10 @@ class _UploadSheetState extends State<_UploadSheet> {
                                     height: 18,
                                     child: CircularProgressIndicator(strokeWidth: 2, color: context.bg),
                                   )
-                                : Text(
+                                : AppText.labelMd(
                                     AppStrings.uploadReport,
-                                    style: AppTypography.buttonSm.copyWith(
-                                      color: canUpload ? context.bg : AppColors.textHint,
-                                    ),
+                                    color: canUpload ? context.bg : AppColors.textHint,
+                                    fontWeight: FontWeight.w600,
                                   ),
                           ),
                         );
@@ -997,7 +826,7 @@ class _UploadSheetState extends State<_UploadSheet> {
   }
 }
 
-// ─── Shared form helpers ──────────────────────────────────────────────────────
+// ─── Form helpers ─────────────────────────────────────────────────────────────
 
 class _FieldLabel extends StatelessWidget {
   final String text;
@@ -1007,42 +836,11 @@ class _FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
         children: [
-          Text(text, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          AppText.bodyXs(text, color: context.secondaryText, fontWeight: FontWeight.w600),
           if (required) ...[
             const SizedBox(width: 3),
             const Text('*', style: TextStyle(color: AppColors.red, fontSize: 12)),
           ],
         ],
-      );
-}
-
-class _InputField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final int maxLines;
-  _InputField({required this.controller, required this.hint, this.maxLines = 1});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: context.inputBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: TextField(
-          controller: controller,
-          maxLines: maxLines,
-          style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            filled: true,
-            fillColor: Colors.transparent,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          ),
-        ),
       );
 }

@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../../shared/widgets/skeleton/skeleton.dart';
+import '../../presentation/providers/professionals_provider.dart';
+import '../../data/models/professional_model.dart' as pro_model;
 import 'professional_detail_screen.dart';
 import '../../../professional_profile/presentation/screens/become_professional_screen.dart';
+import '../../../connections/presentation/providers/connections_provider.dart';
+import '../../../../core/utils/logger.dart';
+import '../../../../core/network/connectivity_monitor.dart';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +26,7 @@ enum ProPlanType { hourly, daily, monthly }
 
 class ProData {
   final String id;
+  final String userId;
   final String name;
   final String categoryName;
   final Color categoryColor;
@@ -37,6 +44,7 @@ class ProData {
 
   const ProData({
     required this.id,
+    required this.userId,
     required this.name,
     required this.categoryName,
     required this.categoryColor,
@@ -54,177 +62,46 @@ class ProData {
   });
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-class _Category {
-  final String name;
-  final Color color;
-  const _Category(this.name, this.color);
+Color _categoryColor(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('doctor') || n.contains('physician')) return AppColors.teal;
+  if (n.contains('nurse')) return AppColors.blue;
+  if (n.contains('therapist') || n.contains('psycholog')) return AppColors.purple;
+  if (n.contains('diet') || n.contains('nutrition')) return AppColors.amber;
+  if (n.contains('caregiver') || n.contains('care')) return AppColors.red;
+  if (n.contains('physio')) return AppColors.green;
+  return AppColors.teal;
 }
 
-const _kCategories = [
-  _Category('Doctor', AppColors.teal),
-  _Category('Nurse', AppColors.blue),
-  _Category('Therapist', AppColors.purple),
-  _Category('Dietitian', AppColors.amber),
-  _Category('Caregiver', AppColors.red),
-  _Category('Physiotherapist', AppColors.green),
-];
+// ─── Adapter ──────────────────────────────────────────────────────────────────
 
-const _kProfessionals = [
-  ProData(
-    id: 'p1',
-    name: 'Dr. Arjun Sharma',
-    categoryName: 'Doctor',
-    categoryColor: AppColors.teal,
-    bio: 'Senior cardiologist with 12 years of experience in heart disease management, preventive care, and minimally invasive procedures.',
-    address: 'Mumbai, MH',
-    certifications: ['MBBS', 'MD Cardiology', 'FACC'],
-    experienceYrs: 12,
-    isVerified: true,
-    averageRating: 4.8,
-    ratingCount: 142,
-    hourlyRate: 500,
-    dailyRate: 3000,
-    monthlyRate: 45000,
-    connectionState: ProConnState.none,
-  ),
-  ProData(
-    id: 'p2',
-    name: 'Meena Patel',
-    categoryName: 'Nurse',
-    categoryColor: AppColors.blue,
-    bio: 'Registered nurse specialising in home care and post-operative recovery. Compassionate, punctual, and experienced with elderly patients.',
-    address: 'Delhi, DL',
-    certifications: ['RN', 'B.Sc Nursing', 'ACLS'],
-    experienceYrs: 8,
-    isVerified: true,
-    averageRating: 4.6,
-    ratingCount: 88,
-    hourlyRate: 300,
-    dailyRate: 1800,
-    monthlyRate: 28000,
-    connectionState: ProConnState.pending,
-  ),
-  ProData(
-    id: 'p3',
-    name: 'Dr. Priya Rajan',
-    categoryName: 'Therapist',
-    categoryColor: AppColors.purple,
-    bio: 'Licensed clinical psychologist offering CBT, mindfulness-based therapy, and anxiety management. Creates a safe, non-judgemental space.',
-    address: 'Bangalore, KA',
-    certifications: ['PhD Psychology', 'CBT Certified'],
-    experienceYrs: 5,
-    isVerified: false,
-    averageRating: 4.5,
-    ratingCount: 61,
-    hourlyRate: 800,
-    dailyRate: 4000,
-    monthlyRate: 60000,
-    connectionState: ProConnState.none,
-  ),
-  ProData(
-    id: 'p4',
-    name: 'Ravi Shankar',
-    categoryName: 'Dietitian',
-    categoryColor: AppColors.amber,
-    bio: 'Clinical dietitian with expertise in diabetes nutrition, weight management, and sports nutrition. Evidence-based, personalised plans.',
-    address: 'Hyderabad, TS',
-    certifications: ['M.Sc Dietetics', 'Certified Diabetes Educator'],
-    experienceYrs: 10,
-    isVerified: true,
-    averageRating: 4.7,
-    ratingCount: 103,
-    hourlyRate: 400,
-    dailyRate: 2500,
-    monthlyRate: 38000,
-    connectionState: ProConnState.none,
-  ),
-  ProData(
-    id: 'p5',
-    name: 'Sunita Devi',
-    categoryName: 'Caregiver',
-    categoryColor: AppColors.red,
-    bio: 'Dedicated caregiver for elderly and bedridden patients. Experienced in bathing, mobility assistance, feeding, and medication reminders.',
-    address: 'Chennai, TN',
-    certifications: ['Home Health Aide', 'CPR Certified'],
-    experienceYrs: 6,
-    isVerified: true,
-    averageRating: 4.9,
-    ratingCount: 54,
-    hourlyRate: 200,
-    dailyRate: 1200,
-    monthlyRate: 18000,
-    connectionState: ProConnState.connected,
-  ),
-  ProData(
-    id: 'p6',
-    name: 'Dr. Vikram Nair',
-    categoryName: 'Physiotherapist',
-    categoryColor: AppColors.green,
-    bio: 'Sports physiotherapist and rehabilitation specialist. Expert in post-surgery recovery, musculoskeletal pain, and sports injury management.',
-    address: 'Pune, MH',
-    certifications: ['BPT', 'MPT Orthopaedics', 'MCPA'],
-    experienceYrs: 15,
-    isVerified: true,
-    averageRating: 4.9,
-    ratingCount: 187,
-    hourlyRate: 600,
-    dailyRate: 3500,
-    monthlyRate: 52000,
-    connectionState: ProConnState.none,
-  ),
-  ProData(
-    id: 'p7',
-    name: 'Aisha Khan',
-    categoryName: 'Nurse',
-    categoryColor: AppColors.blue,
-    bio: 'ICU-trained nurse offering private nursing care. Skilled in IV therapy, wound dressing, catheter care, and patient monitoring.',
-    address: 'Kolkata, WB',
-    certifications: ['RN', 'Critical Care Nursing'],
-    experienceYrs: 4,
-    isVerified: true,
-    averageRating: 4.4,
-    ratingCount: 32,
-    hourlyRate: 280,
-    dailyRate: 1500,
-    monthlyRate: 22000,
-    connectionState: ProConnState.none,
-  ),
-  ProData(
-    id: 'p8',
-    name: 'Dr. Sanjay Mehta',
-    categoryName: 'Doctor',
-    categoryColor: AppColors.teal,
-    bio: 'General physician and internal medicine specialist. Expert in chronic disease management, diabetes, hypertension, and preventive health.',
-    address: 'Mumbai, MH',
-    certifications: ['MBBS', 'MD Internal Medicine'],
-    experienceYrs: 20,
-    isVerified: true,
-    averageRating: 4.8,
-    ratingCount: 231,
-    hourlyRate: 1000,
-    dailyRate: 6000,
-    monthlyRate: 90000,
-    connectionState: ProConnState.none,
-  ),
-];
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
-class ProfessionalsScreen extends StatefulWidget {
-  const ProfessionalsScreen({super.key});
-
-  @override
-  State<ProfessionalsScreen> createState() => _ProfessionalsScreenState();
-}
+ProData _toPro(pro_model.Professional p) => ProData(
+      id: p.id,
+      userId: p.user.id,
+      name: p.name,
+      categoryName: p.category.name,
+      categoryColor: _categoryColor(p.category.name),
+      bio: p.bio ?? '',
+      address: p.address ?? '',
+      certifications: p.certifications,
+      experienceYrs: p.experienceYrs ?? 0,
+      isVerified: p.isVerified,
+      averageRating: p.averageRating ?? 0.0,
+      ratingCount: p.ratingCount ?? 0,
+      hourlyRate: p.hourlyRate?.toInt(),
+      dailyRate: p.dailyRate?.toInt(),
+      monthlyRate: p.monthlyRate?.toInt(),
+      connectionState: ProConnState.none,
+    );
 
 // ─── Filter state ─────────────────────────────────────────────────────────────
 
 class _ProFilter {
-  final int? maxHourlyRate;   // null = any
-  final String? location;     // null = any
-  final double? minRating;    // null = any
+  final int? maxHourlyRate;
+  final String? location;
+  final double? minRating;
 
   const _ProFilter({this.maxHourlyRate, this.location, this.minRating});
 
@@ -251,16 +128,24 @@ const _sentinel = Object();
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
+class ProfessionalsScreen extends ConsumerStatefulWidget {
+  const ProfessionalsScreen({super.key});
+
+  @override
+  ConsumerState<ProfessionalsScreen> createState() => _ProfessionalsScreenState();
+}
+
+class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
   final _searchCtrl = TextEditingController();
-  String? _selectedCategory;
-  String _query = '';
+  String? _selectedCategoryId;
   _ProFilter _filter = const _ProFilter();
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() => setState(() => _query = _searchCtrl.text.trim().toLowerCase()));
+    _searchCtrl.addListener(() {
+      ref.read(professionalsProvider.notifier).setSearch(_searchCtrl.text.trim());
+    });
   }
 
   @override
@@ -270,18 +155,8 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
   }
 
   List<ProData> get _filtered {
-    var list = _kProfessionals.toList();
-    if (_selectedCategory != null) {
-      list = list.where((p) => p.categoryName == _selectedCategory).toList();
-    }
-    if (_query.isNotEmpty) {
-      list = list.where((p) =>
-        p.name.toLowerCase().contains(_query) ||
-        p.categoryName.toLowerCase().contains(_query) ||
-        p.bio.toLowerCase().contains(_query) ||
-        p.address.toLowerCase().contains(_query),
-      ).toList();
-    }
+    List<ProData> list =
+        ref.watch(professionalsProvider).professionals.map(_toPro).toList();
     if (_filter.maxHourlyRate != null) {
       list = list.where((p) => (p.hourlyRate ?? 0) <= _filter.maxHourlyRate!).toList();
     }
@@ -315,6 +190,9 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Professionals', showAppBar: false);
+    }
     final filtered = _filtered;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
@@ -327,14 +205,14 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
               backgroundColor: context.bg,
               surfaceTintColor: Colors.transparent,
               expandedHeight: 96,
-              leading: IconButton(
+              leading: AppIconButton(
                 icon: const Icon(Icons.menu_rounded, size: 22),
-                onPressed: openAppSidebar,
                 tooltip: 'Menu',
+                onPressed: openAppSidebar,
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-                title: Text(AppStrings.browseProfessionals, style: AppTypography.h3),
+                title: AppText.h3(AppStrings.browseProfessionals),
               ),
             ),
 
@@ -344,13 +222,19 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: Row(
                   children: [
-                    Expanded(child: _SearchBar(controller: _searchCtrl)),
+                    Expanded(
+                      child: AppSearchField(
+                        controller: _searchCtrl,
+                        hint: AppStrings.searchProfessionals,
+                        onClear: _searchCtrl.clear,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: _showFilterSheet,
                       child: AnimatedContainer(
-                        duration: Duration(milliseconds: 200),
-                        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
                           color: _filter.isActive
                               ? AppColors.teal.withValues(alpha: 0.12)
@@ -368,23 +252,21 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
                             Icon(
                               Icons.tune_rounded,
                               size: 18,
-                              color: _filter.isActive
-                                  ? AppColors.teal
-                                  : AppColors.textHint,
+                              color: _filter.isActive ? AppColors.teal : AppColors.textHint,
                             ),
                             if (_filter.isActive) ...[
                               const SizedBox(width: 5),
                               Container(
                                 width: 16,
                                 height: 16,
-                                decoration: BoxDecoration(
+                                decoration: const BoxDecoration(
                                   color: AppColors.teal,
                                   shape: BoxShape.circle,
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   '${_filter.activeCount}',
-                                  style: AppTypography.labelXs.copyWith(
+                                  style: TextStyle(
                                     fontSize: 9,
                                     color: context.bg,
                                     fontWeight: FontWeight.w800,
@@ -404,10 +286,15 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
             // Category chips
             SliverToBoxAdapter(
               child: _CategoryChips(
-                selected: _selectedCategory,
-                onSelect: (c) => setState(
-                  () => _selectedCategory = _selectedCategory == c ? null : c,
-                ),
+                categories: ref.watch(professionalsProvider).categories
+                    .map((c) => (id: c.id, name: c.name, color: _categoryColor(c.name)))
+                    .toList(),
+                selectedId: _selectedCategoryId,
+                onSelect: (id) {
+                  final newId = _selectedCategoryId == id ? null : id;
+                  setState(() => _selectedCategoryId = newId);
+                  ref.read(professionalsProvider.notifier).filterByCategory(newId);
+                },
               ),
             ),
 
@@ -417,13 +304,10 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const BecomeProfessionalScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
                   ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -434,42 +318,37 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
                         end: Alignment.centerRight,
                       ),
                       borderRadius: AppBorderRadius.lgAll,
-                      border: Border.all(
-                          color: AppColors.teal.withValues(alpha: 0.35)),
+                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.35)),
                     ),
-                    child: Row(children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.teal.withValues(alpha: 0.20),
-                          shape: BoxShape.circle,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.teal.withValues(alpha: 0.20),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.workspace_premium_rounded, color: AppColors.teal, size: 20),
                         ),
-                        child: const Icon(Icons.workspace_premium_rounded,
-                            color: AppColors.teal, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(AppStrings.becomeProfessional,
-                                style: AppTypography.labelMd.copyWith(
-                                    color: AppColors.teal,
-                                    fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 2),
-                            Text(AppStrings.earnMoney,
-                                style: AppTypography.bodyXs.copyWith(
-                                    color: AppColors.teal
-                                        .withValues(alpha: 0.75))),
-                          ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppText.labelMd(AppStrings.becomeProfessional,
+                                  color: AppColors.teal, fontWeight: FontWeight.w700),
+                              const SizedBox(height: 2),
+                              AppText.bodyXs(AppStrings.earnMoney,
+                                  color: AppColors.teal.withValues(alpha: 0.75)),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_ios_rounded,
-                          size: 14,
-                          color: AppColors.teal.withValues(alpha: 0.7)),
-                    ]),
+                        const SizedBox(width: 8),
+                        Icon(Icons.arrow_forward_ios_rounded,
+                            size: 14, color: AppColors.teal.withValues(alpha: 0.7)),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -478,56 +357,65 @@ class _ProfessionalsScreenState extends State<ProfessionalsScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
             // Results or empty
-            filtered.isEmpty
-                ? SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.search_off_rounded, size: 48, color: AppColors.textHint),
-                          const SizedBox(height: 12),
-                          Text(
-                            AppStrings.noProfessionalsFound,
-                            style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            AppStrings.tryDifferentSearch,
-                            style: AppTypography.bodySm.copyWith(color: AppColors.textHint),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _ProCard(
-                            pro: filtered[i],
-                            onViewProfile: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ProfessionalDetailScreen(pro: filtered[i]),
-                              ),
-                            ),
-                            onConnect: () => _showConnect(filtered[i]),
+            if (ref.watch(professionalsProvider).isLoading)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, __) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: AppSkeleton(
+                        child: Container(
+                          height: 130,
+                          decoration: BoxDecoration(
+                            color: context.cardBg,
+                            borderRadius: AppBorderRadius.lgAll,
                           ),
                         ),
-                        childCount: filtered.length,
                       ),
                     ),
+                    childCount: 5,
                   ),
+                ),
+              )
+            else if (filtered.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: AppEmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: AppStrings.noProfessionalsFound,
+                    subtitle: AppStrings.tryDifferentSearch,
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ProCard(
+                        pro: filtered[i],
+                        onViewProfile: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProfessionalDetailScreen(pro: filtered[i]),
+                          ),
+                        ),
+                        onConnect: () => _showConnect(filtered[i]),
+                      ),
+                    ),
+                    childCount: filtered.length,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 }
-
-// ─── Search bar ───────────────────────────────────────────────────────────────
 
 // ─── Filter bottom sheet ──────────────────────────────────────────────────────
 
@@ -561,11 +449,9 @@ class _FilterSheetState extends State<_FilterSheet> {
     return Container(
       decoration: BoxDecoration(
         color: context.cardBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.fromLTRB(
-        20, 12, 20, 20 + MediaQuery.of(context).padding.bottom,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,7 +459,8 @@ class _FilterSheetState extends State<_FilterSheet> {
           // Handle
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: context.dividerCol,
                 borderRadius: BorderRadius.circular(2),
@@ -587,23 +474,20 @@ class _FilterSheetState extends State<_FilterSheet> {
             children: [
               const Icon(Icons.tune_rounded, size: 18, color: AppColors.teal),
               const SizedBox(width: 8),
-              Text('Filter Professionals', style: AppTypography.h3),
+              AppText.h3('Filter Professionals'),
               const Spacer(),
               if (_isActive)
                 GestureDetector(
                   onTap: () => setState(() {
                     _maxRate = null; _location = null; _minRating = null;
                   }),
-                  child: Text(
-                    'Clear all',
-                    style: AppTypography.labelSm.copyWith(color: AppColors.red),
-                  ),
+                  child: AppText.labelSm('Clear all', color: AppColors.red),
                 ),
             ],
           ),
           const SizedBox(height: 20),
 
-          // ── Pricing ──────────────────────────────────────────────────────
+          // ── Pricing ────────────────────────────────────────────────────────
           _FilterSectionLabel('Pricing (Hourly Rate)'),
           const SizedBox(height: 10),
           Wrap(
@@ -618,7 +502,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           ),
           const SizedBox(height: 20),
 
-          // ── Location ─────────────────────────────────────────────────────
+          // ── Location ───────────────────────────────────────────────────────
           _FilterSectionLabel('Location'),
           const SizedBox(height: 10),
           Wrap(
@@ -634,7 +518,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           ),
           const SizedBox(height: 20),
 
-          // ── Rating ───────────────────────────────────────────────────────
+          // ── Rating ─────────────────────────────────────────────────────────
           _FilterSectionLabel('Minimum Rating'),
           const SizedBox(height: 10),
           Wrap(
@@ -646,34 +530,15 @@ class _FilterSheetState extends State<_FilterSheet> {
               _FilterChip(label: '4.8+', active: _minRating == 4.8,  onTap: () => setState(() => _minRating = _minRating == 4.8 ? null : 4.8), icon: Icons.star_rounded),
             ],
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
-          // ── Apply button ─────────────────────────────────────────────────
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(
-                context,
-                _ProFilter(
-                  maxHourlyRate: _maxRate,
-                  location: _location,
-                  minRating: _minRating,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.teal,
-                foregroundColor: context.bg,
-                padding: EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-                elevation: 0,
-              ),
-              child: Text(
-                _isActive ? 'Apply Filters' : 'Done',
-                style: AppTypography.buttonMd.copyWith(
-                  color: context.bg,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+          // ── Apply button ───────────────────────────────────────────────────
+          AppButton.primary(
+            label: _isActive ? 'Apply Filters' : 'Done',
+            isFullWidth: true,
+            onPressed: () => Navigator.pop(
+              context,
+              _ProFilter(maxHourlyRate: _maxRate, location: _location, minRating: _minRating),
             ),
           ),
         ],
@@ -689,9 +554,10 @@ class _FilterSectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         label.toUpperCase(),
-        style: AppTypography.overline.copyWith(
-          color: AppColors.textHint,
+        style: const TextStyle(
           fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textHint,
           letterSpacing: 1.0,
         ),
       );
@@ -708,8 +574,8 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 180),
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: active ? AppColors.teal.withValues(alpha: 0.12) : context.inputBg,
             borderRadius: AppBorderRadius.pill,
@@ -724,13 +590,10 @@ class _FilterChip extends StatelessWidget {
                 Icon(icon, size: 11, color: active ? AppColors.teal : AppColors.textHint),
                 const SizedBox(width: 4),
               ],
-              Text(
+              AppText.labelSm(
                 label,
-                style: AppTypography.labelSm.copyWith(
-                  color: active ? AppColors.teal : AppColors.textSecondary,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  letterSpacing: 0,
-                ),
+                color: active ? AppColors.teal : AppColors.textSecondary,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
               ),
             ],
           ),
@@ -738,66 +601,17 @@ class _FilterChip extends StatelessWidget {
       );
 }
 
-// ─── Search bar ───────────────────────────────────────────────────────────────
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  _SearchBar({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.inputBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: context.borderCol),
-      ),
-      child: Row(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: 14),
-            child: Icon(Icons.search_rounded, color: AppColors.textHint, size: 18),
-          ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-              decoration: InputDecoration(
-                hintText: AppStrings.searchProfessionals,
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              ),
-            ),
-          ),
-          ValueListenableBuilder(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isNotEmpty
-                ? GestureDetector(
-                    onTap: controller.clear,
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 12),
-                      child: Icon(Icons.close_rounded, color: AppColors.textHint, size: 16),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─── Category chips ───────────────────────────────────────────────────────────
 
 class _CategoryChips extends StatelessWidget {
-  final String? selected;
+  final List<({String id, String name, Color color})> categories;
+  final String? selectedId;
   final ValueChanged<String?> onSelect;
-  const _CategoryChips({required this.selected, required this.onSelect});
+  const _CategoryChips({
+    required this.categories,
+    required this.selectedId,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -807,21 +621,20 @@ class _CategoryChips extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          // All chip
           _Chip(
             label: AppStrings.filterAll,
             color: AppColors.teal,
-            isSelected: selected == null,
+            isSelected: selectedId == null,
             onTap: () => onSelect(null),
           ),
           const SizedBox(width: 8),
-          ..._kCategories.map((c) => Padding(
+          ...categories.map((c) => Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: _Chip(
                   label: c.name,
                   color: c.color,
-                  isSelected: selected == c.name,
-                  onTap: () => onSelect(c.name),
+                  isSelected: selectedId == c.id,
+                  onTap: () => onSelect(c.id),
                 ),
               )),
         ],
@@ -842,8 +655,8 @@ class _Chip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? color.withValues(alpha: 0.15) : context.cardBg,
           borderRadius: AppBorderRadius.pill,
@@ -852,12 +665,10 @@ class _Chip extends StatelessWidget {
             width: isSelected ? 1.5 : 1,
           ),
         ),
-        child: Text(
+        child: AppText.labelSm(
           label,
-          style: AppTypography.labelSm.copyWith(
-            color: isSelected ? color : AppColors.textSecondary,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          ),
+          color: isSelected ? color : AppColors.textSecondary,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
     );
@@ -870,12 +681,7 @@ class _ProCard extends StatelessWidget {
   final ProData pro;
   final VoidCallback onViewProfile;
   final VoidCallback onConnect;
-  _ProCard({required this.pro, required this.onViewProfile, required this.onConnect});
-
-  String get _initials {
-    final parts = pro.name.replaceAll(RegExp(r'^Dr\.\s*'), '').split(' ');
-    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
-  }
+  const _ProCard({required this.pro, required this.onViewProfile, required this.onConnect});
 
   @override
   Widget build(BuildContext context) {
@@ -889,11 +695,13 @@ class _ProCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Coloured top bar with gradient
+          // Coloured top bar
           Container(
             height: 6,
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [pro.categoryColor, pro.categoryColor.withValues(alpha: 0.4)]),
+              gradient: LinearGradient(
+                colors: [pro.categoryColor, pro.categoryColor.withValues(alpha: 0.4)],
+              ),
             ),
           ),
 
@@ -906,25 +714,7 @@ class _ProCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar circle
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: pro.categoryColor.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: pro.categoryColor.withValues(alpha: 0.4), width: 2),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _initials,
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: pro.categoryColor,
-                        ),
-                      ),
-                    ),
+                    AppAvatar(name: pro.name, size: AppAvatarSize.md),
                     const SizedBox(width: 12),
 
                     // Name + badges
@@ -935,44 +725,38 @@ class _ProCard extends StatelessWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
+                                child: AppText.labelMd(
                                   pro.name,
-                                  style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.w700),
+                                  fontWeight: FontWeight.w700,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               if (pro.isVerified) ...[
                                 const SizedBox(width: 6),
-                                Icon(Icons.verified_rounded, size: 15, color: AppColors.teal),
+                                const Icon(Icons.verified_rounded, size: 15, color: AppColors.teal),
                               ],
                             ],
                           ),
                           const SizedBox(height: 4),
-                          // Category badge
-                          Container(
+                          AppContainer.tinted(
+                            color: pro.categoryColor,
+                            borderRadius: AppBorderRadius.pill,
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: pro.categoryColor.withValues(alpha: 0.12),
-                              borderRadius: AppBorderRadius.pill,
-                            ),
-                            child: Text(
+                            child: AppText.labelXs(
                               pro.categoryName,
-                              style: AppTypography.labelXs.copyWith(
-                                color: pro.categoryColor,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              color: pro.categoryColor,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          // Rating
                           Row(
                             children: [
-                              Icon(Icons.star_rounded, size: 13, color: AppColors.amber),
+                              const Icon(Icons.star_rounded, size: 13, color: AppColors.amber),
                               const SizedBox(width: 3),
-                              Text(
+                              AppText.labelXs(
                                 '${pro.averageRating.toStringAsFixed(1)} (${pro.ratingCount})',
-                                style: AppTypography.labelXs.copyWith(color: AppColors.textSecondary),
+                                color: context.secondaryText,
                               ),
                             ],
                           ),
@@ -985,17 +769,18 @@ class _ProCard extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            AppStrings.from,
-                            style: AppTypography.bodyXs.copyWith(color: AppColors.textHint),
-                          ),
+                          AppText.bodyXs(AppStrings.from, color: AppColors.textHint),
                           Text(
                             '₹${pro.hourlyRate}',
-                            style: AppTypography.statMd.copyWith(color: pro.categoryColor, fontSize: 16),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: pro.categoryColor,
+                            ),
                           ),
                           Text(
                             AppStrings.perHour,
-                            style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 9),
+                            style: const TextStyle(fontSize: 9, color: AppColors.textHint),
                           ),
                         ],
                       ),
@@ -1004,17 +789,15 @@ class _ProCard extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
-                // Bio
-                Text(
+                AppText.bodySm(
                   pro.bio,
-                  style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.5),
+                  color: context.secondaryText,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
 
                 const SizedBox(height: 10),
 
-                // Meta chips
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
@@ -1026,11 +809,14 @@ class _ProCard extends StatelessWidget {
 
                 const SizedBox(height: 12),
 
-                // Buttons
                 Row(
                   children: [
                     Expanded(
-                      child: _OutlineBtn(label: AppStrings.viewProfile, onTap: onViewProfile),
+                      child: AppButton.secondary(
+                        label: AppStrings.viewProfile,
+                        isFullWidth: true,
+                        onPressed: onViewProfile,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     _ConnStateButton(state: pro.connectionState, color: pro.categoryColor, onTap: onConnect),
@@ -1048,12 +834,12 @@ class _ProCard extends StatelessWidget {
 class _MetaChip extends StatelessWidget {
   final IconData icon;
   final String label;
-  _MetaChip({required this.icon, required this.label});
+  const _MetaChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: context.inputBg,
         borderRadius: AppBorderRadius.smAll,
@@ -1064,31 +850,8 @@ class _MetaChip extends StatelessWidget {
         children: [
           Icon(icon, size: 11, color: AppColors.textHint),
           const SizedBox(width: 4),
-          Text(label, style: AppTypography.labelXs.copyWith(color: AppColors.textSecondary)),
+          AppText.labelXs(label, color: context.secondaryText),
         ],
-      ),
-    );
-  }
-}
-
-class _OutlineBtn extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  _OutlineBtn({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: context.inputBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: Text(label, style: AppTypography.buttonSm.copyWith(color: AppColors.textSecondary)),
       ),
     );
   }
@@ -1103,52 +866,43 @@ class _ConnStateButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (state) {
-      ProConnState.connected => Container(
+      ProConnState.connected => AppContainer.tinted(
+          color: AppColors.teal,
+          borderRadius: AppBorderRadius.lgAll,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.teal.withValues(alpha: 0.12),
-            borderRadius: AppBorderRadius.lgAll,
-            border: Border.all(color: AppColors.teal.withValues(alpha: 0.4)),
-          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.teal),
+              const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.teal),
               const SizedBox(width: 6),
-              Text(AppStrings.message, style: AppTypography.buttonSm.copyWith(color: AppColors.teal)),
+              AppText.labelSm(AppStrings.message, color: AppColors.teal, fontWeight: FontWeight.w600),
             ],
           ),
         ),
-      ProConnState.pending => Container(
+      ProConnState.pending => AppContainer.tinted(
+          color: AppColors.amber,
+          borderRadius: AppBorderRadius.lgAll,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.amber.withValues(alpha: 0.1),
-            borderRadius: AppBorderRadius.lgAll,
-            border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
-          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.hourglass_top_rounded, size: 13, color: AppColors.amber),
+              const Icon(Icons.hourglass_top_rounded, size: 13, color: AppColors.amber),
               const SizedBox(width: 6),
-              Text(AppStrings.pending, style: AppTypography.buttonSm.copyWith(color: AppColors.amber)),
+              AppText.labelSm(AppStrings.pending, color: AppColors.amber, fontWeight: FontWeight.w600),
             ],
           ),
         ),
       ProConnState.none => GestureDetector(
           onTap: onTap,
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: AppBorderRadius.lgAll,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(color: color, borderRadius: AppBorderRadius.lgAll),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add_rounded, size: 14, color: AppColors.textInverse),
+                const Icon(Icons.add_rounded, size: 14, color: Colors.white),
                 const SizedBox(width: 4),
-                Text(AppStrings.connect, style: AppTypography.buttonSm.copyWith(color: context.bg)),
+                AppText.labelSm(AppStrings.connect, color: Colors.white, fontWeight: FontWeight.w600),
               ],
             ),
           ),
@@ -1159,16 +913,16 @@ class _ConnStateButton extends StatelessWidget {
 
 // ─── Connect sheet ────────────────────────────────────────────────────────────
 
-class ProConnectSheet extends StatefulWidget {
+class ProConnectSheet extends ConsumerStatefulWidget {
   final ProData pro;
   final ProPlanType? initialPlan;
   const ProConnectSheet({super.key, required this.pro, this.initialPlan});
 
   @override
-  State<ProConnectSheet> createState() => _ProConnectSheetState();
+  ConsumerState<ProConnectSheet> createState() => _ProConnectSheetState();
 }
 
-class _ProConnectSheetState extends State<ProConnectSheet> {
+class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
   late ProPlanType _selected;
   bool _sending = false;
 
@@ -1202,18 +956,21 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
   }
 
   Future<void> _submit() async {
+    AppLogger.i('Connection request send → userId:${widget.pro.userId}', tag: 'Professionals');
     setState(() => _sending = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.connectionRequestSent),
-        backgroundColor: AppColors.teal,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-      ),
-    );
+    try {
+      await ref.read(sendConnectionRequestProvider).call(widget.pro.userId);
+      AppLogger.i('Connection request sent ✓', tag: 'Professionals');
+      AppLogger.track('connection.request_sent');
+      if (!mounted) return;
+      Navigator.pop(context);
+      AppSnackbar.success(context, AppStrings.connectionRequestSent);
+    } on Exception catch (e) {
+      AppLogger.e('Connection request failed', tag: 'Professionals', error: e);
+      if (!mounted) return;
+      setState(() => _sending = false);
+      AppSnackbar.error(context, e.toString());
+    }
   }
 
   @override
@@ -1223,7 +980,7 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
       margin: EdgeInsets.only(bottom: bottom),
       decoration: BoxDecoration(
         color: context.cardBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1251,25 +1008,15 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(AppStrings.selectPlanTitle, style: AppTypography.h3),
+                          AppText.h3(AppStrings.selectPlanTitle),
                           const SizedBox(height: 2),
-                          Text(
-                            widget.pro.name,
-                            style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
-                          ),
+                          AppText.bodySm(widget.pro.name, color: context.secondaryText),
                         ],
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: context.inputBg,
-                          borderRadius: AppBorderRadius.lgAll,
-                        ),
-                        child: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
-                      ),
+                    AppIconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
@@ -1285,8 +1032,8 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
                     child: GestureDetector(
                       onTap: () => setState(() => _selected = t),
                       child: AnimatedContainer(
-                        duration: Duration(milliseconds: 200),
-                        padding: EdgeInsets.all(16),
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isSelected ? meta.color.withValues(alpha: 0.08) : context.inputBg,
                           borderRadius: AppBorderRadius.lgAll,
@@ -1297,34 +1044,28 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: meta.color.withValues(alpha: 0.12),
-                                borderRadius: AppBorderRadius.mdAll,
-                              ),
-                              alignment: Alignment.center,
+                            AppContainer.tinted(
+                              color: meta.color,
+                              borderRadius: AppBorderRadius.mdAll,
+                              padding: const EdgeInsets.all(11),
                               child: Icon(meta.icon, size: 18, color: meta.color),
                             ),
-                            SizedBox(width: 14),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(meta.label, style: AppTypography.labelMd.copyWith(color: context.primaryText)),
+                                  AppText.labelMd(meta.label, color: context.primaryText),
                                   const SizedBox(height: 2),
-                                  Text(
+                                  AppText.bodySm(
                                     meta.rate != null ? '₹${meta.rate} ${_rateLabel(t)}' : 'Not available',
-                                    style: AppTypography.bodySm.copyWith(
-                                      color: meta.rate != null ? meta.color : AppColors.textHint,
-                                    ),
+                                    color: meta.rate != null ? meta.color : AppColors.textHint,
                                   ),
                                 ],
                               ),
                             ),
                             AnimatedContainer(
-                              duration: Duration(milliseconds: 200),
+                              duration: const Duration(milliseconds: 200),
                               width: 20,
                               height: 20,
                               decoration: BoxDecoration(
@@ -1336,7 +1077,7 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
                                 ),
                               ),
                               child: isSelected
-                                  ? Icon(Icons.check_rounded, size: 12, color: AppColors.textInverse)
+                                  ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
                                   : null,
                             ),
                           ],
@@ -1354,8 +1095,8 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
                   child: GestureDetector(
                     onTap: _sending ? null : _submit,
                     child: AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: _planMeta(_selected).color,
                         borderRadius: AppBorderRadius.lgAll,
@@ -1365,15 +1106,9 @@ class _ProConnectSheetState extends State<ProConnectSheet> {
                           ? SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(
-                                color: context.bg,
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(color: context.bg, strokeWidth: 2),
                             )
-                          : Text(
-                              AppStrings.connectNow,
-                              style: AppTypography.buttonMd.copyWith(color: context.bg),
-                            ),
+                          : AppText.labelMd(AppStrings.connectNow, color: context.bg, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),

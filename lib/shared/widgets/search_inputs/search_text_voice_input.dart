@@ -109,15 +109,11 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
     final micColor  = widget.micColor ?? AppColors.teal;
 
-    final bg = widget.backgroundColor ??
-        (isDark ? context.inputBg : const Color(0xFFF1F5F9));
+    final bg = widget.backgroundColor ?? context.inputBg;
     final borderCol = widget.borderColor ??
-        (widget.isRecording
-            ? AppColors.error
-            : (isDark ? context.borderCol : const Color(0xFFE2E8F0)));
+        (widget.isRecording ? AppColors.error : context.borderCol);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/extensions/context_extensions.dart';
 import 'app_base_button.dart';
@@ -43,7 +42,6 @@ class AppSecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppBaseButton(
       label: label,
       onPressed: onPressed,
@@ -51,7 +49,7 @@ class AppSecondaryButton extends StatelessWidget {
       trailingIcon: trailingIcon,
       leadingWidget: leadingWidget,
       trailingWidget: trailingWidget,
-      backgroundColor: isDark ? AppColors.dark700 : AppColors.light200,
+      backgroundColor: context.inputBg,
       foregroundColor: context.primaryText,
       size: size,
       borderRadius: borderRadius ?? AppBorderRadius.lgAll,

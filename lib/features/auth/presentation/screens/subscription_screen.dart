@@ -1,63 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/extensions/context_extensions.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../premium/domain/entities/plan_entity.dart';
+import '../../../premium/presentation/providers/subscription_provider.dart';
 import '../widgets/auth_shell.dart';
 
-class _Plan {
-  const _Plan({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.period,
-    required this.badge,
-    required this.badgeColor,
-    required this.features,
-    this.isFeatured = false,
-  });
-  final String id;
-  final String name;
-  final String price;
-  final String period;
-  final String badge;
-  final Color badgeColor;
-  final List<String> features;
-  final bool isFeatured;
-}
-
-final _plans = [
-  _Plan(
-    id: 'free',
-    name: AppStrings.planBasicName,
-    price: AppStrings.planFreePrice,
-    period: '',
-    badge: AppStrings.planFreeBadge,
-    badgeColor: AppColors.teal,
-    features: [
-      AppStrings.planBasicFeature1,
-      AppStrings.planBasicFeature2,
-      AppStrings.planBasicFeature3,
-    ],
-  ),
-  _Plan(
-    id: 'premium',
-    name: AppStrings.planPremiumName,
-    price: AppStrings.planPremiumPrice,
-    period: AppStrings.planPeriodMonth,
-    badge: AppStrings.planPremiumBadge,
-    badgeColor: AppColors.purple,
-    features: [
-      AppStrings.planPremiumFeature1,
-      AppStrings.planPremiumFeature2,
-      AppStrings.planPremiumFeature3,
-      AppStrings.planPremiumFeature4,
-      AppStrings.planPremiumFeature5,
-    ],
-    isFeatured: true,
-  ),
-];
-
-class SubscriptionScreen extends StatefulWidget {
+class SubscriptionScreen extends ConsumerStatefulWidget {
   const SubscriptionScreen({
     super.key,
     this.onDone,
@@ -68,16 +19,24 @@ class SubscriptionScreen extends StatefulWidget {
   final VoidCallback onBack;
 
   @override
-  State<SubscriptionScreen> createState() => _SubscriptionScreenState();
+  ConsumerState<SubscriptionScreen> createState() => _SubscriptionScreenState();
 }
 
-class _SubscriptionScreenState extends State<SubscriptionScreen> {
-  String _selected = 'free';
+class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
+  int _selectedIndex = 0;
+  bool _acting = false;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
+    final st = ref.watch(subscriptionProvider);
+
+    final plans = st.plans;
+    final freePlan = plans.isEmpty ? null : plans.firstWhere(
+      (p) => p.isFree,
+      orElse: () => plans.first,
+    );
+    final selectedIsFree = plans.isEmpty ||
+        (_selectedIndex < plans.length && plans[_selectedIndex].isFree);
 
     return AuthShell(
       showBack: true,
@@ -86,78 +45,124 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          const Center(child: AuthBrand()),
+          const Center(child: AppBrand()),
           const SizedBox(height: 16),
 
-          AuthStepper(steps: const ['Account', 'Health', 'Emergency', 'Plan'], current: 3),
+          AuthStepper(
+              steps: const ['Account', 'Health', 'Emergency', 'Plan'],
+              current: 3),
 
           Center(
             child: Column(
               children: [
-                Text(AppStrings.choosePlan,
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 26, fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF1A202C),
-                      letterSpacing: -0.3,
-                    )),
+                AppText.h1(
+                  AppStrings.choosePlan,
+                  fontWeight: FontWeight.w800,
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 6),
-                Text(AppStrings.planSubtitle,
-                    style: GoogleFonts.inter(fontSize: 13, color: secondaryColor)),
+                AppText.labelMd(
+                  AppStrings.planSubtitle,
+                  color: AppColors.textSecondary,
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
           const SizedBox(height: 24),
 
-          ..._plans.map((plan) => _PlanCard(
-            plan: plan,
-            selected: _selected == plan.id,
-            isDark: isDark,
-            onTap: () => setState(() => _selected = plan.id),
-          )),
+          if (st.isLoadingPlans && plans.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: CircularProgressIndicator(
+                    color: AppColors.teal, strokeWidth: 2),
+              ),
+            )
+          else if (plans.isNotEmpty)
+            ...plans.asMap().entries.map((e) => _PlanCard(
+                  plan: e.value,
+                  selected: _selectedIndex == e.key,
+                  onTap: () => setState(() => _selectedIndex = e.key),
+                ))
+          else
+            _StaticPlans(
+              selectedIsFree: selectedIsFree,
+              onSelectFree: () => setState(() => _selectedIndex = 0),
+              onSelectPremium: () => setState(() => _selectedIndex = 1),
+            ),
+
           const SizedBox(height: 28),
 
           AuthButton(
-            label: _selected == 'free' ? AppStrings.startForFree : AppStrings.getPremium,
-            onPressed: widget.onDone,
+            label: selectedIsFree
+                ? AppStrings.startForFree
+                : AppStrings.getPremium,
+            loading: _acting,
+            onPressed: _acting ? null : () => _onContinue(plans, freePlan),
           ),
           const SizedBox(height: 12),
 
           Center(
-            child: Text(AppStrings.noCreditCard,
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: isDark ? AppColors.dark500 : const Color(0xFFCBD5E1),
-                )),
+            child: AppText.caption(AppStrings.noCreditCard),
           ),
           const SizedBox(height: 16),
         ],
       ),
     );
   }
+
+  Future<void> _onContinue(List<PlanEntity> plans, PlanEntity? freePlan) async {
+    if (plans.isEmpty) {
+      widget.onDone?.call();
+      return;
+    }
+
+    final selected = _selectedIndex < plans.length
+        ? plans[_selectedIndex]
+        : (freePlan ?? plans.first);
+
+    setState(() => _acting = true);
+    try {
+      await ref.read(subscriptionProvider.notifier).selectPlan(selected.id);
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _acting = false);
+      widget.onDone?.call();
+    }
+  }
 }
+
+// ── Real plan card (from API) ─────────────────────────────────────────────────
 
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.plan,
     required this.selected,
-    required this.isDark,
     required this.onTap,
   });
-  final _Plan plan;
+
+  final PlanEntity plan;
   final bool selected;
-  final bool isDark;
   final VoidCallback onTap;
+
+  Color get _accent => plan.isFree ? AppColors.teal : AppColors.purple;
+
+  String get _priceLabel {
+    if (plan.isFree) return AppStrings.planFreePrice;
+    final sym = plan.currency == 'INR' ? '₹' : '\$';
+    return '$sym${plan.priceMonthly.toStringAsFixed(0)}${AppStrings.planPeriodMonth}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDark;
     final borderColor = selected
-        ? plan.isFeatured ? AppColors.purple : AppColors.teal
-        : isDark ? AppColors.dark600 : const Color(0xFFE2E8F0);
+        ? _accent
+        : context.borderCol;
     final bgColor = selected
-        ? (plan.isFeatured
-            ? AppColors.purple.withValues(alpha: 0.08)
-            : AppColors.teal.withValues(alpha: 0.06))
-        : isDark ? AppColors.dark700 : Colors.white;
+        ? _accent.withValues(alpha: 0.08)
+        : (isDark ? AppColors.dark700 : Colors.white);
 
     return GestureDetector(
       onTap: onTap,
@@ -169,8 +174,13 @@ class _PlanCard extends StatelessWidget {
           color: bgColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderColor, width: selected ? 1.5 : 1),
-          boxShadow: selected && plan.isFeatured
-              ? [BoxShadow(color: AppColors.purple.withValues(alpha: 0.15), blurRadius: 20)]
+          boxShadow: selected && !plan.isFree
+              ? [
+                  BoxShadow(
+                    color: _accent.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                  )
+                ]
               : null,
         ),
         child: Column(
@@ -181,23 +191,152 @@ class _PlanCard extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      Text(plan.name,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 16, fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF1A202C),
-                          )),
+                      AppText.h3(plan.name, fontWeight: FontWeight.w800),
                       const SizedBox(width: 8),
-                      Container(
+                      AppContainer.tinted(
+                        color: _accent,
+                        borderRadius: BorderRadius.circular(20),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: plan.badgeColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
+                        child: AppText.labelXs(
+                          plan.isFree ? AppStrings.planFreeBadge : AppStrings.planPremiumBadge,
+                          color: _accent,
                         ),
-                        child: Text(plan.badge,
-                            style: GoogleFonts.inter(
-                              fontSize: 9, fontWeight: FontWeight.w800,
-                              color: plan.badgeColor, letterSpacing: 0.8,
-                            )),
+                      ),
+                    ],
+                  ),
+                ),
+                AppText.h2(_priceLabel, color: _accent, fontWeight: FontWeight.w800),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...plan.features.map((f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_rounded, size: 14, color: _accent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: AppText.labelMd(f, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Static fallback while plans load ─────────────────────────────────────────
+
+class _StaticPlans extends StatelessWidget {
+  const _StaticPlans({
+    required this.selectedIsFree,
+    required this.onSelectFree,
+    required this.onSelectPremium,
+  });
+
+  final bool selectedIsFree;
+  final VoidCallback onSelectFree;
+  final VoidCallback onSelectPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _StaticCard(
+          name: AppStrings.planBasicName,
+          badge: AppStrings.planFreeBadge,
+          price: AppStrings.planFreePrice,
+          period: '',
+          badgeColor: AppColors.teal,
+          features: [
+            AppStrings.planBasicFeature1,
+            AppStrings.planBasicFeature2,
+            AppStrings.planBasicFeature3,
+          ],
+          selected: selectedIsFree,
+          onTap: onSelectFree,
+        ),
+        _StaticCard(
+          name: AppStrings.planPremiumName,
+          badge: AppStrings.planPremiumBadge,
+          price: AppStrings.planPremiumPrice,
+          period: AppStrings.planPeriodMonth,
+          badgeColor: AppColors.purple,
+          features: [
+            AppStrings.planPremiumFeature1,
+            AppStrings.planPremiumFeature2,
+            AppStrings.planPremiumFeature3,
+            AppStrings.planPremiumFeature4,
+            AppStrings.planPremiumFeature5,
+          ],
+          selected: !selectedIsFree,
+          onTap: onSelectPremium,
+        ),
+      ],
+    );
+  }
+}
+
+class _StaticCard extends StatelessWidget {
+  const _StaticCard({
+    required this.name,
+    required this.badge,
+    required this.price,
+    required this.period,
+    required this.badgeColor,
+    required this.features,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final String badge;
+  final String price;
+  final String period;
+  final Color badgeColor;
+  final List<String> features;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    final borderColor = selected
+        ? badgeColor
+        : context.borderCol;
+    final bgColor = selected
+        ? badgeColor.withValues(alpha: 0.08)
+        : (isDark ? AppColors.dark700 : Colors.white);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: selected ? 1.5 : 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      AppText.h3(name, fontWeight: FontWeight.w800),
+                      const SizedBox(width: 8),
+                      AppContainer.tinted(
+                        color: badgeColor,
+                        borderRadius: BorderRadius.circular(20),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        child: AppText.labelXs(badge, color: badgeColor),
                       ),
                     ],
                   ),
@@ -205,20 +344,16 @@ class _PlanCard extends StatelessWidget {
                 RichText(
                   text: TextSpan(
                     children: [
-                      TextSpan(
-                        text: plan.price,
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 20, fontWeight: FontWeight.w800,
-                          color: plan.isFeatured ? AppColors.purple : AppColors.teal,
-                        ),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.baseline,
+                        baseline: TextBaseline.alphabetic,
+                        child: AppText.h2(price, color: badgeColor, fontWeight: FontWeight.w800),
                       ),
-                      if (plan.period.isNotEmpty)
-                        TextSpan(
-                          text: plan.period,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
-                          ),
+                      if (period.isNotEmpty)
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.baseline,
+                          baseline: TextBaseline.alphabetic,
+                          child: AppText.labelSm(period, color: AppColors.textHint),
                         ),
                     ],
                   ),
@@ -226,21 +361,16 @@ class _PlanCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            ...plan.features.map((f) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, size: 14,
-                      color: plan.isFeatured ? AppColors.purple : AppColors.teal),
-                  const SizedBox(width: 8),
-                  Text(f,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: isDark ? AppColors.textSecondary : const Color(0xFF64748B),
-                      )),
-                ],
-              ),
-            )),
+            ...features.map((f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_rounded, size: 14, color: badgeColor),
+                      const SizedBox(width: 8),
+                      AppText.labelMd(f, color: AppColors.textSecondary),
+                    ],
+                  ),
+                )),
           ],
         ),
       ),

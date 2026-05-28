@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 // ─── Args ─────────────────────────────────────────────────────────────────────
 
@@ -79,34 +79,29 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
                     padding: const EdgeInsets.fromLTRB(20, 56, 20, 0),
                     child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundColor: p.avatarColor.withValues(alpha: 0.15),
-                          child: Text(
-                            p.name[0],
-                            style: AppTypography.h1.copyWith(color: p.avatarColor, fontSize: 26),
-                          ),
-                        ),
+                        AppAvatar(name: p.name, size: AppAvatarSize.xl),
                         const SizedBox(height: 12),
-                        Text(p.name, style: AppTypography.h2.copyWith(fontSize: 20)),
+                        Text(
+                          p.name,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
                         const SizedBox(height: 4),
-                        Text(p.condition, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
+                        AppText.bodySm(p.condition, color: AppColors.textSecondary),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
+                            AppContainer.tinted(
+                              color: accessColor,
+                              borderRadius: AppBorderRadius.pill,
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: accessColor.withValues(alpha: 0.1),
-                                borderRadius: AppBorderRadius.pill,
-                              ),
-                              child: Text(p.accessLevel,
-                                  style: AppTypography.labelXs.copyWith(color: accessColor)),
+                              child: AppText.labelXs(p.accessLevel, color: accessColor),
                             ),
                             const SizedBox(width: 8),
-                            Text('· Since ${p.since}',
-                                style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
+                            Text(
+                              '· Since ${p.since}',
+                              style: const TextStyle(fontSize: 10, color: AppColors.textHint),
+                            ),
                           ],
                         ),
                       ],
@@ -124,8 +119,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
                     indicatorSize: TabBarIndicatorSize.label,
                     labelColor: AppColors.teal,
                     unselectedLabelColor: AppColors.textSecondary,
-                    labelStyle: AppTypography.labelSm.copyWith(fontWeight: FontWeight.w700),
-                    unselectedLabelStyle: AppTypography.labelSm,
+                    labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                    unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                     tabs: const [
                       Tab(text: 'Overview'),
                       Tab(text: 'Vitals'),
@@ -160,11 +155,12 @@ class _OverviewTab extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          _Card(
+          AppCard(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _CardLabel('HEALTH SUMMARY'),
+                const _CardLabel('HEALTH SUMMARY'),
                 const SizedBox(height: 12),
                 _SummaryRow(icon: Icons.monitor_heart_outlined, color: AppColors.blue, label: 'Blood Pressure', value: '128/84 mmHg', status: 'Warning', statusColor: AppColors.amber),
                 const SizedBox(height: 8),
@@ -175,11 +171,12 @@ class _OverviewTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          _Card(
+          AppCard(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _CardLabel('RECENT ACTIVITY'),
+                const _CardLabel('RECENT ACTIVITY'),
                 const SizedBox(height: 12),
                 _ActivityRow(icon: Icons.check_circle_rounded, color: AppColors.green, text: 'Metformin 500mg taken at 8:00 AM', time: '2h ago'),
                 const SizedBox(height: 8),
@@ -190,17 +187,18 @@ class _OverviewTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          _Card(
+          AppCard(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _CardLabel('PERMISSIONS'),
+                const _CardLabel('PERMISSIONS'),
                 const SizedBox(height: 12),
                 Text(
                   patient.accessLevel == AppStrings.fullAccess
                       ? 'You have full access to view vitals, medicines, reports and schedule.'
                       : 'You have read-only access to vitals and reports only.',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.6),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6),
                 ),
               ],
             ),
@@ -219,11 +217,12 @@ class _VitalsTab extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          _Card(
+          AppCard(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _CardLabel('BLOOD PRESSURE'),
+                const _CardLabel('BLOOD PRESSURE'),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -235,16 +234,17 @@ class _VitalsTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Logged today at 9:00 AM', style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                AppText.bodyXs('Logged today at 9:00 AM', color: AppColors.textHint),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          _Card(
+          AppCard(
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _CardLabel('BLOOD SUGAR'),
+                const _CardLabel('BLOOD SUGAR'),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -254,7 +254,7 @@ class _VitalsTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Logged today at 7:30 AM', style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                AppText.bodyXs('Logged today at 7:30 AM', color: AppColors.textHint),
               ],
             ),
           ),
@@ -279,11 +279,13 @@ class _MedicinesTab extends StatelessWidget {
             children: [
               const Icon(Icons.lock_rounded, size: 48, color: AppColors.textHint),
               const SizedBox(height: 16),
-              Text('Read-only access', style: AppTypography.h3.copyWith(fontSize: 16)),
+              const Text('Read-only access', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              Text('You need full access to view this patient\'s medicines.',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
-                  textAlign: TextAlign.center),
+              AppText.bodySm(
+                'You need full access to view this patient\'s medicines.',
+                color: AppColors.textSecondary,
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
@@ -311,18 +313,14 @@ class _MedRow extends StatelessWidget {
   const _MedRow({required this.name, required this.dose, required this.color, required this.status});
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => AppCard(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
         child: Row(
           children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppBorderRadius.smAll),
+            AppContainer.tinted(
+              color: color,
+              borderRadius: AppBorderRadius.smAll,
+              padding: const EdgeInsets.all(9),
               child: Icon(Icons.medication_rounded, size: 18, color: color),
             ),
             const SizedBox(width: 12),
@@ -330,18 +328,16 @@ class _MedRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: AppTypography.bodyMd.copyWith(color: context.primaryText, fontWeight: FontWeight.w600)),
-                  Text(dose, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
+                  AppText.bodyMd(name, color: context.primaryText, fontWeight: FontWeight.w600),
+                  AppText.bodyXs(dose, color: AppColors.textSecondary),
                 ],
               ),
             ),
-            Container(
+            AppContainer.tinted(
+              color: AppColors.green,
+              borderRadius: AppBorderRadius.pill,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.green.withValues(alpha: 0.1),
-                borderRadius: AppBorderRadius.pill,
-              ),
-              child: Text(status, style: AppTypography.labelXs.copyWith(color: AppColors.green)),
+              child: AppText.labelXs(status, color: AppColors.green),
             ),
           ],
         ),
@@ -350,23 +346,6 @@ class _MedRow extends StatelessWidget {
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
-class _Card extends StatelessWidget {
-  final Widget child;
-  const _Card({required this.child});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: child,
-      );
-}
-
 class _CardLabel extends StatelessWidget {
   final String text;
   const _CardLabel(this.text);
@@ -374,7 +353,12 @@ class _CardLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1),
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textHint,
+          letterSpacing: 1,
+        ),
       );
 }
 
@@ -393,13 +377,13 @@ class _SummaryRow extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 10),
-          Expanded(child: Text(label, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary))),
-          Text(value, style: AppTypography.bodySm.copyWith(color: context.primaryText, fontWeight: FontWeight.w600)),
+          Expanded(child: AppText.bodySm(label, color: AppColors.textSecondary)),
+          AppText.bodySm(value, color: context.primaryText, fontWeight: FontWeight.w600),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: AppBorderRadius.pill),
-            child: Text(status, style: AppTypography.labelXs.copyWith(color: statusColor, letterSpacing: 0)),
+            child: Text(status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
           ),
         ],
       );
@@ -419,9 +403,11 @@ class _ActivityRow extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 10),
-          Expanded(child: Text(text, style: AppTypography.bodySm.copyWith(color: context.primaryText, height: 1.4))),
+          Expanded(
+            child: Text(text, style: TextStyle(fontSize: 12, color: context.primaryText, height: 1.4)),
+          ),
           const SizedBox(width: 8),
-          Text(time, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
+          Text(time, style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
         ],
       );
 }
@@ -446,13 +432,13 @@ class _VitalChip extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
+              AppText.bodyXs(label, color: AppColors.textSecondary, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 3),
               RichText(
                 text: TextSpan(
                   children: [
-                    TextSpan(text: value, style: AppTypography.statMd.copyWith(color: color, fontSize: 18)),
-                    TextSpan(text: ' $unit', style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
+                    TextSpan(text: value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: color, height: 1)),
+                    TextSpan(text: ' $unit', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                   ],
                 ),
               ),

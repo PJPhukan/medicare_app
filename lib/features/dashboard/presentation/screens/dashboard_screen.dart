@@ -1,56 +1,117 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../data/models/banner_config.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
-import '../../../../shared/widgets/charts.dart';
+import '../../../../shared/widgets/graphs/charts.dart';
+import '../../../../shared/widgets/skeleton/skeleton.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../providers/dashboard_provider.dart';
+import '../../../schedule/data/models/appointment_model.dart' as dash_model;
+import '../../../vitals/data/models/vital_reading_model.dart' as vrm;
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Local view models ─────────────────────────────────────────────────────────
 
 enum _DoseStatus { taken, skipped, missed, pending }
 
 class _Dose {
-  _Dose(this.name, this.time, this.status);
+  _Dose({
+    required this.id,
+    required this.name,
+    required this.time,
+    required this.status,
+  });
+  final String id;
   final String name;
   final String time;
   _DoseStatus status;
 }
 
-// Mock sparkline history for each vital
-const _systolicPoints  = [118.0, 122.0, 119.0, 124.0, 117.0, 121.0, 120.0];
-const _diastolicPoints = [79.0, 83.0, 78.0, 82.0, 76.0, 81.0, 80.0];
-const _heartRatePoints = [70.0, 74.0, 71.0, 76.0, 68.0, 73.0, 72.0];
+// ─── Adapters ─────────────────────────────────────────────────────────────────
+
+_Dose _toLocalDose(dash_model.TodayDose d) => _Dose(
+      id: d.doseTimeId,
+      name: d.medicineName,
+      time: d.scheduledTime,
+      status: d.isTaken
+          ? _DoseStatus.taken
+          : d.isSkipped
+              ? _DoseStatus.skipped
+              : _DoseStatus.pending,
+    );
+
+Color _dashHexColor(String hex) {
+  final h = hex.replaceFirst('#', '');
+  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
+}
+
+({
+  String name,
+  String timestamp,
+  List<({String label, String value, String unit, Color color, List<double> points})>
+      chips,
+})?
+    _latestVital(List<vrm.VitalReading> readings) {
+  if (readings.isEmpty) return null;
+  final sorted = List<vrm.VitalReading>.from(readings)
+    ..sort((a, b) => b.measuredAtDate.compareTo(a.measuredAtDate));
+  final latest = sorted.first;
+  final history = sorted
+      .where((r) => r.vitalConfigId == latest.vitalConfigId)
+      .toList()
+    ..sort((a, b) => a.measuredAtDate.compareTo(b.measuredAtDate));
+  final chips = latest.values.take(3).map((v) {
+    final color = _dashHexColor(v.input.color);
+    final points = history.map((r) {
+      final match = r.values.where((rv) => rv.inputId == v.inputId);
+      return match.isEmpty ? v.value : match.first.value;
+    }).toList();
+    final intV = v.value.toInt();
+    final valStr =
+        v.value == intV.toDouble() ? '$intV' : v.value.toStringAsFixed(1);
+    return (
+      label: v.input.label,
+      value: valStr,
+      unit: v.input.unit,
+      color: color,
+      points: points,
+    );
+  }).toList();
+  final now = DateTime.now();
+  final m = latest.measuredAtDate;
+  final isToday =
+      m.year == now.year && m.month == now.month && m.day == now.day;
+  final hh = m.hour % 12 == 0 ? 12 : m.hour % 12;
+  final mm = m.minute.toString().padLeft(2, '0');
+  final period = m.hour < 12 ? 'AM' : 'PM';
+  final ts = isToday
+      ? 'Today, $hh:$mm $period'
+      : '${m.month}/${m.day}, $hh:$mm $period';
+  return (name: latest.vitalConfig.name, timestamp: ts, chips: chips);
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  late final List<_Dose> _doses;
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   BannerConfig? _bannerConfig;
 
   @override
   void initState() {
     super.initState();
-    _doses = [
-      _Dose('Metformin 500mg',   '8:00 AM',  _DoseStatus.taken),
-      _Dose('Amlodipine 5mg',    '12:00 PM', _DoseStatus.taken),
-      _Dose('Vitamin D3',        '6:00 PM',  _DoseStatus.pending),
-      _Dose('Omega-3 Capsule',   '9:00 PM',  _DoseStatus.pending),
-    ];
     BannerConfig.fetch().then((c) {
       if (mounted) setState(() => _bannerConfig = c);
     });
@@ -64,267 +125,310 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return AppStrings.goodNight;
   }
 
-  int get _takenCount   => _doses.where((d) => d.status == _DoseStatus.taken).length;
-  int get _adherence    => _doses.isEmpty ? 100 : ((_takenCount / _doses.length) * 100).round();
-
-  void _markDose(int i, _DoseStatus s) => setState(() => _doses[i].status = s);
+  void _markDose(String id, _DoseStatus s) {
+    final apiStatus = s == _DoseStatus.taken
+        ? 'TAKEN'
+        : s == _DoseStatus.skipped
+            ? 'SKIPPED'
+            : 'PENDING';
+    ref.read(dashboardProvider.notifier).markDose(id, apiStatus);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
-    final bgPage    = isDark ? context.bg : AppColors.light100;
-    final bgCard    = isDark ? context.cardBg : Colors.white;
-    final border    = isDark ? context.borderCol : const Color(0xFFE2E8F0);
-    final secondary = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
-    final textColor = isDark ? context.primaryText : const Color(0xFF1A202C);
+    final state      = ref.watch(dashboardProvider);
+    final isLoading  = state.isLoading;
+    final stats      = state.stats;
+    final doses      = state.doses.map(_toLocalDose).toList();
+    final takenCount = doses.where((d) => d.status == _DoseStatus.taken).length;
+    final adherence  = stats != null
+        ? stats.adherencePercent.round()
+        : doses.isEmpty
+            ? 100
+            : ((takenCount / doses.length) * 100).round();
 
     return Scaffold(
-      backgroundColor: bgPage,
-      body: CustomScrollView(
-        slivers: [
+      backgroundColor: context.bg,
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(dashboardProvider.notifier).load(),
+        child: CustomScrollView(
+          slivers: [
 
-          // ── Greeting app bar ───────────────────────────────────────────────
-          SliverAppBar(
-            backgroundColor: bgPage,
-            pinned: true,
-            floating: false,
-            toolbarHeight: 70,
-            automaticallyImplyLeading: false,
-            leading: IconButton(
-              icon: Icon(Icons.menu_rounded, color: textColor, size: 22),
-              onPressed: openAppSidebar,
-              tooltip: 'Menu',
-            ),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$_greeting, Arjun 👋',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 19, fontWeight: FontWeight.w800,
-                      color: textColor, letterSpacing: -0.3,
-                    )),
-                Text(AppStrings.todayOverview,
-                    style: GoogleFonts.inter(fontSize: 12, color: secondary)),
+            // ── Greeting app bar ─────────────────────────────────────────────
+            SliverAppBar(
+              backgroundColor: context.bg,
+              pinned: true,
+              floating: false,
+              toolbarHeight: 70,
+              automaticallyImplyLeading: false,
+              leading: AppIconButton(
+                icon: const Icon(Icons.menu_rounded, size: 22),
+                onPressed: openAppSidebar,
+                tooltip: 'Menu',
+              ),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText.h3('$_greeting, Arjun 👋'),
+                  AppText.bodySm(AppStrings.todayOverview, color: context.secondaryText),
+                ],
+              ),
+              actions: [
+                _NotifBell(count: stats?.unreadNotifications ?? 0),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: AppAvatar(name: 'Arjun Kumar', size: AppAvatarSize.xs),
+                  ),
+                ),
               ],
             ),
-            actions: [
-              _NotifBell(count: 3),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                ),
-                child: Container(
-                  width: 34, height: 34,
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.teal.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.teal.withValues(alpha: 0.35)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text('AK',
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.teal,
-                      )),
-                ),
-              ),
-            ],
-          ),
 
-          // ── Promo banners ──────────────────────────────────────────────────
-          if (_bannerConfig != null && _bannerConfig!.shouldShow)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 18),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: FractionallySizedBox(
-                    widthFactor: 0.98,
-                    child: _BannerCarousel(banners: _bannerConfig!.banners),
+            // ── Promo banners ────────────────────────────────────────────────
+            if (_bannerConfig != null && _bannerConfig!.shouldShow)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 18),
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: FractionallySizedBox(
+                      widthFactor: 0.98,
+                      child: _BannerCarousel(banners: _bannerConfig!.banners),
+                    ),
                   ),
                 ),
               ),
-            ),
 
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
 
-                // ── Stat cards ─────────────────────────────────────────────
-                Row(children: [
-                  Expanded(child: _StatCard(
-                    icon: Icons.trending_up_rounded,
-                    value: '$_adherence%',
-                    label: AppStrings.adherenceRate,
-                    color: AppColors.teal,
-                    bgCard: bgCard, border: border,
-                    badge: _StatBadge(
-                      icon: Icons.arrow_upward_rounded,
-                      label: '12% vs last week',
-                      color: AppColors.green,
-                    ),
-                  )),
-                  const SizedBox(width: 10),
-                  Expanded(child: _StatCard(
-                    icon: Icons.calendar_month_rounded,
-                    value: '2',
-                    label: AppStrings.upcoming,
-                    color: AppColors.purple,
-                    bgCard: bgCard, border: border,
-                    badge: _StatBadge(
-                      label: 'Appointments',
-                      color: AppColors.purple,
-                    ),
-                  )),
-                  const SizedBox(width: 10),
-                  Expanded(child: _StatCard(
-                    icon: Icons.inventory_2_outlined,
-                    value: '1',
-                    label: 'Low stock',
-                    color: AppColors.amber,
-                    bgCard: bgCard, border: border,
-                    badge: _StatBadge(
-                      label: 'View details',
-                      color: AppColors.amber,
-                    ),
-                  )),
-                ]),
-                const SizedBox(height: 24),
-
-                // ── Today's medicines ──────────────────────────────────────
-                _SectionHeader(
-                  title: AppStrings.todayMedicines,
-                  subtitle: '$_takenCount/${_doses.length} ${AppStrings.taken}',
-                  onViewAll: () {},
-                ),
-                const SizedBox(height: 10),
-                _card(bgCard, border,
-                  child: Column(
-                    children: List.generate(_doses.length, (i) {
-                      final d = _doses[i];
-                      final isLast = i == _doses.length - 1;
-                      return Column(children: [
-                        _DoseRow(
-                          dose: d,
-                          onTake: () => _markDose(i, _DoseStatus.taken),
-                          onSkip: () => _markDose(i, _DoseStatus.skipped),
+                  // ── Stat cards ───────────────────────────────────────────
+                  if (isLoading)
+                    AppSkeleton(
+                      child: Row(children: [
+                        Expanded(child: SkeletonBox(height: 130, borderRadius: BorderRadius.circular(12))),
+                        const SizedBox(width: 10),
+                        Expanded(child: SkeletonBox(height: 130, borderRadius: BorderRadius.circular(12))),
+                        const SizedBox(width: 10),
+                        Expanded(child: SkeletonBox(height: 130, borderRadius: BorderRadius.circular(12))),
+                      ]),
+                    )
+                  else
+                    Row(children: [
+                      Expanded(child: _StatCard(
+                        icon: Icons.trending_up_rounded,
+                        value: '$adherence%',
+                        label: AppStrings.adherenceRate,
+                        color: AppColors.teal,
+                        badge: _StatBadge(
+                          icon: Icons.arrow_upward_rounded,
+                          label: '12% vs last week',
+                          color: AppColors.green,
                         ),
-                        if (!isLast) Divider(height: 1, color: border),
-                      ]);
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(child: _StatCard(
+                        icon: Icons.calendar_month_rounded,
+                        value: '${stats?.pendingCount ?? 0}',
+                        label: AppStrings.upcoming,
+                        color: AppColors.purple,
+                        badge: _StatBadge(label: 'Appointments', color: AppColors.purple),
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(child: _StatCard(
+                        icon: Icons.inventory_2_outlined,
+                        value: '${stats?.lowStockCount ?? 0}',
+                        label: 'Low stock',
+                        color: AppColors.amber,
+                        badge: _StatBadge(label: 'View details', color: AppColors.amber),
+                      )),
+                    ]),
+                  const SizedBox(height: 24),
 
-                // ── Recent vitals ──────────────────────────────────────────
-                _SectionHeader(title: AppStrings.recentVitals, onViewAll: () {}),
-                const SizedBox(height: 10),
-                _card(bgCard, border,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.monitor_heart_outlined, size: 16, color: AppColors.blue),
-                          const SizedBox(width: 6),
-                          Text('Blood Pressure',
-                              style: GoogleFonts.inter(
-                                fontSize: 12, fontWeight: FontWeight.w600, color: secondary,
-                              )),
-                          const Spacer(),
-                          Text('Today, 9:00 AM',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: secondary.withValues(alpha: 0.7),
-                              )),
-                        ],
+                  // ── Today's medicines ────────────────────────────────────
+                  _SectionHeader(
+                    title: AppStrings.todayMedicines,
+                    subtitle: '$takenCount/${doses.length} ${AppStrings.taken}',
+                    onViewAll: () {},
+                  ),
+                  const SizedBox(height: 10),
+                  if (isLoading)
+                    AppCard(
+                      child: AppSkeleton(
+                        child: Column(
+                          children: List.generate(4, (_) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: AppListTileSkeleton(
+                              leadingShape: BoxShape.rectangle,
+                              leadingSize: 36,
+                              showTrailing: true,
+                              padding: EdgeInsets.zero,
+                            ),
+                          )),
+                        ),
                       ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          _VitalChip(
-                            label: AppStrings.systolic,
-                            value: '120', unit: AppStrings.mmHg,
-                            color: AppColors.teal,
-                            sparkPoints: _systolicPoints,
-                            bgCard: bgCard, border: border,
+                    )
+                  else if (doses.isEmpty)
+                    AppCard(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: AppText.bodySm(
+                            'No medicines scheduled today',
+                            color: AppColors.textHint,
                           ),
-                          const SizedBox(width: 10),
-                          _VitalChip(
-                            label: AppStrings.diastolic,
-                            value: '80', unit: AppStrings.mmHg,
-                            color: AppColors.blue,
-                            sparkPoints: _diastolicPoints,
-                            bgCard: bgCard, border: border,
+                        ),
+                      ),
+                    )
+                  else
+                    AppCard(
+                      padding: const EdgeInsets.all(0),
+                      child: Column(
+                        children: List.generate(doses.length, (i) {
+                          final d = doses[i];
+                          final isLast = i == doses.length - 1;
+                          return Column(children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: _DoseRow(
+                                dose: d,
+                                onTake: () => _markDose(d.id, _DoseStatus.taken),
+                                onSkip: () => _markDose(d.id, _DoseStatus.skipped),
+                              ),
+                            ),
+                            if (!isLast) Divider(height: 1, color: context.borderCol),
+                          ]);
+                        }),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+
+                  // ── Recent vitals ────────────────────────────────────────
+                  _SectionHeader(title: AppStrings.recentVitals, onViewAll: () {}),
+                  const SizedBox(height: 10),
+                  if (isLoading)
+                    AppCard(
+                      child: AppSkeleton(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SkeletonBox(width: 120, height: 14, borderRadius: BorderRadius.circular(6)),
+                            const SizedBox(height: 14),
+                            Row(children: [
+                              Expanded(child: SkeletonBox(height: 80, borderRadius: BorderRadius.circular(8))),
+                              const SizedBox(width: 10),
+                              Expanded(child: SkeletonBox(height: 80, borderRadius: BorderRadius.circular(8))),
+                              const SizedBox(width: 10),
+                              Expanded(child: SkeletonBox(height: 80, borderRadius: BorderRadius.circular(8))),
+                            ]),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Builder(builder: (context) {
+                      final vital = _latestVital(state.recentVitals);
+                      if (vital == null) {
+                        return AppCard(
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: AppText.bodySm(
+                                'No vitals recorded yet',
+                                color: AppColors.textHint,
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          _VitalChip(
-                            label: AppStrings.heartRate,
-                            value: '72', unit: AppStrings.bpm,
-                            color: AppColors.purple,
-                            sparkPoints: _heartRatePoints,
-                            bgCard: bgCard, border: border,
-                          ),
-                        ],
+                        );
+                      }
+                      return AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.monitor_heart_outlined, size: 16, color: AppColors.blue),
+                                const SizedBox(width: 6),
+                                AppText.bodySm(vital.name, fontWeight: FontWeight.w600, color: context.secondaryText),
+                                const Spacer(),
+                                AppText.bodyXs(vital.timestamp, color: context.secondaryText),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                for (int i = 0; i < vital.chips.length; i++) ...[
+                                  if (i > 0) const SizedBox(width: 10),
+                                  _VitalChip(
+                                    label: vital.chips[i].label,
+                                    value: vital.chips[i].value,
+                                    unit: vital.chips[i].unit,
+                                    color: vital.chips[i].color,
+                                    sparkPoints: vital.chips[i].points,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 24),
+
+                  // ── Quick actions ────────────────────────────────────────
+                  _SectionHeader(title: AppStrings.quickActions),
+                  const SizedBox(height: 10),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 2.2,
+                    children: [
+                      _QuickAction(
+                        icon: Icons.medication_outlined,
+                        label: AppStrings.addMedicine,
+                        subtitle: 'Set medicine reminder',
+                        color: AppColors.teal,
+                        onTap: () {},
+                      ),
+                      _QuickAction(
+                        icon: Icons.monitor_heart_outlined,
+                        label: AppStrings.addVital,
+                        subtitle: 'Record your health',
+                        color: AppColors.blue,
+                        onTap: () {},
+                      ),
+                      _QuickAction(
+                        icon: Icons.calendar_today_outlined,
+                        label: AppStrings.addAppointment,
+                        subtitle: 'Schedule a visit',
+                        color: AppColors.purple,
+                        onTap: () {},
+                      ),
+                      _QuickAction(
+                        icon: Icons.emergency_outlined,
+                        label: AppStrings.sos,
+                        subtitle: 'Emergency assistance',
+                        color: AppColors.error,
+                        onTap: () {},
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
 
-                // ── Quick actions ──────────────────────────────────────────
-                _SectionHeader(title: AppStrings.quickActions),
-                const SizedBox(height: 10),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 2.2,
-                  children: [
-                    _QuickAction(
-                      icon: Icons.medication_outlined,
-                      label: AppStrings.addMedicine,
-                      subtitle: 'Set medicine reminder',
-                      color: AppColors.teal,
-                      bgCard: bgCard, border: border,
-                      onTap: () {},
-                    ),
-                    _QuickAction(
-                      icon: Icons.monitor_heart_outlined,
-                      label: AppStrings.addVital,
-                      subtitle: 'Record your health',
-                      color: AppColors.blue,
-                      bgCard: bgCard, border: border,
-                      onTap: () {},
-                    ),
-                    _QuickAction(
-                      icon: Icons.calendar_today_outlined,
-                      label: AppStrings.addAppointment,
-                      subtitle: 'Schedule a visit',
-                      color: AppColors.purple,
-                      bgCard: bgCard, border: border,
-                      onTap: () {},
-                    ),
-                    _QuickAction(
-                      icon: Icons.emergency_outlined,
-                      label: AppStrings.sos,
-                      subtitle: 'Emergency assistance',
-                      color: AppColors.error,
-                      bgCard: bgCard, border: border,
-                      onTap: () {},
-                    ),
-                  ],
-                ),
-
-              ]),
+                ]),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -338,13 +442,12 @@ class _NotifBell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        IconButton(
-          icon: Icon(Icons.notifications_outlined, size: 24,
-              color: isDark ? AppColors.textSecondary : const Color(0xFF64748B)),
+        AppIconButton(
+          icon: const Icon(Icons.notifications_outlined, size: 24),
+          color: context.secondaryText,
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
@@ -357,10 +460,12 @@ class _NotifBell extends StatelessWidget {
               width: 16, height: 16,
               decoration: const BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
               child: Center(
-                child: Text('$count',
-                    style: GoogleFonts.inter(
-                      fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white,
-                    )),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ),
@@ -377,8 +482,6 @@ class _StatCard extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
-    required this.bgCard,
-    required this.border,
     required this.badge,
   });
 
@@ -386,51 +489,40 @@ class _StatCard extends StatelessWidget {
   final String  value;
   final String  label;
   final Color   color;
-  final Color   bgCard;
-  final Color   border;
   final Widget  badge;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: AppBorderRadius.xlAll,
-        border: Border.all(color: border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: AppBorderRadius.smAll,
-                ),
+              AppContainer.tinted(
+                color: color,
+                borderRadius: AppBorderRadius.smAll,
+                padding: const EdgeInsets.all(7),
                 child: Icon(icon, size: 17, color: color),
               ),
               const Spacer(),
-              SizedBox(
-                width: 22, height: 22,
-                child: Icon(Icons.more_horiz_rounded,
-                    size: 16,
-                    color: AppColors.textHint),
-              ),
+              const Icon(Icons.more_horiz_rounded, size: 16, color: AppColors.textHint),
             ],
           ),
           const SizedBox(height: 10),
-          Text(value,
-              style: AppTypography.statMd.copyWith(color: color, height: 1)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: color,
+              height: 1,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label,
-              style: GoogleFonts.inter(
-                fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textHint,
-              ),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
+          AppText.bodyXs(label, color: AppColors.textHint, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 10),
           badge,
         ],
@@ -442,24 +534,17 @@ class _StatCard extends StatelessWidget {
 // ─── Stat badge ───────────────────────────────────────────────────────────────
 
 class _StatBadge extends StatelessWidget {
-  const _StatBadge({
-    required this.label,
-    required this.color,
-    this.icon,
-  });
-
-  final String   label;
-  final Color    color;
+  const _StatBadge({required this.label, required this.color, this.icon});
+  final String    label;
+  final Color     color;
   final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppContainer.tinted(
+      color: color,
+      borderRadius: AppBorderRadius.pill,
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: AppBorderRadius.pill,
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -468,11 +553,7 @@ class _StatBadge extends StatelessWidget {
             const SizedBox(width: 3),
           ],
           Flexible(
-            child: Text(label,
-                style: GoogleFonts.inter(
-                  fontSize: 9, fontWeight: FontWeight.w700, color: color,
-                ),
-                overflow: TextOverflow.ellipsis),
+            child: AppText.labelXs(label, color: color, overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
@@ -490,7 +571,6 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -498,43 +578,24 @@ class _SectionHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 15, fontWeight: FontWeight.w700,
-                    color: isDark ? context.primaryText : const Color(0xFF1A202C),
-                  )),
+              AppText.bodyMd(title, fontWeight: FontWeight.w700),
               if (subtitle != null)
-                Text(subtitle!,
-                    style: GoogleFonts.inter(fontSize: 11, color: AppColors.textSecondary)),
+                AppText.bodyXs(subtitle!, color: context.secondaryText),
             ],
           ),
         ),
         if (onViewAll != null)
           GestureDetector(
             onTap: onViewAll,
-            child: Text(AppStrings.viewAll,
-                style: GoogleFonts.inter(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.teal,
-                )),
+            child: AppText.bodySm(
+              AppStrings.viewAll,
+              color: AppColors.teal,
+              fontWeight: FontWeight.w600,
+            ),
           ),
       ],
     );
   }
-}
-
-// ─── Card wrapper ─────────────────────────────────────────────────────────────
-
-Widget _card(Color bg, Color border, {required Widget child}) {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: bg,
-      borderRadius: AppBorderRadius.xlAll,
-      border: Border.all(color: border),
-    ),
-    child: child,
-  );
 }
 
 // ─── Dose row ─────────────────────────────────────────────────────────────────
@@ -547,10 +608,6 @@ class _DoseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
-    final secondary = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
-    final textColor = isDark ? context.primaryText    : const Color(0xFF1A202C);
-
     final (statusColor, statusLabel) = switch (dose.status) {
       _DoseStatus.taken   => (AppColors.green, AppStrings.taken),
       _DoseStatus.skipped => (AppColors.amber, AppStrings.skip),
@@ -562,12 +619,10 @@ class _DoseRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.teal.withValues(alpha: 0.10),
-              borderRadius: AppBorderRadius.smAll,
-            ),
+          AppContainer.tinted(
+            color: AppColors.teal,
+            borderRadius: AppBorderRadius.smAll,
+            padding: const EdgeInsets.all(9),
             child: const Icon(Icons.medication_rounded, size: 18, color: AppColors.teal),
           ),
           const SizedBox(width: 12),
@@ -575,17 +630,12 @@ class _DoseRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(dose.name,
-                    style: GoogleFonts.inter(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: textColor,
-                    ),
-                    overflow: TextOverflow.ellipsis),
+                AppText.bodySm(dose.name, fontWeight: FontWeight.w600, overflow: TextOverflow.ellipsis),
                 Row(
                   children: [
-                    Icon(Icons.access_time_rounded, size: 10, color: secondary),
+                    const Icon(Icons.access_time_rounded, size: 10, color: AppColors.textHint),
                     const SizedBox(width: 3),
-                    Text(dose.time,
-                        style: GoogleFonts.inter(fontSize: 11, color: secondary)),
+                    AppText.bodyXs(dose.time, color: context.secondaryText),
                   ],
                 ),
               ],
@@ -597,17 +647,11 @@ class _DoseRow extends StatelessWidget {
             const SizedBox(width: 6),
             _ActionBtn(Icons.close_rounded, AppColors.amber, onSkip),
           ] else
-            Container(
+            AppContainer.tinted(
+              color: statusColor,
+              borderRadius: AppBorderRadius.pill,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: AppBorderRadius.pill,
-                border: Border.all(color: statusColor.withValues(alpha: 0.25)),
-              ),
-              child: Text(statusLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 10, fontWeight: FontWeight.w700, color: statusColor,
-                  )),
+              child: AppText.labelXs(statusLabel, color: statusColor, fontWeight: FontWeight.w700),
             ),
         ],
       ),
@@ -625,12 +669,10 @@ class _ActionBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 30, height: 30,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: AppBorderRadius.smAll,
-        ),
+      child: AppContainer.tinted(
+        color: color,
+        borderRadius: AppBorderRadius.smAll,
+        padding: const EdgeInsets.all(7),
         child: Icon(icon, size: 15, color: color),
       ),
     );
@@ -646,8 +688,6 @@ class _VitalChip extends StatelessWidget {
     required this.unit,
     required this.color,
     required this.sparkPoints,
-    required this.bgCard,
-    required this.border,
   });
 
   final String       label;
@@ -655,21 +695,16 @@ class _VitalChip extends StatelessWidget {
   final String       unit;
   final Color        color;
   final List<double> sparkPoints;
-  final Color        bgCard;
-  final Color        border;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg     = isDark ? context.inputBg : AppColors.light200;
-
     return Expanded(
       child: Container(
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: bg,
+          color: context.inputBg,
           borderRadius: AppBorderRadius.mdAll,
-          border: Border.all(color: border),
+          border: Border.all(color: context.borderCol),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -679,26 +714,25 @@ class _VitalChip extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: GoogleFonts.inter(
-                        fontSize: 9, color: AppColors.textSecondary,
-                      ),
-                      overflow: TextOverflow.ellipsis),
+                  AppText.labelXs(label, color: context.secondaryText, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
                   RichText(
                     text: TextSpan(
                       children: [
                         TextSpan(
                           text: value,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 18, fontWeight: FontWeight.w800,
-                            color: color, height: 1,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: color,
+                            height: 1,
                           ),
                         ),
                         TextSpan(
                           text: ' $unit',
-                          style: GoogleFonts.inter(
-                            fontSize: 9, color: AppColors.textSecondary,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: context.secondaryText,
                           ),
                         ),
                       ],
@@ -708,7 +742,6 @@ class _VitalChip extends StatelessWidget {
                 ],
               ),
             ),
-            // Sparkline flush to bottom edge, no side padding
             MiniSparkline(
               points: sparkPoints,
               color: color,
@@ -732,8 +765,6 @@ class _QuickAction extends StatelessWidget {
     required this.label,
     required this.subtitle,
     required this.color,
-    required this.bgCard,
-    required this.border,
     required this.onTap,
   });
 
@@ -741,64 +772,42 @@ class _QuickAction extends StatelessWidget {
   final String   label;
   final String   subtitle;
   final Color    color;
-  final Color    bgCard;
-  final Color    border;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? context.primaryText : const Color(0xFF1A202C);
-
-    return GestureDetector(
+    return AppCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: bgCard,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: AppBorderRadius.smAll,
-              ),
-              child: Icon(icon, size: 16, color: color),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          AppContainer.tinted(
+            color: color,
+            borderRadius: AppBorderRadius.smAll,
+            padding: const EdgeInsets.all(8),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AppText.bodySm(label, fontWeight: FontWeight.w700, overflow: TextOverflow.ellipsis),
+                AppText.bodyXs(subtitle, color: context.secondaryText, overflow: TextOverflow.ellipsis),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(label,
-                      style: GoogleFonts.inter(
-                        fontSize: 12, fontWeight: FontWeight.w700, color: textColor,
-                      ),
-                      overflow: TextOverflow.ellipsis),
-                  Text(subtitle,
-                      style: GoogleFonts.inter(
-                        fontSize: 10, color: AppColors.textSecondary,
-                      ),
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            width: 22, height: 22,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: 6),
-            Container(
-              width: 22, height: 22,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.arrow_forward_rounded, size: 12, color: color),
-            ),
-          ],
-        ),
+            child: Icon(Icons.arrow_forward_rounded, size: 12, color: color),
+          ),
+        ],
       ),
     );
   }
@@ -882,7 +891,6 @@ class _BannerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (banner.isGradient) return _GradientBanner(banner: banner);
     return GestureDetector(
       onTap: () {},
@@ -894,7 +902,7 @@ class _BannerCard extends StatelessWidget {
           width: double.infinity,
           height: double.infinity,
           placeholder: (_, __) => Container(
-            color: isDark ? context.inputBg : AppColors.light200,
+            color: context.inputBg,
             child: const Center(
               child: SizedBox(
                 width: 24, height: 24,
@@ -940,18 +948,17 @@ class _GradientBanner extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (banner.title != null)
-                      Text(banner.title!,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 14, fontWeight: FontWeight.w700,
-                            color: Colors.white, letterSpacing: -0.2,
-                          )),
+                      AppText.labelMd(
+                        banner.title!,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     if (banner.subtitle != null) ...[
                       const SizedBox(height: 3),
-                      Text(banner.subtitle!,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.72),
-                          )),
+                      AppText.bodyXs(
+                        banner.subtitle!,
+                        color: Colors.white.withValues(alpha: 0.72),
+                      ),
                     ],
                   ],
                 ),

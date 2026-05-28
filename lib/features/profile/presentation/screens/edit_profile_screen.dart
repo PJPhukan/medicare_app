@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../providers/profile_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/utils/logger.dart';
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
@@ -31,16 +35,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl       = TextEditingController(text: 'Arjun Kumar');
-    _emailCtrl      = TextEditingController(text: 'arjun@email.com');
-    _phoneCtrl      = TextEditingController(text: '+91 98765 43210');
-    _dobCtrl        = TextEditingController(text: '15 Mar 1990');
-    _locationCtrl   = TextEditingController(text: 'Mumbai, Maharashtra');
-    _bloodGroupCtrl = TextEditingController(text: 'O+');
-    _weightCtrl     = TextEditingController(text: '72');
-    _heightCtrl     = TextEditingController(text: '175');
-    _conditionsCtrl = TextEditingController(text: 'Type 2 Diabetes');
-    _allergiesCtrl  = TextEditingController(text: 'Penicillin');
+    final user      = ref.read(authProvider).user;
+    _nameCtrl       = TextEditingController(text: user?.name ?? '');
+    _emailCtrl      = TextEditingController(text: user?.email ?? '');
+    _phoneCtrl      = TextEditingController(text: user?.phone ?? '');
+    _dobCtrl        = TextEditingController();
+    _locationCtrl   = TextEditingController();
+    _bloodGroupCtrl = TextEditingController();
+    _weightCtrl     = TextEditingController();
+    _heightCtrl     = TextEditingController();
+    _conditionsCtrl = TextEditingController();
+    _allergiesCtrl  = TextEditingController();
   }
 
   @override
@@ -56,17 +61,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    AppLogger.i('Profile update', tag: 'Profile');
     setState(() => _saving = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(AppStrings.profileUpdated, style: AppTypography.bodySm),
-      backgroundColor: AppColors.teal.withValues(alpha: 0.9),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-    ));
-    Navigator.pop(context);
+    try {
+      await ref.read(updateProfileProvider).call({
+        'name': _nameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'dob': _dobCtrl.text.trim(),
+        'gender': _gender,
+        'location': _locationCtrl.text.trim(),
+        'bloodGroup': _bloodGroupCtrl.text.trim(),
+        'weight': _weightCtrl.text.trim(),
+        'height': _heightCtrl.text.trim(),
+        'conditions': _conditionsCtrl.text.trim(),
+        'allergies': _allergiesCtrl.text.trim(),
+      });
+      AppLogger.i('Profile updated ✓', tag: 'Profile');
+      if (!mounted) return;
+      AppSnackbar.success(context, AppStrings.profileUpdated);
+      Navigator.pop(context);
+    } on Exception catch (e) {
+      AppLogger.e('Profile update failed', tag: 'Profile', error: e);
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppSnackbar.error(context, e.toString());
+    }
   }
 
   @override
@@ -102,14 +122,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                         child: _saving
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal))
-                            : Text(AppStrings.save, style: AppTypography.buttonSm.copyWith(color: AppColors.textInverse)),
+                            : const Text(AppStrings.save, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
                       ),
                     ),
                   ),
                 ],
                 flexibleSpace: FlexibleSpaceBar(
                   titlePadding: const EdgeInsets.only(left: 52, bottom: 14),
-                  title: Text(AppStrings.editProfile, style: AppTypography.h2.copyWith(fontSize: 22)),
+                  title: AppText.h2(AppStrings.editProfile),
                   background: Container(color: context.bg),
                 ),
               ),
@@ -124,7 +144,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           CircleAvatar(
                             radius: 44,
                             backgroundColor: AppColors.teal.withValues(alpha: 0.15),
-                            child: Text('AK', style: AppTypography.h1.copyWith(color: AppColors.teal, fontSize: 28)),
+                            child: const Text('AK', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.teal)),
                           ),
                           Positioned(
                             bottom: 0, right: 0,
@@ -146,7 +166,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 6),
                     Center(
-                      child: Text(AppStrings.changePhoto, style: AppTypography.bodySm.copyWith(color: AppColors.teal, fontWeight: FontWeight.w600)),
+                      child: AppText.bodySm(AppStrings.changePhoto, color: AppColors.teal, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 24),
                     _SectionLabel('PERSONAL INFO'),
@@ -168,8 +188,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(AppStrings.gender,
-                            style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                        AppText.bodyXs(AppStrings.gender, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                         const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.all(4),
@@ -194,7 +213,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     ),
                                     alignment: Alignment.center,
                                     child: Text(g,
-                                        style: AppTypography.buttonSm.copyWith(
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.2,
                                           color: sel ? AppColors.teal : AppColors.textSecondary,
                                         )),
                                   ),
@@ -241,7 +263,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         alignment: Alignment.center,
                         child: _saving
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal))
-                            : Text(AppStrings.save, style: AppTypography.buttonMd.copyWith(color: AppColors.textInverse)),
+                            : const Text(AppStrings.save, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
                       ),
                     ),
                   ]),
@@ -262,7 +284,7 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 1),
       );
 }
 
@@ -289,7 +311,7 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          AppText.bodyXs(label, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
@@ -302,10 +324,10 @@ class _Field extends StatelessWidget {
               keyboardType: keyboardType,
               maxLines: maxLines,
               validator: validator,
-              style: AppTypography.bodyMd.copyWith(color: context.primaryText),
+              style: TextStyle(fontSize: 14, color: context.primaryText),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
+                hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,

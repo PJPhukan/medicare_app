@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../domain/entities/note_entity.dart';
+import '../providers/notes_provider.dart';
 import 'note_editor_screen.dart';
 
-// ─── Model ────────────────────────────────────────────────────────────────────
+// ─── Mutable view-model used by NoteEditorScreen ─────────────────────────────
 
 class NoteData {
   final String id;
@@ -28,166 +31,109 @@ class NoteData {
 // ─── Palette of note background colours ──────────────────────────────────────
 
 const _kPalette = [
-  Color(0xFF1A2332), // default dark
-  Color(0xFF0F2A1A), // dark green
-  Color(0xFF1A1A2E), // dark blue
-  Color(0xFF2A1A1A), // dark red
-  Color(0xFF251A2E), // dark purple
-  Color(0xFF2A2210), // dark amber
+  Color(0xFF1A2332),
+  Color(0xFF0F2A1A),
+  Color(0xFF1A1A2E),
+  Color(0xFF2A1A1A),
+  Color(0xFF251A2E),
+  Color(0xFF2A2210),
 ];
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Color conversion helpers ─────────────────────────────────────────────────
 
-final _kMockNotes = [
-  NoteData(
-    id: 'note1',
-    title: 'BP Readings — Week 3',
-    content: 'Mon: 138/88, Tue: 142/90, Wed: 135/85. Trend improving after reducing sodium. Doctor says keep tracking daily for two more weeks.',
-    colour: _kPalette[0],
-    updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-  ),
-  NoteData(
-    id: 'note2',
-    title: 'Metformin Side Effects',
-    content: 'Mild nausea the first two days. Doctor said take it after a full meal. Nausea gone by day 4. Blood sugar stabilising around 108 mg/dL.',
-    colour: _kPalette[1],
-    updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-  ),
-  NoteData(
-    id: 'note3',
-    title: 'Questions for Next Appointment',
-    content: '1. Can I reduce Amlodipine dose?\n2. Request physio referral for knee.\n3. Ask about HbA1c target range.\n4. Diet recommendations update.',
-    colour: _kPalette[2],
-    updatedAt: DateTime.now().subtract(const Duration(days: 3)),
-  ),
-  NoteData(
-    id: 'note4',
-    title: 'Knee Exercise Log',
-    content: 'Dr. Vikram\'s programme: straight leg raises (3×15), wall squats (2×30s), calf raises (3×20). Week 2 — pain reduced from 7/10 to 4/10.',
-    colour: _kPalette[3],
-    updatedAt: DateTime.now().subtract(const Duration(days: 5)),
-  ),
-  NoteData(
-    id: 'note5',
-    title: 'Diet Changes',
-    content: 'No more processed salt. More leafy greens and oats. Reduce red meat to once a week. Drink 2L water daily. Limit alcohol to zero for now.',
-    colour: _kPalette[4],
-    updatedAt: DateTime.now().subtract(const Duration(days: 7)),
-  ),
-  NoteData(
-    id: 'note6',
-    title: 'Insurance Claims',
-    content: 'Claim #MF-2024-882 submitted 4 Feb. Waiting on approval. Call insurer if no response by 20 Feb. Keep all pharmacy receipts for reimbursement.',
-    colour: _kPalette[5],
-    updatedAt: DateTime.now().subtract(const Duration(days: 14)),
-  ),
-];
+Color _hexToColor(String? hex) {
+  if (hex == null || hex.isEmpty) return _kPalette[0];
+  final h = hex.startsWith('#') ? hex.substring(1) : hex;
+  if (h.length == 6) return Color(int.parse('FF$h', radix: 16));
+  return _kPalette[0];
+}
+
+String _colorToHex(Color color) {
+  final hex = color.toARGB32().toRadixString(16).padLeft(8, '0');
+  return '#${hex.substring(2).toUpperCase()}';
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class NotesScreen extends StatefulWidget {
+class NotesScreen extends ConsumerStatefulWidget {
   const NotesScreen({super.key});
 
   @override
-  State<NotesScreen> createState() => _NotesScreenState();
+  ConsumerState<NotesScreen> createState() => _NotesScreenState();
 }
 
-class _NotesScreenState extends State<NotesScreen> {
-  final _searchCtrl = TextEditingController();
-  final List<NoteData> _notes = List.from(_kMockNotes);
+class _NotesScreenState extends ConsumerState<NotesScreen> {
   String _query = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _searchCtrl.addListener(
-      () => setState(() => _query = _searchCtrl.text.trim().toLowerCase()),
+  List<NoteEntity> _filter(List<NoteEntity> notes) {
+    if (_query.isEmpty) return notes;
+    return notes
+        .where((n) =>
+            n.title.toLowerCase().contains(_query) ||
+            n.body.toLowerCase().contains(_query))
+        .toList();
+  }
+
+  Future<void> _openNote(NoteEntity entity) async {
+    final nd = NoteData(
+      id: entity.id,
+      title: entity.title,
+      content: entity.body,
+      colour: _hexToColor(entity.color),
+      updatedAt: DateTime.tryParse(entity.updatedAt ?? entity.createdAt) ?? DateTime.now(),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  List<NoteData> get _filtered {
-    if (_query.isEmpty) return _notes;
-    return _notes.where((n) =>
-      n.title.toLowerCase().contains(_query) ||
-      n.content.toLowerCase().contains(_query),
-    ).toList();
-  }
-
-  void _openNote(NoteData note) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NoteEditorScreen(note: note)),
+      MaterialPageRoute(builder: (_) => NoteEditorScreen(note: nd)),
     );
-    setState(() {}); // refresh after edit
+    if (!mounted) return;
+    await ref.read(notesProvider.notifier).updateNote(
+          id: entity.id,
+          title: nd.title,
+          body: nd.content,
+          color: _colorToHex(nd.colour),
+        );
   }
 
-  void _createNote() async {
-    final newNote = NoteData(
-      id: 'note_${DateTime.now().millisecondsSinceEpoch}',
+  Future<void> _createNote() async {
+    final nd = NoteData(
+      id: '',
       title: '',
       content: '',
       colour: _kPalette[0],
       updatedAt: DateTime.now(),
     );
-    _notes.insert(0, newNote);
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NoteEditorScreen(note: newNote)),
+      MaterialPageRoute(builder: (_) => NoteEditorScreen(note: nd)),
     );
-    setState(() {
-      // if left blank, remove it
-      if (newNote.title.isEmpty && newNote.content.isEmpty) {
-        _notes.remove(newNote);
-      }
-    });
+    if (!mounted) return;
+    if (nd.title.isEmpty && nd.content.isEmpty) return;
+    await ref.read(notesProvider.notifier).createNote(
+          title: nd.title,
+          body: nd.content,
+          color: _colorToHex(nd.colour),
+        );
   }
 
-  void _confirmDelete(NoteData note) {
-    showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardBg,
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-        title: Text(AppStrings.delete, style: AppTypography.h3),
-        content: Text(
-          AppStrings.deleteNoteConfirm,
-          style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppStrings.cancel,
-                style: AppTypography.buttonMd.copyWith(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppStrings.delete,
-                style: AppTypography.buttonMd.copyWith(color: AppColors.red)),
-          ),
-        ],
-      ),
-    ).then((confirmed) {
-      if (confirmed == true && mounted) {
-        setState(() => _notes.remove(note));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppStrings.noteDeleted, style: AppTypography.bodySm),
-            backgroundColor: context.inputBg,
-          ),
-        );
-      }
-    });
+  Future<void> _confirmDelete(String noteId) async {
+    final confirmed = await AppDialog.confirm(
+      context,
+      title: AppStrings.delete,
+      message: AppStrings.deleteNoteConfirm,
+      confirmLabel: AppStrings.delete,
+      isDanger: true,
+    );
+    if (confirmed != true || !mounted) return;
+    ref.read(notesProvider.notifier).deleteNote(noteId);
+    AppSnackbar.success(context, AppStrings.noteDeleted);
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
+    final st = ref.watch(notesProvider);
+    final filtered = _filter(st.notes);
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -201,60 +147,51 @@ class _NotesScreenState extends State<NotesScreen> {
               expandedHeight: 96,
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 16, bottom: 14),
-                title: Text(AppStrings.myNotes, style: AppTypography.h3),
+                title: AppText.h3(AppStrings.myNotes),
               ),
             ),
-
-            // Search bar
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: _SearchBar(controller: _searchCtrl),
+                child: AppSearchTextInput(
+                  hint: AppStrings.searchNotes,
+                  onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                ),
               ),
             ),
-
-            // Notes grid or empty state
-            filtered.isEmpty
-                ? SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.sticky_note_2_outlined,
-                              size: 52, color: AppColors.textHint),
-                          const SizedBox(height: 16),
-                          Text(
-                            _query.isNotEmpty
-                                ? AppStrings.nothingFound
-                                : AppStrings.noNotes,
-                            style: AppTypography.bodyMd.copyWith(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 0.88,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => _NoteCard(
-                          note: filtered[i],
-                          onTap: () => _openNote(filtered[i]),
-                          onLongPress: () => _confirmDelete(filtered[i]),
-                        ),
-                        childCount: filtered.length,
-                      ),
-                    ),
+            if (st.isLoading)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
+                ),
+              )
+            else if (filtered.isEmpty)
+              SliverFillRemaining(
+                child: AppEmptyState(
+                  icon: Icons.sticky_note_2_outlined,
+                  title: _query.isNotEmpty ? AppStrings.nothingFound : AppStrings.noNotes,
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.88,
                   ),
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => _NoteCard(
+                      note: filtered[i],
+                      onTap: () => _openNote(filtered[i]),
+                      onLongPress: () => _confirmDelete(filtered[i].id),
+                    ),
+                    childCount: filtered.length,
+                  ),
+                ),
+              ),
           ],
         ),
         floatingActionButton: FloatingActionButton(
@@ -268,64 +205,10 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 }
 
-// ─── Search bar ───────────────────────────────────────────────────────────────
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  const _SearchBar({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.inputBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: context.borderCol),
-      ),
-      child: Row(
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 14),
-            child: Icon(Icons.search_rounded, color: AppColors.textHint, size: 18),
-          ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-              decoration: InputDecoration(
-                hintText: AppStrings.searchNotes,
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              ),
-            ),
-          ),
-          ValueListenableBuilder(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isNotEmpty
-                ? GestureDetector(
-                    onTap: controller.clear,
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 12),
-                      child: Icon(Icons.close_rounded, size: 16, color: AppColors.textHint),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─── Note card ────────────────────────────────────────────────────────────────
 
 class _NoteCard extends StatelessWidget {
-  final NoteData note;
+  final NoteEntity note;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -335,7 +218,9 @@ class _NoteCard extends StatelessWidget {
     required this.onLongPress,
   });
 
-  String _fmtDate(DateTime dt) {
+  String _fmtDate(String isoStr) {
+    final dt = DateTime.tryParse(isoStr);
+    if (dt == null) return '';
     final now = DateTime.now();
     final diff = now.difference(dt);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
@@ -348,33 +233,35 @@ class _NoteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = note.title.isEmpty ? AppStrings.untitledNote : note.title;
+    final colour = _hexToColor(note.color);
+    final dateStr = _fmtDate(note.updatedAt ?? note.createdAt);
+
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: note.colour,
+          color: colour,
           borderRadius: AppBorderRadius.lgAll,
           border: Border.all(color: context.borderCol),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            AppText.labelMd(
               title,
-              style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w700),
+              fontWeight: FontWeight.w700,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 6),
             Expanded(
               child: Text(
-                note.content.isEmpty ? AppStrings.tapToEdit : note.content,
-                style: AppTypography.bodySm.copyWith(
-                  color: note.content.isEmpty
-                      ? AppColors.textHint
-                      : AppColors.textSecondary,
+                note.body.isEmpty ? AppStrings.tapToEdit : note.body,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: note.body.isEmpty ? AppColors.textHint : AppColors.textSecondary,
                   height: 1.5,
                 ),
                 maxLines: 5,
@@ -386,10 +273,7 @@ class _NoteCard extends StatelessWidget {
               children: [
                 const Icon(Icons.access_time_rounded, size: 10, color: AppColors.textHint),
                 const SizedBox(width: 4),
-                Text(
-                  _fmtDate(note.updatedAt),
-                  style: AppTypography.bodyXs,
-                ),
+                AppText.bodyXs(dateStr, color: AppColors.textHint),
               ],
             ),
           ],

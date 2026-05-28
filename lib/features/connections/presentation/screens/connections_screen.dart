@@ -1,121 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../domain/entities/connection_entity.dart';
+import '../../domain/entities/connection_request_entity.dart';
+import '../providers/connections_provider.dart';
 import 'chat_screen.dart';
+import '../../../../core/network/connectivity_monitor.dart';
 
-// ─── Models ───────────────────────────────────────────────────────────────────
-
-enum _ConnStatus { active, pending, declined }
-
-class _Connection {
-  final String id;
-  final String name;
-  final String specialty;
-  final Color avatarColor;
-  final String lastMessage;
-  final DateTime updatedAt;
-  final int unreadCount;
-  final _ConnStatus status;
-
-  const _Connection({
-    required this.id,
-    required this.name,
-    required this.specialty,
-    required this.avatarColor,
-    required this.lastMessage,
-    required this.updatedAt,
-    this.unreadCount = 0,
-    this.status = _ConnStatus.active,
-  });
+String _fmtTime(String? isoStr) {
+  if (isoStr == null) return '';
+  final dt = DateTime.tryParse(isoStr);
+  if (dt == null) return '';
+  final now = DateTime.now();
+  final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  if (isToday) return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return '${dt.day} ${months[dt.month - 1]}';
 }
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-final _kActive = [
-  _Connection(
-    id: 'conn_1',
-    name: 'Dr. Arjun Sharma',
-    specialty: 'Cardiologist',
-    avatarColor: AppColors.teal,
-    lastMessage: 'Your blood pressure readings look elevated. Please rest and recheck.',
-    updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
-    unreadCount: 2,
-  ),
-  _Connection(
-    id: 'conn_2',
-    name: 'Dr. Priya Nair',
-    specialty: 'Nutritionist',
-    avatarColor: AppColors.green,
-    lastMessage: 'Here is your personalised meal plan for the week.',
-    updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-    unreadCount: 0,
-  ),
-  _Connection(
-    id: 'conn_3',
-    name: 'Dr. Rahul Menon',
-    specialty: 'Physiotherapist',
-    avatarColor: AppColors.blue,
-    lastMessage: 'Great progress! Keep doing the knee exercises twice daily.',
-    updatedAt: DateTime.now().subtract(const Duration(days: 3)),
-    unreadCount: 1,
-  ),
-];
-
-final _kSent = [
-  _Connection(
-    id: 'req_1',
-    name: 'Dr. Kavya Rao',
-    specialty: 'Psychologist',
-    avatarColor: AppColors.purple,
-    lastMessage: '',
-    updatedAt: DateTime.now().subtract(const Duration(days: 2)),
-    status: _ConnStatus.pending,
-  ),
-  _Connection(
-    id: 'req_2',
-    name: 'Dr. Suresh Iyer',
-    specialty: 'Dermatologist',
-    avatarColor: AppColors.amber,
-    lastMessage: '',
-    updatedAt: DateTime.now().subtract(const Duration(days: 6)),
-    status: _ConnStatus.declined,
-  ),
-];
-
-final _kIncoming = [
-  _Connection(
-    id: 'inc_1',
-    name: 'Dr. Deepa Krishnan',
-    specialty: 'Endocrinologist',
-    avatarColor: AppColors.amber,
-    lastMessage: 'Hi! I noticed your recent vitals and would like to help manage your condition.',
-    updatedAt: DateTime.now().subtract(const Duration(hours: 6)),
-  ),
-];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ConnectionsScreen extends StatefulWidget {
+class ConnectionsScreen extends ConsumerStatefulWidget {
   const ConnectionsScreen({super.key});
 
   @override
-  State<ConnectionsScreen> createState() => _ConnectionsScreenState();
+  ConsumerState<ConnectionsScreen> createState() => _ConnectionsScreenState();
 }
 
-class _ConnectionsScreenState extends State<ConnectionsScreen>
+class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   final _searchCtrl = TextEditingController();
   String _query = '';
-
-  // Mutable local state for demo accept/decline
-  final _incoming = List<_Connection>.from(_kIncoming);
 
   @override
   void initState() {
@@ -131,58 +53,52 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
     super.dispose();
   }
 
-  List<_Connection> get _filteredActive => _query.isEmpty
-      ? _kActive
-      : _kActive.where((c) => c.name.toLowerCase().contains(_query) || c.specialty.toLowerCase().contains(_query)).toList();
-
-  List<_Connection> get _filteredSent => _query.isEmpty
-      ? _kSent
-      : _kSent.where((c) => c.name.toLowerCase().contains(_query)).toList();
-
-  List<_Connection> get _filteredIncoming => _query.isEmpty
-      ? _incoming
-      : _incoming.where((c) => c.name.toLowerCase().contains(_query)).toList();
-
-  void _openChat(_Connection conn) {
+  void _openChat(ConnectionEntity conn) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
           connectionId: conn.id,
-          professionalName: conn.name,
-          professionalSpecialty: conn.specialty,
-          avatarColor: conn.avatarColor,
+          professionalName: conn.connectedUser.name,
+          professionalSpecialty: '',
         ),
       ),
     );
   }
 
-  void _accept(_Connection conn) {
-    setState(() => _incoming.remove(conn));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.connectionAccepted, style: AppTypography.bodySm),
-        backgroundColor: context.inputBg,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-      ),
-    );
+  Future<void> _accept(String requestId) async {
+    await ref.read(connectionsProvider.notifier).acceptRequest(requestId);
+    if (!mounted) return;
+    AppSnackbar.success(context, AppStrings.connectionAccepted);
   }
 
-  void _decline(_Connection conn) {
-    setState(() => _incoming.remove(conn));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.requestDeclined, style: AppTypography.bodySm),
-        backgroundColor: context.inputBg,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-      ),
-    );
+  Future<void> _decline(String requestId) async {
+    await ref.read(connectionsProvider.notifier).declineRequest(requestId);
+    if (!mounted) return;
+    AppSnackbar.info(context, AppStrings.requestDeclined);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Connections', showAppBar: false);
+    }
+    final st = ref.watch(connectionsProvider);
+
+    final filteredActive = _query.isEmpty
+        ? st.connections
+        : st.connections
+            .where((c) => c.connectedUser.name.toLowerCase().contains(_query))
+            .toList();
+
+    final filteredIncoming = _query.isEmpty
+        ? st.incomingRequests
+        : st.incomingRequests
+            .where((r) => r.sender.name.toLowerCase().contains(_query))
+            .toList();
+
+    final incomingCount = st.incomingRequests.length;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -195,23 +111,25 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
               backgroundColor: context.bg,
               surfaceTintColor: Colors.transparent,
               expandedHeight: 96,
-              leading: IconButton(
+              leading: AppIconButton(
                 icon: const Icon(Icons.menu_rounded, size: 22),
                 onPressed: openAppSidebar,
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-                title: Text(AppStrings.myConnections, style: AppTypography.h3),
+                title: AppText.h3(AppStrings.myConnections),
               ),
             ),
-            // Search bar
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: _SearchBar(controller: _searchCtrl),
+                child: AppSearchField(
+                  controller: _searchCtrl,
+                  hint: AppStrings.searchConnections,
+                  onClear: _searchCtrl.clear,
+                ),
               ),
             ),
-            // Tab bar
             SliverPersistentHeader(
               pinned: true,
               delegate: _TabBarDelegate(
@@ -221,31 +139,18 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
                   indicatorSize: TabBarIndicatorSize.label,
                   labelColor: AppColors.teal,
                   unselectedLabelColor: AppColors.textHint,
-                  labelStyle: AppTypography.labelSm.copyWith(fontWeight: FontWeight.w600),
-                  unselectedLabelStyle: AppTypography.labelSm,
                   dividerColor: context.borderCol,
                   tabs: [
-                    Tab(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('Active'),
-                          if (_kActive.any((c) => c.unreadCount > 0)) ...[
-                            const SizedBox(width: 5),
-                            _TabBadge(count: _kActive.fold(0, (s, c) => s + c.unreadCount)),
-                          ],
-                        ],
-                      ),
-                    ),
+                    const Tab(text: 'Active'),
                     const Tab(text: 'Sent'),
                     Tab(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text('Requests'),
-                          if (_incoming.isNotEmpty) ...[
+                          if (incomingCount > 0) ...[
                             const SizedBox(width: 5),
-                            _TabBadge(count: _incoming.length),
+                            _TabBadge(count: incomingCount),
                           ],
                         ],
                       ),
@@ -258,29 +163,29 @@ class _ConnectionsScreenState extends State<ConnectionsScreen>
           body: TabBarView(
             controller: _tabCtrl,
             children: [
-              // Active connections
-              _ListTab(
-                items: _filteredActive,
+              _ListTab<ConnectionEntity>(
+                items: filteredActive,
+                isLoading: st.isLoading,
                 emptyMessage: AppStrings.noConnectionsYet,
                 emptyIcon: Icons.people_outline_rounded,
                 itemBuilder: (conn) => _ActiveCard(conn: conn, onTap: () => _openChat(conn)),
               ),
-              // Sent requests
-              _ListTab(
-                items: _filteredSent,
+              _ListTab<Never>(
+                items: const [],
+                isLoading: false,
                 emptyMessage: AppStrings.noRequestsYet,
                 emptyIcon: Icons.send_outlined,
-                itemBuilder: (conn) => _SentCard(conn: conn),
+                itemBuilder: (_) => const SizedBox.shrink(),
               ),
-              // Incoming requests
-              _ListTab(
-                items: _filteredIncoming,
+              _ListTab<ConnectionRequestEntity>(
+                items: filteredIncoming,
+                isLoading: st.isLoading,
                 emptyMessage: AppStrings.noRequestsYet,
                 emptyIcon: Icons.inbox_outlined,
-                itemBuilder: (conn) => _IncomingCard(
-                  conn: conn,
-                  onAccept: () => _accept(conn),
-                  onDecline: () => _decline(conn),
+                itemBuilder: (req) => _IncomingCard(
+                  req: req,
+                  onAccept: () => _accept(req.id),
+                  onDecline: () => _decline(req.id),
                 ),
               ),
             ],
@@ -305,7 +210,11 @@ class _TabBadge extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           '$count',
-          style: AppTypography.labelXs.copyWith(color: context.bg, fontSize: 9, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            color: context.bg,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       );
 }
@@ -330,14 +239,16 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
 // ─── Generic list tab ─────────────────────────────────────────────────────────
 
-class _ListTab extends StatelessWidget {
-  final List<_Connection> items;
+class _ListTab<T> extends StatelessWidget {
+  final List<T> items;
+  final bool isLoading;
   final String emptyMessage;
   final IconData emptyIcon;
-  final Widget Function(_Connection) itemBuilder;
+  final Widget Function(T) itemBuilder;
 
   const _ListTab({
     required this.items,
+    required this.isLoading,
     required this.emptyMessage,
     required this.emptyIcon,
     required this.itemBuilder,
@@ -345,16 +256,14 @@ class _ListTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
+      );
+    }
     if (items.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(emptyIcon, size: 52, color: AppColors.textHint),
-            const SizedBox(height: 16),
-            Text(emptyMessage, style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-          ],
-        ),
+        child: AppEmptyState(icon: emptyIcon, title: emptyMessage),
       );
     }
     return ListView.separated(
@@ -369,184 +278,41 @@ class _ListTab extends StatelessWidget {
 // ─── Active connection card ───────────────────────────────────────────────────
 
 class _ActiveCard extends StatelessWidget {
-  final _Connection conn;
+  final ConnectionEntity conn;
   final VoidCallback onTap;
   const _ActiveCard({required this.conn, required this.onTap});
 
-  String get _initials {
-    final parts = conn.name.replaceAll(RegExp(r'^Dr\.\s*'), '').split(' ');
-    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
-  }
-
-  String _fmtTime(DateTime dt) {
-    final now = DateTime.now();
-    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    if (isToday) return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${dt.day} ${months[dt.month - 1]}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final hasUnread = conn.unreadCount > 0;
-    return GestureDetector(
+    final name = conn.connectedUser.name;
+    final timeStr = _fmtTime(conn.lastMessageAt ?? conn.createdAt);
+
+    return AppCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(
-            color: hasUnread ? conn.avatarColor.withValues(alpha: 0.25) : context.borderCol,
-          ),
-        ),
-        child: Row(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: conn.avatarColor.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: conn.avatarColor.withValues(alpha: 0.3)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    _initials,
-                    style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.w700, color: conn.avatarColor),
-                  ),
-                ),
-                if (hasUnread)
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: AppColors.teal,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: context.bg, width: 2),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${conn.unreadCount}',
-                        style: AppTypography.labelXs.copyWith(color: context.bg, fontSize: 9, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(conn.name, style: AppTypography.labelMd.copyWith(fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w600)),
-                      Text(_fmtTime(conn.updatedAt), style: AppTypography.bodyXs.copyWith(color: hasUnread ? AppColors.teal : AppColors.textHint)),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(conn.specialty, style: AppTypography.bodyXs.copyWith(color: conn.avatarColor)),
-                  const SizedBox(height: 3),
-                  Text(
-                    conn.lastMessage,
-                    style: AppTypography.bodySm.copyWith(
-                      color: hasUnread ? AppColors.textSecondary : AppColors.textHint,
-                      fontWeight: hasUnread ? FontWeight.w500 : FontWeight.w400,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Sent request card ────────────────────────────────────────────────────────
-
-class _SentCard extends StatelessWidget {
-  final _Connection conn;
-  const _SentCard({required this.conn});
-
-  String get _initials {
-    final parts = conn.name.replaceAll(RegExp(r'^Dr\.\s*'), '').split(' ');
-    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isPending = conn.status == _ConnStatus.pending;
-    final statusColor = isPending ? AppColors.amber : AppColors.red;
-    final statusLabel = isPending ? AppStrings.pending : AppStrings.connectionDeclined;
-
-    return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: context.borderCol),
-      ),
       child: Row(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: conn.avatarColor.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: conn.avatarColor.withValues(alpha: 0.3)),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              _initials,
-              style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.w700, color: conn.avatarColor),
-            ),
-          ),
+          AppAvatar(name: name, size: AppAvatarSize.md),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(conn.name, style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(conn.specialty, style: AppTypography.bodyXs.copyWith(color: conn.avatarColor)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: AppBorderRadius.pill,
-              border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isPending ? Icons.hourglass_top_rounded : Icons.cancel_outlined,
-                  size: 12,
-                  color: statusColor,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AppText.labelMd(name, fontWeight: FontWeight.w600),
+                    if (timeStr.isNotEmpty)
+                      AppText.bodyXs(timeStr, color: AppColors.textHint),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                Text(statusLabel, style: AppTypography.labelXs.copyWith(color: statusColor)),
+                const SizedBox(height: 2),
+                AppText.bodySm(AppStrings.connected, color: AppColors.teal),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
         ],
       ),
     );
@@ -556,171 +322,53 @@ class _SentCard extends StatelessWidget {
 // ─── Incoming request card ────────────────────────────────────────────────────
 
 class _IncomingCard extends StatelessWidget {
-  final _Connection conn;
+  final ConnectionRequestEntity req;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
-  const _IncomingCard({required this.conn, required this.onAccept, required this.onDecline});
-
-  String get _initials {
-    final parts = conn.name.replaceAll(RegExp(r'^Dr\.\s*'), '').split(' ');
-    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
-  }
+  const _IncomingCard({required this.req, required this.onAccept, required this.onDecline});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final name = req.sender.name;
+
+    return AppCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: conn.avatarColor.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: conn.avatarColor.withValues(alpha: 0.3)),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _initials,
-                  style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.w700, color: conn.avatarColor),
-                ),
-              ),
+              AppAvatar(name: name, size: AppAvatarSize.md),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(conn.name, style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(conn.specialty, style: AppTypography.bodyXs.copyWith(color: conn.avatarColor)),
-                  ],
-                ),
+                child: AppText.labelMd(name, fontWeight: FontWeight.w600),
               ),
-              Container(
+              AppContainer.tinted(
+                color: AppColors.teal,
+                borderRadius: AppBorderRadius.pill,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.teal.withValues(alpha: 0.1),
-                  borderRadius: AppBorderRadius.pill,
-                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
-                ),
-                child: Text('New', style: AppTypography.labelXs.copyWith(color: AppColors.teal, fontSize: 10)),
+                child: AppText.labelXs('New', color: AppColors.teal),
               ),
             ],
           ),
-          if (conn.lastMessage.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: context.inputBg,
-                borderRadius: AppBorderRadius.mdAll,
-              ),
-              child: Text(
-                conn.lastMessage,
-                style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: GestureDetector(
-                  onTap: onDecline,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.red.withValues(alpha: 0.1),
-                      borderRadius: AppBorderRadius.lgAll,
-                      border: Border.all(color: AppColors.red.withValues(alpha: 0.3)),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(AppStrings.declineRequest, style: AppTypography.buttonSm.copyWith(color: AppColors.red)),
-                  ),
+                child: AppButton.outline(
+                  label: AppStrings.declineRequest,
+                  color: AppColors.error,
+                  onPressed: onDecline,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: GestureDetector(
-                  onTap: onAccept,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.teal,
-                      borderRadius: AppBorderRadius.lgAll,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(AppStrings.acceptRequest, style: AppTypography.buttonSm.copyWith(color: context.bg)),
-                  ),
+                child: AppButton.primary(
+                  label: AppStrings.acceptRequest,
+                  onPressed: onAccept,
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Search bar ───────────────────────────────────────────────────────────────
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  const _SearchBar({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: context.inputBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: context.borderCol),
-      ),
-      child: Row(
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 14),
-            child: Icon(Icons.search_rounded, color: AppColors.textHint, size: 18),
-          ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-              decoration: InputDecoration(
-                hintText: AppStrings.searchConnections,
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              ),
-            ),
-          ),
-          ValueListenableBuilder(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isNotEmpty
-                ? GestureDetector(
-                    onTap: controller.clear,
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 12),
-                      child: Icon(Icons.close_rounded, size: 16, color: AppColors.textHint),
-                    ),
-                  )
-                : const SizedBox.shrink(),
           ),
         ],
       ),

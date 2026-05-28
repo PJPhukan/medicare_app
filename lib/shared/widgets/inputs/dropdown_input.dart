@@ -72,11 +72,8 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
     final hasError  = widget.error != null && widget.error!.isNotEmpty;
-    final borderCol = hasError
-        ? AppColors.error
-        : (isDark ? context.borderCol : const Color(0xFFE2E8F0));
+    final borderCol = hasError ? AppColors.error : context.borderCol;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,7 +88,7 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: isDark ? context.inputBg : Colors.white,
+              color: context.inputBg,
               borderRadius: AppBorderRadius.mdAll,
               border: Border.all(color: borderCol),
             ),
@@ -154,9 +151,8 @@ class _DropdownSheet<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final bg      = isDark ? context.cardBg : Colors.white;
-    final border  = isDark ? context.borderCol : const Color(0xFFE2E8F0);
+    final bg      = context.cardBg;
+    final border  = context.borderCol;
     final bottom  = MediaQuery.paddingOf(context).bottom;
 
     return Container(

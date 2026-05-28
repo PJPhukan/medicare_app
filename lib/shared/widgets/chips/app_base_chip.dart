@@ -3,6 +3,7 @@ import '../../../core/theme/app_animations.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/extensions/context_extensions.dart';
 
 // ─── Size preset ──────────────────────────────────────────────────────────────
 
@@ -153,25 +154,21 @@ class _AppBaseChipState extends State<AppBaseChip>
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
     final accent  = widget.color ?? AppColors.teal;
     final sel     = widget.selected;
 
     // ── Resolved colours ────────────────────────────────────────────────────
     final bg = sel
         ? (widget.selectedBackgroundColor ?? accent.withValues(alpha: 0.15))
-        : (widget.backgroundColor ??
-            (isDark ? AppColors.dark700 : AppColors.light200));
+        : (widget.backgroundColor ?? context.inputBg);
 
     final fg = sel
         ? (widget.selectedForegroundColor ?? accent)
-        : (widget.foregroundColor ??
-            (isDark ? AppColors.textSecondary : const Color(0xFF64748B)));
+        : (widget.foregroundColor ?? context.secondaryText);
 
     final bc = sel
         ? (widget.selectedBorderColor ?? accent.withValues(alpha: 0.45))
-        : (widget.borderColor ??
-            (isDark ? AppColors.dark600 : AppColors.light300));
+        : (widget.borderColor ?? context.borderCol);
 
     // ── Sizes ───────────────────────────────────────────────────────────────
     final pad    = widget.padding ?? widget.size.defaultPadding;

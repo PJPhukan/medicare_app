@@ -1,170 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
-
-// ─── Model ────────────────────────────────────────────────────────────────────
-
-enum _ReminderType { medicine, appointment, vital, other }
-
-class _Reminder {
-  final String id;
-  final String title;
-  final TimeOfDay time;
-  final _ReminderType type;
-  final String repeat;
-  bool enabled;
-
-  _Reminder({
-    required this.id,
-    required this.title,
-    required this.time,
-    required this.type,
-    required this.repeat,
-    this.enabled = true,
-  });
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-List<_Reminder> _buildMockReminders() => [
-      _Reminder(
-        id: 'r1',
-        title: 'Take Metformin 500mg',
-        time: const TimeOfDay(hour: 8, minute: 0),
-        type: _ReminderType.medicine,
-        repeat: AppStrings.repeatDaily,
-      ),
-      _Reminder(
-        id: 'r2',
-        title: 'Blood Pressure Check',
-        time: const TimeOfDay(hour: 9, minute: 30),
-        type: _ReminderType.vital,
-        repeat: AppStrings.repeatDaily,
-      ),
-      _Reminder(
-        id: 'r3',
-        title: 'Cardiology Appointment',
-        time: const TimeOfDay(hour: 11, minute: 0),
-        type: _ReminderType.appointment,
-        repeat: AppStrings.repeatCustom,
-        enabled: false,
-      ),
-      _Reminder(
-        id: 'r4',
-        title: 'Evening Insulin Dose',
-        time: const TimeOfDay(hour: 19, minute: 0),
-        type: _ReminderType.medicine,
-        repeat: AppStrings.repeatDaily,
-      ),
-      _Reminder(
-        id: 'r5',
-        title: 'Weekly Weight Log',
-        time: const TimeOfDay(hour: 7, minute: 0),
-        type: _ReminderType.vital,
-        repeat: AppStrings.repeatWeekends,
-      ),
-    ];
+import '../../../../shared/widgets/widgets.dart';
+import '../../data/models/reminder_schedule_model.dart';
+import '../providers/reminders_provider.dart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-Color _typeColor(_ReminderType t) => switch (t) {
-      _ReminderType.medicine    => AppColors.teal,
-      _ReminderType.appointment => AppColors.blue,
-      _ReminderType.vital       => AppColors.red,
-      _ReminderType.other       => AppColors.amber,
+Color _typeColor(String type) => switch (type) {
+      'MEDICINE' => AppColors.teal,
+      'APPOINTMENT' => AppColors.blue,
+      'VITAL' => AppColors.red,
+      _ => AppColors.amber,
     };
 
-IconData _typeIcon(_ReminderType t) => switch (t) {
-      _ReminderType.medicine    => Icons.medication_rounded,
-      _ReminderType.appointment => Icons.calendar_today_rounded,
-      _ReminderType.vital       => Icons.monitor_heart_rounded,
-      _ReminderType.other       => Icons.alarm_rounded,
+IconData _typeIcon(String type) => switch (type) {
+      'MEDICINE' => Icons.medication_rounded,
+      'APPOINTMENT' => Icons.calendar_today_rounded,
+      'VITAL' => Icons.monitor_heart_rounded,
+      _ => Icons.alarm_rounded,
     };
 
-String _typeLabel(_ReminderType t) => switch (t) {
-      _ReminderType.medicine    => AppStrings.reminderTypeMed,
-      _ReminderType.appointment => AppStrings.reminderTypeAppt,
-      _ReminderType.vital       => AppStrings.reminderTypeVital,
-      _ReminderType.other       => AppStrings.reminderTypeOther,
+String _typeLabel(String type) => switch (type) {
+      'MEDICINE' => AppStrings.reminderTypeMed,
+      'APPOINTMENT' => AppStrings.reminderTypeAppt,
+      'VITAL' => AppStrings.reminderTypeVital,
+      _ => AppStrings.reminderTypeOther,
     };
 
-String _fmt(TimeOfDay t) {
-  final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
-  final m = t.minute.toString().padLeft(2, '0');
-  final p = t.period == DayPeriod.am ? 'AM' : 'PM';
-  return '$h:$m $p';
+String _repeatLabel(String type) => switch (type) {
+      'DAILY' => AppStrings.repeatDaily,
+      'WEEKDAYS' => AppStrings.repeatWeekdays,
+      'WEEKENDS' => AppStrings.repeatWeekends,
+      _ => AppStrings.repeatCustom,
+    };
+
+String _fmtTime(String hhmm) {
+  final parts = hhmm.split(':');
+  if (parts.length < 2) return hhmm;
+  var h = int.tryParse(parts[0]) ?? 0;
+  final m = parts[1].padLeft(2, '0');
+  final period = h < 12 ? 'AM' : 'PM';
+  if (h == 0) h = 12;
+  if (h > 12) h -= 12;
+  return '$h:$m $period';
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class RemindersScreen extends StatefulWidget {
+class RemindersScreen extends ConsumerWidget {
   const RemindersScreen({super.key});
 
   @override
-  State<RemindersScreen> createState() => _RemindersScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(remindersProvider);
 
-class _RemindersScreenState extends State<RemindersScreen> {
-  late List<_Reminder> _reminders;
-
-  @override
-  void initState() {
-    super.initState();
-    _reminders = _buildMockReminders();
-  }
-
-  Future<void> _addReminder() async {
-    final result = await showModalBottomSheet<_Reminder>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _AddReminderSheet(),
-    );
-    if (result != null) {
-      setState(() => _reminders.insert(0, result));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.reminderSaved, style: AppTypography.bodySm)),
-        );
-      }
-    }
-  }
-
-  void _toggleEnabled(_Reminder r) {
-    setState(() => r.enabled = !r.enabled);
-  }
-
-  void _deleteReminder(_Reminder r) {
-    showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardBg,
-        title: Text(AppStrings.deleteReminder, style: AppTypography.h3),
-        content: Text(AppStrings.deleteReminderConfirm, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppStrings.cancel, style: AppTypography.bodySm)),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppStrings.delete, style: AppTypography.bodySm.copyWith(color: AppColors.red)),
-          ),
-        ],
-      ),
-    ).then((confirmed) {
-      if (confirmed == true && mounted) {
-        setState(() => _reminders.remove(r));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.reminderDeleted, style: AppTypography.bodySm)),
-        );
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -178,33 +72,74 @@ class _RemindersScreenState extends State<RemindersScreen> {
               expandedHeight: 100,
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 20, bottom: 14),
-                title: Text(AppStrings.reminders, style: AppTypography.h2.copyWith(fontSize: 22)),
+                title: AppText.h2(AppStrings.reminders),
                 background: Container(color: context.bg),
               ),
               actions: [
                 IconButton(
-                  onPressed: _addReminder,
+                  onPressed: () => _addReminder(context, ref),
                   icon: const Icon(Icons.add_rounded, color: AppColors.teal),
                   tooltip: AppStrings.addReminder,
                 ),
                 const SizedBox(width: 8),
               ],
             ),
-            if (_reminders.isEmpty)
-              SliverFillRemaining(
-                child: _EmptyState(onAdd: _addReminder),
+
+            // Loading state (first load)
+            if (state.isLoading && state.schedules.isEmpty)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.teal),
+                ),
               )
+
+            // Error state
+            else if (state.error != null && state.schedules.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_off_rounded,
+                          size: 48, color: AppColors.textHint),
+                      const SizedBox(height: 16),
+                      AppText.bodySm('Could not load reminders.',
+                          color: AppColors.textSecondary),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () =>
+                            ref.read(remindersProvider.notifier).load(),
+                        child: const Text('Retry',
+                            style: TextStyle(color: AppColors.teal)),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+
+            // Empty state
+            else if (state.schedules.isEmpty)
+              SliverFillRemaining(
+                child: _EmptyState(
+                    onAdd: () => _addReminder(context, ref)),
+              )
+
+            // List
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (_, i) => _ReminderCard(
-                      reminder: _reminders[i],
-                      onToggle: () => _toggleEnabled(_reminders[i]),
-                      onDelete: () => _deleteReminder(_reminders[i]),
-                    ),
-                    childCount: _reminders.length,
+                    (_, i) {
+                      final s = state.schedules[i];
+                      return _ReminderCard(
+                        schedule: s,
+                        onToggle: () => _toggle(context, ref, s.id),
+                        onDelete: () => _delete(context, ref, s),
+                      );
+                    },
+                    childCount: state.schedules.length,
                   ),
                 ),
               ),
@@ -213,29 +148,108 @@ class _RemindersScreenState extends State<RemindersScreen> {
       ),
     );
   }
+
+  Future<void> _addReminder(BuildContext context, WidgetRef ref) async {
+    final input = await showModalBottomSheet<_ReminderInput>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _AddReminderSheet(),
+    );
+    if (input == null || !context.mounted) return;
+
+    try {
+      await ref.read(remindersProvider.notifier).createSchedule(
+            medicineName: input.title,
+            time: input.time,
+            unit: input.unit,
+            foodTiming: 'AFTER',
+            scheduleType: input.scheduleType,
+            reminderType: input.reminderType,
+          );
+      if (context.mounted) {
+        AppSnackbar.success(context, AppStrings.reminderSaved);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackbar.error(context, e.toString());
+      }
+    }
+  }
+
+  void _toggle(BuildContext context, WidgetRef ref, String id) {
+    ref.read(remindersProvider.notifier).toggleSchedule(id).catchError((e) {
+      if (context.mounted) AppSnackbar.error(context, e.toString());
+    });
+  }
+
+  void _delete(BuildContext context, WidgetRef ref, ReminderScheduleModel s) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardBg,
+        title: AppText.h3(AppStrings.deleteReminder),
+        content: AppText.bodySm(AppStrings.deleteReminderConfirm,
+            color: AppColors.textSecondary),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: AppText.bodySm(AppStrings.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: AppText.bodySm(AppStrings.delete, color: AppColors.red),
+          ),
+        ],
+      ),
+    ).then((confirmed) {
+      if (confirmed == true && context.mounted) {
+        ref
+            .read(remindersProvider.notifier)
+            .deleteSchedule(s.id)
+            .then((_) {
+          if (context.mounted) {
+            AppSnackbar.info(context, AppStrings.reminderDeleted);
+          }
+        }).catchError((e) {
+          if (context.mounted) AppSnackbar.error(context, e.toString());
+        });
+      }
+    });
+  }
 }
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 class _ReminderCard extends StatelessWidget {
-  final _Reminder reminder;
+  final ReminderScheduleModel schedule;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
-  _ReminderCard({required this.reminder, required this.onToggle, required this.onDelete});
+  const _ReminderCard({
+    required this.schedule,
+    required this.onToggle,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = _typeColor(reminder.type);
-    final dimmed = !reminder.enabled;
+    final color = _typeColor(schedule.reminderType);
+    final firstTime = schedule.doseTimes.isNotEmpty
+        ? _fmtTime(schedule.doseTimes.first.scheduledTime)
+        : '--';
+
     return Opacity(
-      opacity: dimmed ? 0.5 : 1.0,
+      opacity: schedule.isActive ? 1.0 : 0.5,
       child: Container(
-        margin: EdgeInsets.only(bottom: 10),
+        margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
           color: context.cardBg,
           borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: reminder.enabled ? color.withValues(alpha: 0.2) : context.borderCol),
+          border: Border.all(
+            color: schedule.isActive
+                ? color.withValues(alpha: 0.2)
+                : context.borderCol,
+          ),
         ),
         child: InkWell(
           onLongPress: onDelete,
@@ -251,46 +265,65 @@ class _ReminderCard extends StatelessWidget {
                     color: color.withValues(alpha: 0.12),
                     borderRadius: AppBorderRadius.mdAll,
                   ),
-                  child: Icon(_typeIcon(reminder.type), color: color, size: 22),
+                  child: Icon(_typeIcon(schedule.reminderType),
+                      color: color, size: 22),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        reminder.title,
-                        style: AppTypography.bodyMd.copyWith(color: context.primaryText, fontWeight: FontWeight.w600),
+                      AppText.bodyMd(
+                        schedule.medicineName,
+                        color: context.primaryText,
+                        fontWeight: FontWeight.w600,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.access_time_rounded, size: 12, color: AppColors.textHint),
+                          const Icon(Icons.access_time_rounded,
+                              size: 12, color: AppColors.textHint),
                           const SizedBox(width: 4),
-                          Text(_fmt(reminder.time), style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
+                          AppText.bodyXs(firstTime,
+                              color: AppColors.textSecondary),
+                          if (schedule.doseTimes.length > 1) ...[
+                            const SizedBox(width: 4),
+                            AppText.bodyXs(
+                              '+${schedule.doseTimes.length - 1} more',
+                              color: AppColors.textHint,
+                            ),
+                          ],
                           const SizedBox(width: 10),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: 0.1),
                               borderRadius: AppBorderRadius.pill,
                             ),
                             child: Text(
-                              _typeLabel(reminder.type),
-                              style: AppTypography.bodyXs.copyWith(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+                              _typeLabel(schedule.reminderType),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: color),
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Text(reminder.repeat, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
+                          Text(
+                            _repeatLabel(schedule.scheduleType),
+                            style: const TextStyle(
+                                fontSize: 10, color: AppColors.textHint),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
                 Switch.adaptive(
-                  value: reminder.enabled,
+                  value: schedule.isActive,
                   onChanged: (_) => onToggle(),
                   activeThumbColor: AppColors.teal,
                   activeTrackColor: AppColors.teal.withValues(alpha: 0.3),
@@ -322,31 +355,59 @@ class _EmptyState extends StatelessWidget {
                 color: AppColors.amber.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.alarm_rounded, size: 36, color: AppColors.amber),
+              child:
+                  const Icon(Icons.alarm_rounded, size: 36, color: AppColors.amber),
             ),
             const SizedBox(height: 20),
-            Text(AppStrings.noReminders, style: AppTypography.h3.copyWith(fontSize: 17)),
+            const Text(AppStrings.noReminders,
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text(
+            AppText.bodySm(
               AppStrings.noRemindersDesc,
-              style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
+              color: AppColors.textSecondary,
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onAdd,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.teal,
-                foregroundColor: context.bg,
-                shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: AppBorderRadius.lgAll),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(AppStrings.addReminder, style: AppTypography.buttonMd),
+              label: const Text(AppStrings.addReminder,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2)),
             ),
           ],
         ),
       );
+}
+
+// ─── Input data class ─────────────────────────────────────────────────────────
+
+enum _ReminderType { medicine, appointment, vital, other }
+
+class _ReminderInput {
+  final String title;
+  final String time;
+  final String unit;
+  final String reminderType;
+  final String scheduleType;
+
+  const _ReminderInput({
+    required this.title,
+    required this.time,
+    required this.unit,
+    required this.reminderType,
+    required this.scheduleType,
+  });
 }
 
 // ─── Add reminder sheet ───────────────────────────────────────────────────────
@@ -360,6 +421,7 @@ class _AddReminderSheet extends StatefulWidget {
 
 class _AddReminderSheetState extends State<_AddReminderSheet> {
   final _titleCtrl = TextEditingController();
+  final _unitCtrl = TextEditingController(text: '1 tablet');
   TimeOfDay _time = TimeOfDay.now();
   _ReminderType _type = _ReminderType.medicine;
   String _repeat = AppStrings.repeatDaily;
@@ -367,6 +429,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
   @override
   void dispose() {
     _titleCtrl.dispose();
+    _unitCtrl.dispose();
     super.dispose();
   }
 
@@ -394,20 +457,69 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
     if (picked != null) setState(() => _time = picked);
   }
 
+  String get _timeString {
+    final h = _time.hour.toString().padLeft(2, '0');
+    final m = _time.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  String get _timeDisplay {
+    final h = _time.hourOfPeriod == 0 ? 12 : _time.hourOfPeriod;
+    final m = _time.minute.toString().padLeft(2, '0');
+    final period = _time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$h:$m $period';
+  }
+
+  String _toApiReminderType(_ReminderType t) => switch (t) {
+        _ReminderType.medicine => 'MEDICINE',
+        _ReminderType.appointment => 'APPOINTMENT',
+        _ReminderType.vital => 'VITAL',
+        _ReminderType.other => 'OTHER',
+      };
+
+  String _toApiScheduleType(String label) => switch (label) {
+        AppStrings.repeatWeekdays => 'WEEKDAYS',
+        AppStrings.repeatWeekends => 'WEEKENDS',
+        AppStrings.repeatCustom => 'CUSTOM',
+        _ => 'DAILY',
+      };
+
   void _save() {
     final title = _titleCtrl.text.trim();
+    final unit = _unitCtrl.text.trim();
     if (title.isEmpty) return;
     Navigator.pop(
       context,
-      _Reminder(
-        id: 'r_${DateTime.now().millisecondsSinceEpoch}',
+      _ReminderInput(
         title: title,
-        time: _time,
-        type: _type,
-        repeat: _repeat,
+        time: _timeString,
+        unit: unit.isEmpty ? '1 dose' : unit,
+        reminderType: _toApiReminderType(_type),
+        scheduleType: _toApiScheduleType(_repeat),
       ),
     );
   }
+
+  Color _typeColor2(_ReminderType t) => switch (t) {
+        _ReminderType.medicine => AppColors.teal,
+        _ReminderType.appointment => AppColors.blue,
+        _ReminderType.vital => AppColors.red,
+        _ReminderType.other => AppColors.amber,
+      };
+
+  IconData _typeIcon2(_ReminderType t) => switch (t) {
+        _ReminderType.medicine => Icons.medication_rounded,
+        _ReminderType.appointment => Icons.calendar_today_rounded,
+        _ReminderType.vital => Icons.monitor_heart_rounded,
+        _ReminderType.other => Icons.alarm_rounded,
+      };
+
+  String _typeLabel2(_ReminderType t) => switch (t) {
+        _ReminderType.medicine => AppStrings.reminderTypeMed,
+        _ReminderType.appointment => AppStrings.reminderTypeAppt,
+        _ReminderType.vital => AppStrings.reminderTypeVital,
+        _ReminderType.other => AppStrings.reminderTypeOther,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -419,7 +531,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
         padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 20),
         decoration: BoxDecoration(
           color: context.cardBg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -428,50 +540,94 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
             children: [
               Center(
                 child: Container(
-                  width: 36, height: 4,
+                  width: 36,
+                  height: 4,
                   margin: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
+                  decoration: BoxDecoration(
+                      color: context.borderCol,
+                      borderRadius: AppBorderRadius.pill),
                 ),
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(AppStrings.addReminder, style: AppTypography.h3.copyWith(fontSize: 17)),
+                  const Text(AppStrings.addReminder,
+                      style: TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w600)),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close_rounded, color: AppColors.textHint, size: 20),
+                    child: const Icon(Icons.close_rounded,
+                        color: AppColors.textHint, size: 20),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
 
+              // ── Title ──
               _Label(AppStrings.reminderTitle, required: true),
               const SizedBox(height: 6),
-              _SheetTextField(controller: _titleCtrl, hint: AppStrings.reminderTitleHint),
-              SizedBox(height: 14),
+              _SheetTextField(
+                  controller: _titleCtrl,
+                  hint: AppStrings.reminderTitleHint),
+              const SizedBox(height: 14),
 
-              _Label(AppStrings.reminderTime),
-              SizedBox(height: 6),
-              GestureDetector(
-                onTap: _pickTime,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                  decoration: BoxDecoration(
-                    color: context.inputBg,
-                    borderRadius: AppBorderRadius.lgAll,
-                    border: Border.all(color: context.borderCol),
+              // ── Time + Unit ──
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _Label(AppStrings.reminderTime),
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: _pickTime,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 13),
+                            decoration: BoxDecoration(
+                              color: context.inputBg,
+                              borderRadius: AppBorderRadius.lgAll,
+                              border: Border.all(color: context.borderCol),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.access_time_rounded,
+                                    size: 15, color: AppColors.teal),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _timeDisplay,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                    color: context.primaryText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 15, color: AppColors.teal),
-                      const SizedBox(width: 8),
-                      Text(_fmt(_time), style: AppTypography.labelSm.copyWith(color: context.primaryText)),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _Label(AppStrings.doseUnit),
+                        const SizedBox(height: 6),
+                        _SheetTextField(
+                            controller: _unitCtrl, hint: '1 tablet'),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
               const SizedBox(height: 14),
 
+              // ── Type ──
               _Label(AppStrings.reminderType),
               const SizedBox(height: 8),
               Wrap(
@@ -479,27 +635,42 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                 runSpacing: 8,
                 children: _ReminderType.values.map((t) {
                   final selected = _type == t;
-                  final color = _typeColor(t);
+                  final color = _typeColor2(t);
                   return GestureDetector(
                     onTap: () => setState(() => _type = t),
                     child: AnimatedContainer(
-                      duration: Duration(milliseconds: 160),
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
-                        color: selected ? color.withValues(alpha: 0.15) : context.inputBg,
+                        color: selected
+                            ? color.withValues(alpha: 0.15)
+                            : context.inputBg,
                         borderRadius: AppBorderRadius.pill,
-                        border: Border.all(color: selected ? color.withValues(alpha: 0.5) : context.borderCol),
+                        border: Border.all(
+                          color: selected
+                              ? color.withValues(alpha: 0.5)
+                              : context.borderCol,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(_typeIcon(t), size: 13, color: selected ? color : AppColors.textHint),
+                          Icon(_typeIcon2(t),
+                              size: 13,
+                              color: selected ? color : AppColors.textHint),
                           const SizedBox(width: 5),
                           Text(
-                            _typeLabel(t),
-                            style: AppTypography.labelSm.copyWith(
-                              color: selected ? color : AppColors.textSecondary,
-                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            _typeLabel2(t),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              letterSpacing: 0.5,
+                              color: selected
+                                  ? color
+                                  : AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -510,6 +681,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               ),
               const SizedBox(height: 14),
 
+              // ── Repeat ──
               _Label(AppStrings.reminderRepeat),
               const SizedBox(height: 8),
               Wrap(
@@ -525,20 +697,31 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                   return GestureDetector(
                     onTap: () => setState(() => _repeat = r),
                     child: AnimatedContainer(
-                      duration: Duration(milliseconds: 160),
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.teal.withValues(alpha: 0.15) : context.inputBg,
+                        color: selected
+                            ? AppColors.teal.withValues(alpha: 0.15)
+                            : context.inputBg,
                         borderRadius: AppBorderRadius.pill,
                         border: Border.all(
-                          color: selected ? AppColors.teal.withValues(alpha: 0.5) : context.borderCol,
+                          color: selected
+                              ? AppColors.teal.withValues(alpha: 0.5)
+                              : context.borderCol,
                         ),
                       ),
                       child: Text(
                         r,
-                        style: AppTypography.labelSm.copyWith(
-                          color: selected ? AppColors.teal : AppColors.textSecondary,
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          letterSpacing: 0.5,
+                          color: selected
+                              ? AppColors.teal
+                              : AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -547,6 +730,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               ),
               const SizedBox(height: 24),
 
+              // ── Save button ──
               ValueListenableBuilder<TextEditingValue>(
                 valueListenable: _titleCtrl,
                 builder: (_, val, __) {
@@ -556,8 +740,8 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                     child: GestureDetector(
                       onTap: canSave ? _save : null,
                       child: AnimatedContainer(
-                        duration: Duration(milliseconds: 200),
-                        padding: EdgeInsets.symmetric(vertical: 14),
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         decoration: BoxDecoration(
                           color: canSave ? AppColors.teal : context.inputBg,
                           borderRadius: AppBorderRadius.lgAll,
@@ -565,8 +749,12 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                         alignment: Alignment.center,
                         child: Text(
                           AppStrings.reminderSaved,
-                          style: AppTypography.buttonMd.copyWith(
-                            color: canSave ? context.bg : AppColors.textHint,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                            color:
+                                canSave ? Colors.white : AppColors.textHint,
                           ),
                         ),
                       ),
@@ -592,10 +780,13 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
         children: [
-          Text(text, style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          AppText.bodyXs(text,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600),
           if (required) ...[
             const SizedBox(width: 3),
-            const Text('*', style: TextStyle(color: AppColors.red, fontSize: 12)),
+            const Text('*',
+                style: TextStyle(color: AppColors.red, fontSize: 12)),
           ],
         ],
       );
@@ -605,7 +796,7 @@ class _SheetTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
 
-  _SheetTextField({required this.controller, required this.hint});
+  const _SheetTextField({required this.controller, required this.hint});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -616,16 +807,18 @@ class _SheetTextField extends StatelessWidget {
         ),
         child: TextField(
           controller: controller,
-          style: AppTypography.bodyMd.copyWith(color: context.primaryText),
+          style: TextStyle(fontSize: 14, color: context.primaryText),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
+            hintStyle:
+                const TextStyle(fontSize: 14, color: AppColors.textHint),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
             filled: true,
             fillColor: Colors.transparent,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 12),
           ),
         ),
       );

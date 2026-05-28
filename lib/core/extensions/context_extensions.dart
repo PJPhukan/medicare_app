@@ -13,9 +13,9 @@ extension ThemeX on BuildContext {
   Color get dividerCol => isDark ? AppColors.dark500  : AppColors.light300;
 
   // ── Text ────────────────────────────────────────────────────────────────────
-  Color get primaryText   => isDark ? AppColors.textPrimary : const Color(0xFF1A202C);
-  Color get secondaryText => AppColors.textSecondary;
-  Color get hintText      => isDark ? AppColors.textHint : AppColors.light400;
+  Color get primaryText   => isDark ? AppColors.textPrimary        : AppColors.textPrimaryLight;
+  Color get secondaryText => isDark ? AppColors.textSecondary      : AppColors.textSecondaryLight;
+  Color get hintText      => isDark ? AppColors.textHint           : AppColors.textHintLight;
 
   // ── System UI ───────────────────────────────────────────────────────────────
   SystemUiOverlayStyle get overlayStyle =>

@@ -22,7 +22,6 @@ dependencies:
 
   # Networking
   dio: ^5.7.0
-  retrofit: ^4.4.1
   pretty_dio_logger: ^1.4.0
 
   # Local DB (offline-first)
@@ -91,8 +90,18 @@ dependencies:
   # Voice search
   speech_to_text: ^7.0.0
 
+  # Text-to-speech (medicine reminder voice alerts)
+  flutter_tts: ^4.1.0
+
+  # Timezone support for scheduled notifications
+  timezone: ^0.9.4
+
+  # Biometrics
+  local_auth: ^2.3.0
+
   # Haptics / device
   vibration: ^2.0.1
+  device_info_plus: ^11.5.0
 
 dev_dependencies:
   flutter_test:
@@ -102,7 +111,6 @@ dev_dependencies:
   riverpod_generator: ^2.4.3
   freezed: ^2.5.7
   json_serializable: ^6.8.0
-  retrofit_generator: ^9.1.5
   drift_dev: ^2.21.0
 
 flutter:

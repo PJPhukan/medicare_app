@@ -73,7 +73,6 @@ class _AppOtpInputState extends State<AppOtpInput> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
     final hasError  = widget.error != null && widget.error!.isNotEmpty;
     final activeCol = widget.color ?? AppColors.teal;
 
@@ -86,9 +85,7 @@ class _AppOtpInputState extends State<AppOtpInput> {
             final isFilled = _ctrls[i].text.isNotEmpty;
             final borderCol = hasError
                 ? AppColors.error
-                : (isFilled
-                    ? activeCol
-                    : (isDark ? context.borderCol : const Color(0xFFE2E8F0)));
+                : (isFilled ? activeCol : context.borderCol);
 
             return SizedBox(
               width: (MediaQuery.sizeOf(context).width -
@@ -97,7 +94,7 @@ class _AppOtpInputState extends State<AppOtpInput> {
                   widget.length,
               child: Container(
                 decoration: BoxDecoration(
-                  color: isDark ? context.inputBg : Colors.white,
+                  color: context.inputBg,
                   borderRadius: AppBorderRadius.smAll,
                   border: Border.all(color: borderCol, width: isFilled ? 1.5 : 1),
                 ),

@@ -1,12 +1,14 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../message/presentation/providers/message_provider.dart';
+import '../../../../core/network/connectivity_monitor.dart';
+import '../../../../core/utils/logger.dart';
 
 // ─── Message model ────────────────────────────────────────────────────────────
 
@@ -41,34 +43,27 @@ List<_Msg> _buildMockMessages() {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends ConsumerStatefulWidget {
   final String connectionId;
   final String professionalName;
   final String professionalSpecialty;
-  final Color avatarColor;
 
   const ChatScreen({
     super.key,
     required this.connectionId,
     required this.professionalName,
     required this.professionalSpecialty,
-    required this.avatarColor,
   });
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messages = _buildMockMessages();
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   bool _sending = false;
-
-  String get _initials {
-    final parts = widget.professionalName.replaceAll(RegExp(r'^Dr\.\s*'), '').split(' ');
-    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
-  }
 
   @override
   void initState() {
@@ -97,23 +92,31 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _inputCtrl.text.trim();
     if (text.isEmpty || _sending) return;
-    setState(() {
-      _sending = true;
-      _messages.add(_Msg(
-        id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-        text: text,
-        isMine: true,
-        sentAt: DateTime.now(),
-      ));
-      _inputCtrl.clear();
-    });
+    _inputCtrl.clear();
+    final optimistic = _Msg(
+      id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
+      text: text,
+      isMine: true,
+      sentAt: DateTime.now(),
+    );
+    AppLogger.i('Message send → conn:${widget.connectionId}', tag: 'Chat');
+    setState(() { _sending = true; _messages.add(optimistic); });
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(animate: true));
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _sending = false);
-    });
+    try {
+      await ref.read(sendMessageProvider).call(
+        conversationId: widget.connectionId,
+        body: text,
+      );
+      AppLogger.i('Message sent ✓', tag: 'Chat');
+    } on Exception catch (e) {
+      AppLogger.e('Message send failed', tag: 'Chat', error: e);
+      if (!mounted) return;
+      _messages.remove(optimistic);
+    }
+    if (mounted) setState(() => _sending = false);
   }
 
   void _showRatingSheet() {
@@ -136,14 +139,7 @@ class _ChatScreenState extends State<ChatScreen> {
         reasonCtrl: reasonCtrl,
         onSubmit: () {
           Navigator.pop(ctx);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppStrings.messageReported, style: AppTypography.bodySm),
-              backgroundColor: context.inputBg,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-            ),
-          );
+          AppSnackbar.info(context, AppStrings.messageReported);
         },
       ),
     );
@@ -151,6 +147,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Chat');
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -158,30 +157,19 @@ class _ChatScreenState extends State<ChatScreen> {
         resizeToAvoidBottomInset: true,
         body: Column(
           children: [
-            // ── Header ────────────────────────────────────────────────────────
             _ChatHeader(
-              initials: _initials,
-              avatarColor: widget.avatarColor,
               professionalName: widget.professionalName,
               specialty: widget.professionalSpecialty,
               onBack: () => Navigator.pop(context),
               onRate: _showRatingSheet,
             ),
 
-            // ── Messages ──────────────────────────────────────────────────────
             Expanded(
               child: _messages.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.chat_bubble_outline_rounded, size: 52, color: AppColors.textHint),
-                          const SizedBox(height: 16),
-                          Text(
-                            AppStrings.noMessagesYetSayHi,
-                            style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary),
-                          ),
-                        ],
+                      child: AppEmptyState(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        title: AppStrings.noMessagesYetSayHi,
                       ),
                     )
                   : ListView.builder(
@@ -195,7 +183,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
             ),
 
-            // ── Input bar ─────────────────────────────────────────────────────
             _InputBar(
               controller: _inputCtrl,
               sending: _sending,
@@ -211,16 +198,12 @@ class _ChatScreenState extends State<ChatScreen> {
 // ─── Chat header ──────────────────────────────────────────────────────────────
 
 class _ChatHeader extends StatelessWidget {
-  final String initials;
-  final Color avatarColor;
   final String professionalName;
   final String specialty;
   final VoidCallback onBack;
   final VoidCallback onRate;
 
-  _ChatHeader({
-    required this.initials,
-    required this.avatarColor,
+  const _ChatHeader({
     required this.professionalName,
     required this.specialty,
     required this.onBack,
@@ -238,64 +221,39 @@ class _ChatHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconButton(
+          AppIconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
             onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textSecondary),
           ),
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: avatarColor.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: avatarColor.withValues(alpha: 0.35)),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initials,
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: avatarColor,
-              ),
-            ),
-          ),
+          AppAvatar(name: professionalName, size: AppAvatarSize.sm),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                AppText.labelMd(
                   professionalName,
-                  style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.w700),
+                  fontWeight: FontWeight.w700,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  specialty,
-                  style: AppTypography.bodyXs.copyWith(color: avatarColor),
-                ),
+                if (specialty.isNotEmpty)
+                  AppText.bodyXs(specialty, color: AppColors.teal),
               ],
             ),
           ),
           GestureDetector(
             onTap: onRate,
-            child: Container(
+            child: AppContainer.tinted(
+              color: AppColors.amber,
+              borderRadius: AppBorderRadius.lgAll,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.amber.withValues(alpha: 0.1),
-                borderRadius: AppBorderRadius.lgAll,
-                border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
-              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.star_rounded, size: 14, color: AppColors.amber),
                   const SizedBox(width: 5),
-                  Text(
-                    AppStrings.rateProfessional,
-                    style: AppTypography.labelXs.copyWith(color: AppColors.amber, fontSize: 11),
-                  ),
+                  AppText.labelXs(AppStrings.rateProfessional, color: AppColors.amber),
                 ],
               ),
             ),
@@ -344,12 +302,12 @@ class _MessageBubble extends StatelessWidget {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.sizeOf(context).width * 0.75,
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: msg.isMine ? AppColors.teal : context.cardBg,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
-                    topRight: Radius.circular(18),
+                    topRight: const Radius.circular(18),
                     bottomLeft: Radius.circular(msg.isMine ? 18 : 4),
                     bottomRight: Radius.circular(msg.isMine ? 4 : 18),
                   ),
@@ -358,22 +316,16 @@ class _MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    AppText.bodySm(
                       msg.text,
-                      style: AppTypography.bodySm.copyWith(
-                        color: msg.isMine ? context.bg : context.primaryText,
-                        height: 1.45,
-                      ),
+                      color: msg.isMine ? context.bg : context.primaryText,
                     ),
-                    SizedBox(height: 3),
-                    Text(
+                    const SizedBox(height: 3),
+                    AppText.bodyXs(
                       _fmtTime(msg.sentAt),
-                      style: AppTypography.bodyXs.copyWith(
-                        color: msg.isMine
-                            ? context.bg.withValues(alpha: 0.55)
-                            : AppColors.textHint,
-                        fontSize: 10,
-                      ),
+                      color: msg.isMine
+                          ? context.bg.withValues(alpha: 0.55)
+                          : AppColors.textHint,
                     ),
                   ],
                 ),
@@ -393,7 +345,7 @@ class _InputBar extends StatelessWidget {
   final bool sending;
   final VoidCallback onSend;
 
-  _InputBar({
+  const _InputBar({
     required this.controller,
     required this.sending,
     required this.onSend,
@@ -415,34 +367,16 @@ class _InputBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: context.inputBg,
-                borderRadius: AppBorderRadius.lgAll,
-                border: Border.all(color: context.borderCol),
-              ),
-              child: TextField(
-                controller: controller,
-                maxLines: 4,
-                minLines: 1,
-                maxLength: 2000,
-                style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-                decoration: InputDecoration(
-                  hintText: AppStrings.typeMessage,
-                  hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: true,
-                  fillColor: Colors.transparent,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  counterText: '',
-                ),
-                textInputAction: TextInputAction.newline,
-              ),
+            child: AppTextField(
+              controller: controller,
+              hint: AppStrings.typeMessage,
+              maxLines: 4,
+              minLines: 1,
+              maxLength: 2000,
+              textInputAction: TextInputAction.newline,
             ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
             builder: (_, v, __) {
@@ -450,7 +384,7 @@ class _InputBar extends StatelessWidget {
               return GestureDetector(
                 onTap: canSend ? onSend : null,
                 child: AnimatedContainer(
-                  duration: Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 200),
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
@@ -495,7 +429,6 @@ class _RatingSheet extends StatefulWidget {
 class _RatingSheetState extends State<_RatingSheet> {
   int _stars = 0;
   final _reviewCtrl = TextEditingController();
-  bool _submitting = false;
 
   @override
   void dispose() {
@@ -503,20 +436,10 @@ class _RatingSheetState extends State<_RatingSheet> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  void _submit() {
     if (_stars == 0) return;
-    setState(() => _submitting = true);
-    await Future.delayed(Duration(milliseconds: 800));
-    if (!mounted) return;
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.ratingSubmitted, style: AppTypography.bodySm),
-        backgroundColor: context.inputBg,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-      ),
-    );
+    AppSnackbar.success(context, AppStrings.ratingSubmitted);
   }
 
   @override
@@ -526,12 +449,11 @@ class _RatingSheetState extends State<_RatingSheet> {
       padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 20),
       decoration: BoxDecoration(
         color: context.cardBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 36,
@@ -540,12 +462,11 @@ class _RatingSheetState extends State<_RatingSheet> {
               decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
             ),
           ),
-          Text(AppStrings.rateProfessional, style: AppTypography.h3.copyWith(fontSize: 17)),
+          AppText.h3(AppStrings.rateProfessional),
           const SizedBox(height: 4),
-          Text(widget.professionalName, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
+          AppText.bodySm(widget.professionalName, color: AppColors.textSecondary),
           const SizedBox(height: 20),
 
-          // Stars
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(5, (i) {
@@ -567,61 +488,21 @@ class _RatingSheetState extends State<_RatingSheet> {
               );
             }),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
-          // Review text
-          Container(
-            decoration: BoxDecoration(
-              color: context.inputBg,
-              borderRadius: AppBorderRadius.lgAll,
-              border: Border.all(color: context.borderCol),
-            ),
-            child: TextField(
-              controller: _reviewCtrl,
-              maxLines: 3,
-              maxLength: 500,
-              style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-              decoration: InputDecoration(
-                hintText: AppStrings.shareExperienceHint,
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                counterText: '',
-              ),
-            ),
+          AppTextField(
+            controller: _reviewCtrl,
+            hint: AppStrings.shareExperienceHint,
+            maxLines: 3,
+            minLines: 3,
+            maxLength: 500,
           ),
           const SizedBox(height: 16),
 
-          SizedBox(
-            width: double.infinity,
-            child: GestureDetector(
-              onTap: _stars > 0 && !_submitting ? _submit : null,
-              child: AnimatedContainer(
-                duration: Duration(milliseconds: 200),
-                padding: EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: _stars > 0 ? AppColors.teal : context.inputBg,
-                  borderRadius: AppBorderRadius.lgAll,
-                ),
-                alignment: Alignment.center,
-                child: _submitting
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: context.bg),
-                      )
-                    : Text(
-                        AppStrings.submitRating,
-                        style: AppTypography.buttonMd.copyWith(
-                          color: _stars > 0 ? context.bg : AppColors.textHint,
-                        ),
-                      ),
-              ),
-            ),
+          AppButton.primary(
+            label: AppStrings.submitRating,
+            isFullWidth: true,
+            onPressed: _stars > 0 ? _submit : null,
           ),
         ],
       ),
@@ -651,7 +532,7 @@ class _ReportSheet extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 20),
         decoration: BoxDecoration(
           color: context.cardBg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -665,61 +546,34 @@ class _ReportSheet extends StatelessWidget {
                 decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
               ),
             ),
-            Text(AppStrings.reportMessage, style: AppTypography.h3.copyWith(fontSize: 17)),
-            SizedBox(height: 14),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.inputBg,
-                borderRadius: AppBorderRadius.mdAll,
-                border: Border.all(color: context.borderCol),
-              ),
-              child: Text(
+            AppText.h3(AppStrings.reportMessage),
+            const SizedBox(height: 14),
+            AppContainer(
+              color: context.inputBg,
+              borderRadius: AppBorderRadius.mdAll,
+              padding: const EdgeInsets.all(12),
+              child: AppText.bodySm(
                 '"$messageText"',
-                style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                color: AppColors.textSecondary,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            SizedBox(height: 14),
-            Text(AppStrings.reasonOptional, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
-            SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: context.inputBg,
-                borderRadius: AppBorderRadius.lgAll,
-                border: Border.all(color: context.borderCol),
-              ),
-              child: TextField(
-                controller: reasonCtrl,
-                maxLines: 3,
-                maxLength: 200,
-                style: AppTypography.bodyMd.copyWith(color: context.primaryText),
-                decoration: InputDecoration(
-                  hintText: AppStrings.reportReasonHint,
-                  hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: true,
-                  fillColor: Colors.transparent,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  counterText: '',
-                ),
-              ),
+            const SizedBox(height: 14),
+            AppText.bodyXs(AppStrings.reasonOptional, color: AppColors.textHint),
+            const SizedBox(height: 6),
+            AppTextField(
+              controller: reasonCtrl,
+              hint: AppStrings.reportReasonHint,
+              maxLines: 3,
+              minLines: 3,
+              maxLength: 200,
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: GestureDetector(
-                onTap: onSubmit,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(color: AppColors.red, borderRadius: AppBorderRadius.lgAll),
-                  alignment: Alignment.center,
-                  child: Text(AppStrings.submitReport, style: AppTypography.buttonMd.copyWith(color: Colors.white)),
-                ),
-              ),
+            AppButton.danger(
+              label: AppStrings.submitReport,
+              isFullWidth: true,
+              onPressed: onSubmit,
             ),
           ],
         ),

@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart' hide AppShell;
+import '../../../../core/utils/logger.dart';
 import '../../../auth/presentation/screens/auth_flow.dart';
 import '../../../shell/presentation/screens/app_shell.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
+import '../../../premium/presentation/screens/subscription_management_screen.dart';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -68,33 +69,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Language
   String _language = 'English';
 
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: AppTypography.bodySm),
-        backgroundColor: context.inputBg,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
+  void _showSnack(String msg) => AppSnackbar.info(context, msg);
 
   void _confirmSignOut() {
+    AppLogger.i('Sign-out dialog opened', tag: 'Settings');
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: context.cardBg,
         shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-        title: Text(AppStrings.signOut, style: AppTypography.h3),
-        content: Text(AppStrings.signOutConfirm,
-            style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary)),
+        title: AppText.h3(AppStrings.signOut),
+        content: AppText.bodyMd(AppStrings.signOutConfirm, color: AppColors.textSecondary),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppStrings.cancel,
-                style: AppTypography.buttonMd.copyWith(color: AppColors.textSecondary)),
+            child: const Text(AppStrings.cancel,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () {
+              AppLogger.i('Sign-out confirmed', tag: 'Settings');
               Navigator.pop(ctx);
               Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                 MaterialPageRoute(
@@ -108,8 +102,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 (_) => false,
               );
             },
-            child: Text(AppStrings.signOut,
-                style: AppTypography.buttonMd.copyWith(color: AppColors.red)),
+            child: const Text(AppStrings.signOut,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.red)),
           ),
         ],
       ),
@@ -117,25 +111,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _confirmDeleteAccount() {
+    AppLogger.i('Delete account dialog opened', tag: 'Settings');
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: context.cardBg,
         shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-        title: Text(AppStrings.deleteAccount,
-            style: AppTypography.h3.copyWith(color: AppColors.red)),
-        content: Text(AppStrings.deleteAccountConfirm,
-            style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary)),
+        title: AppText.h3(AppStrings.deleteAccount, color: AppColors.red),
+        content: AppText.bodyMd(AppStrings.deleteAccountConfirm, color: AppColors.textSecondary),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppStrings.cancel,
-                style: AppTypography.buttonMd.copyWith(color: AppColors.textSecondary)),
+            child: const Text(AppStrings.cancel,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppStrings.deleteAccount,
-                style: AppTypography.buttonMd.copyWith(color: AppColors.red)),
+            child: const Text(AppStrings.deleteAccount,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.red)),
           ),
         ],
       ),
@@ -158,11 +151,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _openPlanSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PlanSheet(onUpgrade: () => _showSnack(AppStrings.comingSoon)),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SubscriptionManagementScreen(),
+      ),
     );
   }
 
@@ -218,7 +211,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               expandedHeight: 96,
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 16, bottom: 14),
-                title: Text(AppStrings.settings, style: AppTypography.h3),
+                title: AppText.h3(AppStrings.settings),
               ),
             ),
             SliverToBoxAdapter(
@@ -250,13 +243,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
                               ),
                               alignment: Alignment.center,
-                              child: Text(
+                              child: const Text(
                                 'RK',
-                                style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.teal,
-                                ),
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.teal),
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -264,9 +253,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Ramesh Kumar', style: AppTypography.labelLg),
+                                  const Text('Ramesh Kumar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 2),
-                                  Text('ramesh.kumar@email.com', style: AppTypography.bodySm),
+                                  AppText.bodySm('ramesh.kumar@email.com'),
                                   const SizedBox(height: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -275,8 +264,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       borderRadius: AppBorderRadius.pill,
                                       border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
                                     ),
-                                    child: Text(AppStrings.freePlan,
-                                        style: AppTypography.labelXs.copyWith(color: AppColors.teal)),
+                                    child: const Text(AppStrings.freePlan,
+                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: AppColors.teal)),
                                   ),
                                 ],
                               ),
@@ -310,7 +299,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             child: Text(
                               t.label,
-                              style: AppTypography.labelSm.copyWith(
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
                                 color: active ? context.bg : AppColors.textSecondary,
                               ),
                             ),
@@ -373,8 +365,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.language_rounded,
               label: AppStrings.language,
               color: AppColors.purple,
-              trailing: Text(_language,
-                  style: AppTypography.bodySm.copyWith(color: AppColors.textHint)),
+              trailing: AppText.bodySm(_language, color: AppColors.textHint),
               onTap: _openLanguagePicker,
             ),
           ],
@@ -393,8 +384,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: AppColors.teal.withValues(alpha: 0.12),
                   borderRadius: AppBorderRadius.pill,
                 ),
-                child: Text(AppStrings.freePlan,
-                    style: AppTypography.labelXs.copyWith(color: AppColors.teal)),
+                child: const Text(AppStrings.freePlan,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: AppColors.teal)),
               ),
               onTap: _openPlanSheet,
             ),
@@ -476,7 +467,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           description: 'Use dark background throughout the app',
           value: _darkMode,
           color: AppColors.purple,
-          onChanged: (v) => setState(() => _darkMode = v),
+          onChanged: (v) {
+            AppLogger.i('Dark mode → $v', tag: 'Settings');
+            setState(() => _darkMode = v);
+          },
         ),
         _ToggleItem(
           icon: Icons.view_compact_outlined,
@@ -512,7 +506,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               description: AppStrings.biometricDesc,
               value: _biometricAuth,
               color: AppColors.teal,
-              onChanged: (v) => setState(() => _biometricAuth = v),
+              onChanged: (v) {
+                AppLogger.i('Biometric auth setting → $v', tag: 'Settings');
+                setState(() => _biometricAuth = v);
+              },
             ),
             _ToggleItem(
               icon: Icons.lock_outline_rounded,
@@ -527,8 +524,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.timer_outlined,
                 label: AppStrings.autoLockDuration,
                 color: AppColors.amber,
-                trailing: Text(_autoLockDuration,
-                    style: AppTypography.bodySm.copyWith(color: AppColors.textHint)),
+                trailing: AppText.bodySm(_autoLockDuration, color: AppColors.textHint),
                 onTap: _openAutoLockPicker,
               ),
           ],
@@ -576,8 +572,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.info_outline_rounded,
               label: AppStrings.aboutApp,
               color: AppColors.textSecondary,
-              trailing: Text('v1.0.0',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.textHint)),
+              trailing: AppText.bodySm('v1.0.0', color: AppColors.textHint),
               onTap: _openAbout,
             ),
           ],
@@ -598,8 +593,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 const Icon(Icons.logout_rounded, size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 12),
-                Text(AppStrings.signOut,
-                    style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
+                AppText.labelMd(AppStrings.signOut, color: AppColors.textSecondary),
               ],
             ),
           ),
@@ -624,10 +618,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(AppStrings.deleteAccount,
-                          style: AppTypography.labelMd.copyWith(color: AppColors.red)),
+                      AppText.labelMd(AppStrings.deleteAccount, color: AppColors.red),
                       const SizedBox(height: 2),
-                      Text(AppStrings.deleteAccountDesc, style: AppTypography.bodyXs),
+                      AppText.bodyXs(AppStrings.deleteAccountDesc),
                     ],
                   ),
                 ),
@@ -657,11 +650,7 @@ class _SettingsGroup extends StatelessWidget {
             padding: const EdgeInsets.only(left: 4, bottom: 8),
             child: Text(
               label!.toUpperCase(),
-              style: AppTypography.labelSm.copyWith(
-                color: AppColors.textHint,
-                fontSize: 10,
-                letterSpacing: 0.8,
-              ),
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: AppColors.textHint),
             ),
           ),
         ],
@@ -721,7 +710,7 @@ class _RowItem extends StatelessWidget {
               child: Icon(icon, size: 16, color: color),
             ),
             const SizedBox(width: 12),
-            Expanded(child: Text(label, style: AppTypography.bodyMd)),
+            Expanded(child: AppText.bodyMd(label)),
             if (trailing != null) ...[const SizedBox(width: 8), trailing!],
             const SizedBox(width: 6),
             const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textHint),
@@ -770,9 +759,9 @@ class _ToggleItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: AppTypography.bodyMd),
+                AppText.bodyMd(label),
                 if (description != null)
-                  Text(description!, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                  AppText.bodyXs(description!, color: AppColors.textHint),
               ],
             ),
           ),
@@ -819,7 +808,7 @@ class _LanguageSheet extends StatelessWidget {
               decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
             ),
           ),
-          Text(AppStrings.selectLanguage, style: AppTypography.h3.copyWith(fontSize: 17)),
+          const Text(AppStrings.selectLanguage, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           const SizedBox(height: 16),
           ..._kLanguages.map((lang) {
             final isSel = selected == lang.label;
@@ -849,13 +838,10 @@ class _LanguageSheet extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(lang.label,
-                                style: AppTypography.bodyMd.copyWith(
-                                  color: isSel ? AppColors.teal : context.primaryText,
-                                  fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                                )),
-                            Text(lang.native,
-                                style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                            AppText.bodyMd(lang.label,
+                                color: isSel ? AppColors.teal : context.primaryText,
+                                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500),
+                            AppText.bodyXs(lang.native, color: AppColors.textHint),
                           ],
                         ),
                       ),
@@ -866,8 +852,8 @@ class _LanguageSheet extends StatelessWidget {
                             color: context.borderCol,
                             borderRadius: AppBorderRadius.pill,
                           ),
-                          child: Text('Soon',
-                              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
+                          child: const Text('Soon',
+                              style: TextStyle(fontSize: 10, color: AppColors.textHint)),
                         ),
                       if (isSel) ...[
                         const SizedBox(width: 8),
@@ -880,180 +866,6 @@ class _LanguageSheet extends StatelessWidget {
             );
           }),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Plan sheet ───────────────────────────────────────────────────────────────
-
-class _PlanSheet extends StatelessWidget {
-  final VoidCallback onUpgrade;
-  _PlanSheet({required this.onUpgrade});
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.paddingOf(context).bottom;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 24),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 36, height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
-            ),
-          ),
-          Text(AppStrings.choosePlan, style: AppTypography.h3.copyWith(fontSize: 18)),
-          const SizedBox(height: 4),
-          Text(AppStrings.planSubtitle,
-              style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: 20),
-
-          // Free plan card (current)
-          _PlanCard(
-            name: AppStrings.planBasicName,
-            badge: AppStrings.planFreeBadge,
-            price: AppStrings.planFreePrice,
-            badgeColor: AppColors.teal,
-            features: [AppStrings.planBasicFeature1, AppStrings.planBasicFeature2, AppStrings.planBasicFeature3],
-            isCurrent: true,
-            onTap: null,
-          ),
-          const SizedBox(height: 10),
-
-          // Premium plan card
-          _PlanCard(
-            name: AppStrings.planPremiumName,
-            badge: AppStrings.planPremiumBadge,
-            price: '${AppStrings.planPremiumPrice} ${AppStrings.planPeriodMonth}',
-            badgeColor: AppColors.amber,
-            features: [
-              AppStrings.planPremiumFeature1,
-              AppStrings.planPremiumFeature2,
-              AppStrings.planPremiumFeature3,
-              AppStrings.planPremiumFeature4,
-              AppStrings.planPremiumFeature5,
-            ],
-            isCurrent: false,
-            onTap: () {
-              Navigator.pop(context);
-              onUpgrade();
-            },
-          ),
-          const SizedBox(height: 8),
-          Text(AppStrings.noCreditCard,
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlanCard extends StatelessWidget {
-  final String name;
-  final String badge;
-  final String price;
-  final Color badgeColor;
-  final List<String> features;
-  final bool isCurrent;
-  final VoidCallback? onTap;
-
-  _PlanCard({
-    required this.name,
-    required this.badge,
-    required this.price,
-    required this.badgeColor,
-    required this.features,
-    required this.isCurrent,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isCurrent ? context.inputBg : badgeColor.withValues(alpha: 0.06),
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(
-            color: isCurrent ? context.borderCol : badgeColor.withValues(alpha: 0.4),
-            width: isCurrent ? 1 : 1.5,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(name, style: AppTypography.labelLg.copyWith(color: context.primaryText)),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withValues(alpha: 0.15),
-                    borderRadius: AppBorderRadius.pill,
-                  ),
-                  child: Text(badge,
-                      style: AppTypography.labelXs.copyWith(color: badgeColor, fontWeight: FontWeight.w800)),
-                ),
-                const Spacer(),
-                Text(price,
-                    style: AppTypography.labelMd.copyWith(
-                      color: isCurrent ? AppColors.textHint : badgeColor,
-                      fontWeight: FontWeight.w700,
-                    )),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...features.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_rounded, size: 14,
-                          color: isCurrent ? AppColors.textHint : badgeColor),
-                      SizedBox(width: 8),
-                      Text(f, style: AppTypography.bodyXs.copyWith(
-                          color: isCurrent ? AppColors.textSecondary : context.primaryText)),
-                    ],
-                  ),
-                )),
-            if (!isCurrent) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 11),
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  borderRadius: AppBorderRadius.mdAll,
-                ),
-                alignment: Alignment.center,
-                child: Text(AppStrings.upgradeNow,
-                    style: AppTypography.buttonMd.copyWith(color: context.bg)),
-              ),
-            ],
-            if (isCurrent)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 14),
-                    const SizedBox(width: 6),
-                    Text(AppStrings.currentPlan,
-                        style: AppTypography.labelSm.copyWith(color: AppColors.teal, fontSize: 11)),
-                  ],
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -1085,10 +897,10 @@ class _ExportSheet extends StatelessWidget {
               decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
             ),
           ),
-          Text(AppStrings.exportConfirmTitle, style: AppTypography.h3.copyWith(fontSize: 17)),
+          const Text(AppStrings.exportConfirmTitle, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Text(AppStrings.exportConfirmDesc,
-              style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.5)),
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5)),
           const SizedBox(height: 20),
           _ExportOption(
             icon: Icons.picture_as_pdf_rounded,
@@ -1115,8 +927,8 @@ class _ExportSheet extends StatelessWidget {
                 borderRadius: AppBorderRadius.lgAll,
                 border: Border.all(color: context.borderCol),
               ),
-              child: Text(AppStrings.cancel,
-                  style: AppTypography.buttonMd.copyWith(color: AppColors.textSecondary)),
+              child: const Text(AppStrings.cancel,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
             ),
           ),
         ],
@@ -1147,7 +959,7 @@ class _ExportOption extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 20),
               const SizedBox(width: 14),
-              Expanded(child: Text(label, style: AppTypography.bodyMd.copyWith(color: context.primaryText))),
+              Expanded(child: AppText.bodyMd(label, color: context.primaryText)),
               Icon(Icons.download_rounded, color: color, size: 18),
             ],
           ),
@@ -1190,7 +1002,7 @@ class _PickerSheet extends StatelessWidget {
               decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
             ),
           ),
-          Text(title, style: AppTypography.h3.copyWith(fontSize: 17)),
+          Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           SizedBox(height: 16),
           ...options.map((opt) {
             final isSel = opt == selected;
@@ -1212,11 +1024,9 @@ class _PickerSheet extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(opt,
-                          style: AppTypography.bodyMd.copyWith(
-                            color: isSel ? AppColors.teal : context.primaryText,
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                          )),
+                      child: AppText.bodyMd(opt,
+                          color: isSel ? AppColors.teal : context.primaryText,
+                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w500),
                     ),
                     if (isSel) const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
                   ],
@@ -1263,10 +1073,9 @@ class _AboutSheet extends StatelessWidget {
             child: const Icon(Icons.medical_services_rounded, color: AppColors.teal, size: 34),
           ),
           const SizedBox(height: 14),
-          Text('MediForze', style: AppTypography.h2.copyWith(fontSize: 24)),
+          const Text('MediForze', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text('Your Personal Health Companion',
-              style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
+          AppText.bodySm('Your Personal Health Companion', color: AppColors.textSecondary),
           const SizedBox(height: 4),
           Container(
             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1274,8 +1083,8 @@ class _AboutSheet extends StatelessWidget {
               color: context.inputBg,
               borderRadius: AppBorderRadius.pill,
             ),
-            child: Text('Version 1.0.0 (Build 42)',
-                style: AppTypography.labelSm.copyWith(color: AppColors.textHint, fontSize: 11)),
+            child: const Text('Version 1.0.0 (Build 42)',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: AppColors.textHint)),
           ),
           const SizedBox(height: 24),
           _AboutInfoRow(label: 'Developer', value: 'Hopes Technologies'),
@@ -1283,8 +1092,7 @@ class _AboutSheet extends StatelessWidget {
           _AboutInfoRow(label: AppStrings.privacyPolicy, value: 'View Policy →'),
           _AboutInfoRow(label: AppStrings.termsOfService, value: 'View Terms →'),
           const SizedBox(height: 20),
-          Text('© 2026 MediForze. All rights reserved.',
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.bodyXs('© 2026 MediForze. All rights reserved.', color: AppColors.textHint),
         ],
       ),
     );
@@ -1301,8 +1109,8 @@ class _AboutInfoRow extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Expanded(child: Text(label, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary))),
-            Text(value, style: AppTypography.bodySm.copyWith(color: context.primaryText, fontWeight: FontWeight.w600)),
+            Expanded(child: AppText.bodySm(label, color: AppColors.textSecondary)),
+            AppText.bodySm(value, color: context.primaryText, fontWeight: FontWeight.w600),
           ],
         ),
       );

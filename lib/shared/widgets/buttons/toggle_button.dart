@@ -3,6 +3,7 @@ import '../../../core/theme/app_animations.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/extensions/context_extensions.dart';
 
 /// Segmented toggle bar — one option active at a time.
 ///
@@ -49,10 +50,9 @@ class AppToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
     final accent  = color ?? AppColors.teal;
-    final trackBg = isDark ? AppColors.dark700 : AppColors.light200;
-    final border  = isDark ? AppColors.dark600 : AppColors.light300;
+    final trackBg = context.inputBg;
+    final border  = context.borderCol;
 
     return Container(
       height: height,

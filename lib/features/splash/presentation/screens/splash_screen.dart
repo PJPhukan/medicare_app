@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -263,7 +262,7 @@ class _SplashScreenState extends State<SplashScreen>
                     children: [
                       Text(
                         AppStrings.appName,
-                        style: GoogleFonts.spaceGrotesk(
+                        style: TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w800,
                           color: textPri,
@@ -280,7 +279,7 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         child: Text(
                           AppStrings.appTagline,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w400,
                             color: textSec,

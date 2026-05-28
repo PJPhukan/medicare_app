@@ -70,11 +70,8 @@ class _AppChipTagInputState extends State<AppChipTagInput> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
     final hasError  = widget.error != null && widget.error!.isNotEmpty;
-    final borderCol = hasError
-        ? AppColors.error
-        : (isDark ? context.borderCol : const Color(0xFFE2E8F0));
+    final borderCol = hasError ? AppColors.error : context.borderCol;
     final chipColor = widget.color ?? AppColors.teal;
 
     return Column(
@@ -88,7 +85,7 @@ class _AppChipTagInputState extends State<AppChipTagInput> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: isDark ? context.inputBg : Colors.white,
+            color: context.inputBg,
             borderRadius: AppBorderRadius.mdAll,
             border: Border.all(color: borderCol),
           ),

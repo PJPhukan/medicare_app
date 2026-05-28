@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 // ─── Report model (passed in from list) ──────────────────────────────────────
 
@@ -32,7 +34,7 @@ class ReportViewerArgs {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ReportViewerScreen extends StatelessWidget {
+class ReportViewerScreen extends ConsumerWidget {
   final ReportViewerArgs report;
 
   const ReportViewerScreen({super.key, required this.report});
@@ -53,17 +55,26 @@ class ReportViewerScreen extends StatelessWidget {
         _              => Icons.description_rounded,
       };
 
-  void _snack(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: AppTypography.bodySm),
-      backgroundColor: context.inputBg,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-    ));
+  Future<void> _confirmDelete(BuildContext context) async {
+    final ok = await AppDialog.confirm(
+      context,
+      title: AppStrings.deleteReport,
+      message: AppStrings.deleteReportConfirm,
+      confirmLabel: AppStrings.delete,
+      cancelLabel: AppStrings.cancel,
+      isDanger: true,
+    );
+    if (ok == true && context.mounted) {
+      AppSnackbar.info(context, AppStrings.reportDeleted);
+      Navigator.pop(context);
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Reports');
+    }
     final color = _typeColor(report.type);
     final icon = _typeIcon(report.type);
 
@@ -78,27 +89,25 @@ class ReportViewerScreen extends StatelessWidget {
               surfaceTintColor: Colors.transparent,
               pinned: true,
               expandedHeight: 100,
-              leading: IconButton(
+              leading: AppIconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
                 onPressed: () => Navigator.pop(context),
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.share_rounded, size: 20),
-                  color: context.primaryText,
-                  onPressed: () => _snack(context, 'Sharing report…'),
+                AppIconButton(
+                  icon: Icon(Icons.share_rounded, size: 20, color: context.primaryText),
                   tooltip: AppStrings.share,
+                  onPressed: () => AppSnackbar.info(context, 'Sharing report…'),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.download_rounded, size: 20),
-                  color: context.primaryText,
-                  onPressed: () => _snack(context, 'Downloading…'),
+                AppIconButton(
+                  icon: Icon(Icons.download_rounded, size: 20, color: context.primaryText),
                   tooltip: AppStrings.download,
+                  onPressed: () => AppSnackbar.info(context, 'Downloading…'),
                 ),
               ],
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),
-                title: Text(AppStrings.reports, style: AppTypography.h2.copyWith(fontSize: 22)),
+                title: AppText.h2(AppStrings.reports),
                 background: Container(color: context.bg),
               ),
             ),
@@ -107,24 +116,17 @@ class ReportViewerScreen extends StatelessWidget {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   // Header card
-                  Container(
+                  AppCard(
                     padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: AppBorderRadius.xlAll,
-                      border: Border.all(color: context.borderCol),
-                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Container(
-                              width: 48, height: 48,
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.12),
-                                borderRadius: AppBorderRadius.mdAll,
-                              ),
+                            AppContainer.tinted(
+                              color: color,
+                              borderRadius: AppBorderRadius.mdAll,
+                              padding: const EdgeInsets.all(12),
                               child: Icon(icon, color: color, size: 24),
                             ),
                             const SizedBox(width: 14),
@@ -132,17 +134,13 @@ class ReportViewerScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(report.title,
-                                      style: AppTypography.bodyMd.copyWith(color: context.primaryText, fontWeight: FontWeight.w700)),
+                                  AppText.bodyMd(report.title, fontWeight: FontWeight.w700),
                                   const SizedBox(height: 4),
-                                  Container(
+                                  AppContainer.tinted(
+                                    color: color,
+                                    borderRadius: AppBorderRadius.pill,
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: 0.1),
-                                      borderRadius: AppBorderRadius.pill,
-                                    ),
-                                    child: Text(report.type,
-                                        style: AppTypography.labelXs.copyWith(color: color, letterSpacing: 0.5)),
+                                    child: AppText.labelXs(report.type, color: color),
                                   ),
                                 ],
                               ),
@@ -160,56 +158,52 @@ class ReportViewerScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+
                   if (report.tags.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    Container(
+                    AppCard(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: context.cardBg,
-                        borderRadius: AppBorderRadius.lgAll,
-                        border: Border.all(color: context.borderCol),
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('TAGS', style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1)),
+                          const Text('TAGS',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                                  color: AppColors.textHint, letterSpacing: 1)),
                           const SizedBox(height: 10),
                           Wrap(
-                            spacing: 6, runSpacing: 6,
-                            children: report.tags.map((t) => Container(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: report.tags.map((t) => AppContainer.tinted(
+                              color: AppColors.teal,
+                              borderRadius: AppBorderRadius.pill,
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.teal.withValues(alpha: 0.08),
-                                borderRadius: AppBorderRadius.pill,
-                                border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
-                              ),
-                              child: Text(t, style: AppTypography.labelXs.copyWith(color: AppColors.teal)),
+                              child: AppText.labelXs(t, color: AppColors.teal),
                             )).toList(),
                           ),
                         ],
                       ),
                     ),
                   ],
+
                   if (report.description != null && report.description!.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    Container(
+                    AppCard(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: context.cardBg,
-                        borderRadius: AppBorderRadius.lgAll,
-                        border: Border.all(color: context.borderCol),
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('NOTES', style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1)),
+                          const Text('NOTES',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                                  color: AppColors.textHint, letterSpacing: 1)),
                           const SizedBox(height: 10),
-                          Text(report.description!, style: AppTypography.bodySm.copyWith(color: context.primaryText, height: 1.6)),
+                          AppText.bodySm(report.description!, color: context.primaryText),
                         ],
                       ),
                     ),
                   ],
+
                   const SizedBox(height: 24),
+
                   // Preview area
                   Container(
                     height: 280,
@@ -223,57 +217,55 @@ class ReportViewerScreen extends StatelessWidget {
                       children: [
                         Icon(icon, size: 52, color: color.withValues(alpha: 0.4)),
                         const SizedBox(height: 16),
-                        Text('Preview not available', style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
+                        AppText.bodySm('Preview not available', color: AppColors.textSecondary),
                         const SizedBox(height: 4),
-                        Text('Download the file to view its contents',
-                            style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+                        AppText.bodyXs('Download the file to view its contents',
+                            color: AppColors.textHint),
                         const SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: () => _snack(context, 'Downloading…'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: AppColors.teal.withValues(alpha: 0.12),
-                              borderRadius: AppBorderRadius.lgAll,
-                              border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.download_rounded, color: AppColors.teal, size: 16),
-                                const SizedBox(width: 8),
-                                Text(AppStrings.download, style: AppTypography.buttonSm.copyWith(color: AppColors.teal)),
-                              ],
-                            ),
-                          ),
+                        AppButton.outline(
+                          label: AppStrings.download,
+                          icon: const Icon(Icons.download_rounded, size: 16),
+                          color: AppColors.teal,
+                          size: AppButtonSize.sm,
+                          onPressed: () => AppSnackbar.info(context, 'Downloading…'),
                         ),
                       ],
                     ),
                   ),
+
                   const SizedBox(height: 20),
+
                   // Actions row
                   Row(
                     children: [
-                      Expanded(child: _ActionBtn(
-                        icon: Icons.share_rounded,
-                        label: AppStrings.share,
-                        color: AppColors.blue,
-                        onTap: () => _snack(context, 'Sharing report…'),
-                      )),
+                      Expanded(
+                        child: AppButton.outline(
+                          label: AppStrings.share,
+                          icon: const Icon(Icons.share_rounded, size: 16),
+                          color: AppColors.blue,
+                          isFullWidth: true,
+                          onPressed: () => AppSnackbar.info(context, 'Sharing report…'),
+                        ),
+                      ),
                       const SizedBox(width: 10),
-                      Expanded(child: _ActionBtn(
-                        icon: Icons.download_rounded,
-                        label: AppStrings.download,
-                        color: AppColors.teal,
-                        onTap: () => _snack(context, 'Downloading…'),
-                      )),
+                      Expanded(
+                        child: AppButton.outline(
+                          label: AppStrings.download,
+                          icon: const Icon(Icons.download_rounded, size: 16),
+                          color: AppColors.teal,
+                          isFullWidth: true,
+                          onPressed: () => AppSnackbar.info(context, 'Downloading…'),
+                        ),
+                      ),
                       const SizedBox(width: 10),
-                      Expanded(child: _ActionBtn(
-                        icon: Icons.delete_outline_rounded,
-                        label: AppStrings.delete,
-                        color: AppColors.error,
-                        onTap: () => _confirmDelete(context),
-                      )),
+                      Expanded(
+                        child: AppButton.danger(
+                          label: AppStrings.delete,
+                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                          isFullWidth: true,
+                          onPressed: () => _confirmDelete(context),
+                        ),
+                      ),
                     ],
                   ),
                 ]),
@@ -284,39 +276,9 @@ class ReportViewerScreen extends StatelessWidget {
       ),
     );
   }
-
-  void _confirmDelete(BuildContext context) {
-    showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardBg,
-        title: Text(AppStrings.deleteReport, style: AppTypography.h3),
-        content: Text(AppStrings.deleteReportConfirm,
-            style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppStrings.cancel, style: AppTypography.bodySm),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppStrings.delete, style: AppTypography.bodySm.copyWith(color: AppColors.error)),
-          ),
-        ],
-      ),
-    ).then((ok) {
-      if (ok == true && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(AppStrings.reportDeleted, style: AppTypography.bodySm),
-          backgroundColor: context.inputBg,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-        ));
-        Navigator.pop(context);
-      }
-    });
-  }
 }
+
+// ─── Meta row ─────────────────────────────────────────────────────────────────
 
 class _MetaRow extends StatelessWidget {
   final IconData icon;
@@ -330,37 +292,10 @@ class _MetaRow extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: AppColors.textHint),
           const SizedBox(width: 8),
-          Text('$label: ', style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
-          Expanded(child: Text(value, style: AppTypography.bodyXs.copyWith(color: context.primaryText, fontWeight: FontWeight.w600))),
+          AppText.bodyXs('$label: ', color: context.secondaryText),
+          Expanded(
+            child: AppText.bodyXs(value, color: context.primaryText, fontWeight: FontWeight.w600),
+          ),
         ],
-      );
-}
-
-class _ActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionBtn({required this.icon, required this.label, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: AppBorderRadius.lgAll,
-            border: Border.all(color: color.withValues(alpha: 0.25)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(height: 4),
-              Text(label, style: AppTypography.labelXs.copyWith(color: color)),
-            ],
-          ),
-        ),
       );
 }

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 import 'notes_screen.dart';
 
 // ─── Note colour palette ──────────────────────────────────────────────────────
@@ -62,13 +62,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     widget.note.colour = _selectedColour;
     widget.note.updatedAt = DateTime.now();
     setState(() => _dirty = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.noteSaved, style: AppTypography.bodySm),
-        backgroundColor: context.inputBg,
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    AppSnackbar.success(context, AppStrings.noteSaved);
   }
 
   void _onBack() {
@@ -105,7 +99,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Text(
                   AppStrings.save,
-                  style: AppTypography.buttonMd.copyWith(
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
                     color: _dirty ? AppColors.teal : AppColors.textHint,
                   ),
                 ),
@@ -123,10 +120,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   children: [
                     TextField(
                       controller: _titleCtrl,
-                      style: AppTypography.h2.copyWith(color: context.primaryText),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: context.primaryText, height: 1.25),
                       decoration: InputDecoration(
                         hintText: AppStrings.untitledNote,
-                        hintStyle: AppTypography.h2.copyWith(color: AppColors.textHint),
+                        hintStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.textHint, height: 1.25),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -138,13 +135,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _contentCtrl,
-                      style: AppTypography.bodyLg.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.65,
-                      ),
+                      style: const TextStyle(fontSize: 16, color: AppColors.textSecondary, height: 1.65),
                       decoration: InputDecoration(
                         hintText: AppStrings.tapToEdit,
-                        hintStyle: AppTypography.bodyLg.copyWith(color: AppColors.textHint),
+                        hintStyle: const TextStyle(fontSize: 16, color: AppColors.textHint),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -166,10 +160,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ),
               child: Row(
                 children: [
-                  Text(
-                    AppStrings.noteColourLabel,
-                    style: AppTypography.labelSm.copyWith(color: AppColors.textHint),
-                  ),
+                  AppText.labelSm(AppStrings.noteColourLabel, color: AppColors.textHint),
                   const SizedBox(width: 12),
                   Expanded(
                     child: SingleChildScrollView(

@@ -1,12 +1,13 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
 import 'professionals_screen.dart' show ProData, ProConnState, ProPlanType, ProConnectSheet;
 import '../../../connections/presentation/screens/chat_screen.dart';
 
@@ -58,15 +59,15 @@ List<_Review> _generateReviews(String proId) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ProfessionalDetailScreen extends StatefulWidget {
+class ProfessionalDetailScreen extends ConsumerStatefulWidget {
   final ProData pro;
   const ProfessionalDetailScreen({super.key, required this.pro});
 
   @override
-  State<ProfessionalDetailScreen> createState() => _ProfessionalDetailScreenState();
+  ConsumerState<ProfessionalDetailScreen> createState() => _ProfessionalDetailScreenState();
 }
 
-class _ProfessionalDetailScreenState extends State<ProfessionalDetailScreen> {
+class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScreen> {
   late final List<_Review> _reviews;
   late final double _overallAvg;
   late final double _communicationAvg;
@@ -92,7 +93,6 @@ class _ProfessionalDetailScreenState extends State<ProfessionalDetailScreen> {
             connectionId: 'conn_${widget.pro.id}',
             professionalName: widget.pro.name,
             professionalSpecialty: widget.pro.categoryName,
-            avatarColor: widget.pro.categoryColor,
           ),
         ),
       );
@@ -106,13 +106,11 @@ class _ProfessionalDetailScreenState extends State<ProfessionalDetailScreen> {
     );
   }
 
-  String get _initials {
-    final parts = widget.pro.name.replaceAll(RegExp(r'^Dr\.\s*'), '').split(' ');
-    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Professionals');
+    }
     final pro = widget.pro;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
@@ -120,7 +118,7 @@ class _ProfessionalDetailScreenState extends State<ProfessionalDetailScreen> {
         backgroundColor: context.bg,
         body: CustomScrollView(
           slivers: [
-            // ── Hero app bar ──────────────────────────────────────────────────
+            // ── Hero app bar ────────────────────────────────────────────────
             SliverAppBar(
               pinned: true,
               expandedHeight: 180,
@@ -148,7 +146,6 @@ class _ProfessionalDetailScreenState extends State<ProfessionalDetailScreen> {
                   ),
                   child: Stack(
                     children: [
-                      // Subtle dot pattern overlay
                       Opacity(
                         opacity: 0.07,
                         child: GridView.builder(
@@ -170,54 +167,45 @@ class _ProfessionalDetailScreenState extends State<ProfessionalDetailScreen> {
               ),
             ),
 
-            // ── Content ───────────────────────────────────────────────────────
+            // ── Content ─────────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar + identity
-                    _IdentitySection(pro: pro, initials: _initials),
-
+                    _IdentitySection(pro: pro),
                     const SizedBox(height: 20),
 
-                    // Bio
                     if (pro.bio.isNotEmpty) ...[
                       _SectionLabel(AppStrings.bio),
                       const SizedBox(height: 8),
-                      _Card(
-                        child: Text(
-                          pro.bio,
-                          style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary, height: 1.6),
-                        ),
+                      AppCard(
+                        padding: const EdgeInsets.all(16),
+                        child: AppText.bodyMd(pro.bio, color: context.secondaryText),
                       ),
                       const SizedBox(height: 16),
                     ],
 
-                    // Certifications
                     if (pro.certifications.isNotEmpty) ...[
                       _SectionLabel(AppStrings.certifications),
                       const SizedBox(height: 8),
-                      _Card(
+                      AppCard(
+                        padding: const EdgeInsets.all(16),
                         child: Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: pro.certifications
-                              .map((c) => _CertBadge(label: c))
-                              .toList(),
+                          children: pro.certifications.map((c) => _CertBadge(label: c)).toList(),
                         ),
                       ),
                       const SizedBox(height: 16),
                     ],
 
-                    // Pricing plans
                     _SectionLabel(AppStrings.selectPlanTitle),
                     const SizedBox(height: 8),
                     _PlanCards(pro: pro, onSelect: _showConnect),
                     const SizedBox(height: 16),
 
-                    // Ratings & reviews
                     _SectionLabel('${AppStrings.reviews} (${_reviews.length})'),
                     const SizedBox(height: 8),
                     _ReviewsCard(
@@ -234,87 +222,64 @@ class _ProfessionalDetailScreenState extends State<ProfessionalDetailScreen> {
           ],
         ),
 
-        // ── Bottom connect button ─────────────────────────────────────────────
         bottomNavigationBar: _BottomConnectBar(pro: pro, onConnect: _showConnect),
       ),
     );
   }
 }
 
-// ─── Identity section (avatar + name + badges) ────────────────────────────────
+// ─── Identity section ─────────────────────────────────────────────────────────
 
 class _IdentitySection extends StatelessWidget {
   final ProData pro;
-  final String initials;
-  const _IdentitySection({required this.pro, required this.initials});
+  const _IdentitySection({required this.pro});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Avatar positioned to overlap with hero
         Transform.translate(
-          offset: Offset(0, -36),
+          offset: const Offset(0, -36),
           child: Column(
             children: [
-              // Avatar circle
+              // Avatar with bg-border to separate from hero
               Container(
-                width: 80,
-                height: 80,
                 decoration: BoxDecoration(
-                  color: pro.categoryColor.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
                   border: Border.all(color: context.bg, width: 4),
+                  shape: BoxShape.circle,
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  initials,
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: pro.categoryColor,
-                  ),
-                ),
+                child: AppAvatar(name: pro.name, size: AppAvatarSize.xl),
               ),
               const SizedBox(height: 10),
 
-              // Name
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(pro.name, style: AppTypography.h2),
+                  AppText.h2(pro.name, textAlign: TextAlign.center),
                   if (pro.isVerified) ...[
                     const SizedBox(width: 6),
-                    Icon(Icons.verified_rounded, size: 20, color: AppColors.teal),
+                    const Icon(Icons.verified_rounded, size: 20, color: AppColors.teal),
                   ],
                 ],
               ),
               const SizedBox(height: 8),
 
-              // Badges row
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  // Category
-                  _Badge(
-                    label: pro.categoryName,
-                    color: pro.categoryColor,
-                  ),
-                  // Rating
+                  _Badge(label: pro.categoryName, color: pro.categoryColor),
                   _Badge(
                     icon: Icons.star_rounded,
                     label: '${pro.averageRating.toStringAsFixed(1)} (${pro.ratingCount})',
                     color: AppColors.amber,
                   ),
-                  // Experience
                   _Badge(
                     icon: Icons.work_outline_rounded,
                     label: '${pro.experienceYrs} yrs ${AppStrings.experience}',
                     color: AppColors.blue,
                   ),
-                  // Location
                   _Badge(
                     icon: Icons.location_on_outlined,
                     label: pro.address,
@@ -338,13 +303,10 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppContainer.tinted(
+      color: color,
+      borderRadius: AppBorderRadius.pill,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: AppBorderRadius.pill,
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -352,10 +314,7 @@ class _Badge extends StatelessWidget {
             Icon(icon, size: 12, color: color),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: AppTypography.labelXs.copyWith(color: color, fontWeight: FontWeight.w600),
-          ),
+          AppText.labelXs(label, color: color, fontWeight: FontWeight.w600),
         ],
       ),
     );
@@ -372,30 +331,9 @@ class _PlanCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final plans = [
-      (
-        type: ProPlanType.hourly,
-        label: AppStrings.hourlyPlan,
-        desc: AppStrings.perHour,
-        rate: pro.hourlyRate,
-        color: AppColors.teal,
-        icon: Icons.schedule_rounded,
-      ),
-      (
-        type: ProPlanType.daily,
-        label: AppStrings.dailyPlan,
-        desc: AppStrings.perDay,
-        rate: pro.dailyRate,
-        color: AppColors.blue,
-        icon: Icons.calendar_today_rounded,
-      ),
-      (
-        type: ProPlanType.monthly,
-        label: AppStrings.monthlyPlan,
-        desc: AppStrings.perMonth,
-        rate: pro.monthlyRate,
-        color: AppColors.purple,
-        icon: Icons.date_range_rounded,
-      ),
+      (type: ProPlanType.hourly,  label: AppStrings.hourlyPlan,  desc: AppStrings.perHour,  rate: pro.hourlyRate,  color: AppColors.teal,   icon: Icons.schedule_rounded),
+      (type: ProPlanType.daily,   label: AppStrings.dailyPlan,   desc: AppStrings.perDay,   rate: pro.dailyRate,   color: AppColors.blue,   icon: Icons.calendar_today_rounded),
+      (type: ProPlanType.monthly, label: AppStrings.monthlyPlan, desc: AppStrings.perMonth, rate: pro.monthlyRate, color: AppColors.purple, icon: Icons.date_range_rounded),
     ];
 
     return Row(
@@ -407,7 +345,7 @@ class _PlanCards extends StatelessWidget {
             child: GestureDetector(
               onTap: available ? () => onSelect(p.type) : null,
               child: Container(
-                padding: EdgeInsets.all(14),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: available ? p.color.withValues(alpha: 0.08) : context.cardBg,
                   borderRadius: AppBorderRadius.lgAll,
@@ -419,25 +357,21 @@ class _PlanCards extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(p.icon, size: 18, color: available ? p.color : AppColors.textHint),
-                    SizedBox(height: 8),
-                    Text(
+                    const SizedBox(height: 8),
+                    AppText.labelSm(
                       p.label,
-                      style: AppTypography.labelSm.copyWith(
-                        color: available ? context.primaryText : AppColors.textHint,
-                      ),
+                      color: available ? context.primaryText : AppColors.textHint,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       available ? '₹${p.rate}' : '—',
-                      style: AppTypography.statMd.copyWith(
-                        color: available ? p.color : AppColors.textHint,
+                      style: TextStyle(
                         fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: available ? p.color : AppColors.textHint,
                       ),
                     ),
-                    Text(
-                      p.desc,
-                      style: AppTypography.bodyXs.copyWith(color: AppColors.textHint),
-                    ),
+                    AppText.bodyXs(p.desc, color: AppColors.textHint),
                   ],
                 ),
               ),
@@ -467,16 +401,20 @@ class _ReviewsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
+    return AppCard(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Overall score
           Row(
             children: [
               Text(
                 overall.toStringAsFixed(1),
-                style: AppTypography.statXl.copyWith(color: AppColors.amber),
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.amber,
+                ),
               ),
               const SizedBox(width: 8),
               Column(
@@ -492,10 +430,7 @@ class _ReviewsCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Text(
-                    '${reviews.length} ${AppStrings.reviews}',
-                    style: AppTypography.bodyXs.copyWith(color: AppColors.textHint),
-                  ),
+                  AppText.bodyXs('${reviews.length} ${AppStrings.reviews}', color: AppColors.textHint),
                 ],
               ),
             ],
@@ -503,7 +438,6 @@ class _ReviewsCard extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Star bars
           _StarBar(label: AppStrings.overallRatingLabel, value: overall),
           const SizedBox(height: 8),
           _StarBar(label: AppStrings.communicationRating, value: communication),
@@ -513,11 +447,10 @@ class _ReviewsCard extends StatelessWidget {
           _StarBar(label: AppStrings.availabilityRating, value: availability),
 
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: context.borderCol, height: 1),
           ),
 
-          // Review list
           ...reviews.map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: _ReviewItem(review: r),
@@ -531,7 +464,7 @@ class _ReviewsCard extends StatelessWidget {
 class _StarBar extends StatelessWidget {
   final String label;
   final double value;
-  _StarBar({required this.label, required this.value});
+  const _StarBar({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -539,7 +472,7 @@ class _StarBar extends StatelessWidget {
       children: [
         SizedBox(
           width: 110,
-          child: Text(label, style: AppTypography.labelXs.copyWith(color: AppColors.textSecondary)),
+          child: AppText.labelXs(label, color: context.secondaryText),
         ),
         Expanded(
           child: ClipRRect(
@@ -553,10 +486,7 @@ class _StarBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          value.toStringAsFixed(1),
-          style: AppTypography.labelXs.copyWith(color: AppColors.textSecondary),
-        ),
+        AppText.labelXs(value.toStringAsFixed(1), color: context.secondaryText),
       ],
     );
   }
@@ -564,7 +494,12 @@ class _StarBar extends StatelessWidget {
 
 class _ReviewItem extends StatelessWidget {
   final _Review review;
-  _ReviewItem({required this.review});
+  const _ReviewItem({required this.review});
+
+  String _fmtDate(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -573,60 +508,30 @@ class _ReviewItem extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: context.inputBg,
-                shape: BoxShape.circle,
-                border: Border.all(color: context.borderCol),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                review.reviewer[0],
-                style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary),
-              ),
-            ),
+            AppAvatar(name: review.reviewer, size: AppAvatarSize.xs),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(review.reviewer, style: AppTypography.labelSm),
-                  Text(
-                    _fmtDate(review.date),
-                    style: AppTypography.bodyXs.copyWith(color: AppColors.textHint),
-                  ),
+                  AppText.labelSm(review.reviewer),
+                  AppText.bodyXs(_fmtDate(review.date), color: AppColors.textHint),
                 ],
               ),
             ),
             Row(
               children: [
-                Icon(Icons.star_rounded, size: 13, color: AppColors.amber),
+                const Icon(Icons.star_rounded, size: 13, color: AppColors.amber),
                 const SizedBox(width: 3),
-                Text(
-                  review.overall.toStringAsFixed(1),
-                  style: AppTypography.labelXs.copyWith(color: AppColors.amber),
-                ),
+                AppText.labelXs(review.overall.toStringAsFixed(1), color: AppColors.amber),
               ],
             ),
           ],
         ),
         const SizedBox(height: 8),
-        Text(
-          review.comment,
-          style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.5),
-        ),
+        AppText.bodySm(review.comment, color: context.secondaryText),
       ],
     );
-  }
-
-  String _fmtDate(DateTime d) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[d.month - 1]} ${d.day}, ${d.year}';
   }
 }
 
@@ -635,7 +540,7 @@ class _ReviewItem extends StatelessWidget {
 class _BottomConnectBar extends StatelessWidget {
   final ProData pro;
   final VoidCallback onConnect;
-  _BottomConnectBar({required this.pro, required this.onConnect});
+  const _BottomConnectBar({required this.pro, required this.onConnect});
 
   @override
   Widget build(BuildContext context) {
@@ -651,73 +556,52 @@ class _BottomConnectBar extends StatelessWidget {
             children: [
               const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
               const SizedBox(width: 8),
-              Text(AppStrings.connected, style: AppTypography.labelMd.copyWith(color: AppColors.teal)),
+              AppText.labelMd(AppStrings.connected, color: AppColors.teal),
               const Spacer(),
-              _FilledBtn(
+              AppButton.primary(
                 label: AppStrings.openChat,
-                color: AppColors.teal,
-                icon: Icons.chat_bubble_outline_rounded,
-                onTap: onConnect,
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                onPressed: onConnect,
               ),
             ],
           ),
         ProConnState.pending => Row(
             children: [
-              Icon(Icons.hourglass_top_rounded, color: AppColors.amber, size: 18),
+              const Icon(Icons.hourglass_top_rounded, color: AppColors.amber, size: 18),
               const SizedBox(width: 8),
-              Text(AppStrings.pending, style: AppTypography.labelMd.copyWith(color: AppColors.amber)),
+              AppText.labelMd(AppStrings.pending, color: AppColors.amber),
               const Spacer(),
-              Container(
+              AppContainer.tinted(
+                color: AppColors.amber,
+                borderRadius: AppBorderRadius.lgAll,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.amber.withValues(alpha: 0.1),
-                  borderRadius: AppBorderRadius.lgAll,
-                  border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  AppStrings.cancelRequest,
-                  style: AppTypography.buttonSm.copyWith(color: AppColors.amber),
-                ),
+                child: AppText.labelSm(AppStrings.cancelRequest, color: AppColors.amber, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ProConnState.none => SizedBox(
             width: double.infinity,
-            child: _FilledBtn(
-              label: AppStrings.connect,
-              color: pro.categoryColor,
-              icon: Icons.add_rounded,
+            child: GestureDetector(
               onTap: onConnect,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: pro.categoryColor,
+                  borderRadius: AppBorderRadius.lgAll,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 6),
+                    AppText.labelMd(AppStrings.connect, color: Colors.white, fontWeight: FontWeight.w700),
+                  ],
+                ),
+              ),
             ),
           ),
       },
-    );
-  }
-}
-
-class _FilledBtn extends StatelessWidget {
-  final String label;
-  final Color color;
-  final IconData icon;
-  final VoidCallback onTap;
-  _FilledBtn({required this.label, required this.color, required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(color: color, borderRadius: AppBorderRadius.lgAll),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: context.bg),
-            const SizedBox(width: 6),
-            Text(label, style: AppTypography.buttonMd.copyWith(color: context.bg)),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -729,31 +613,15 @@ class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text);
 
   @override
-  Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: AppTypography.overline.copyWith(color: AppColors.textHint, letterSpacing: 1.2),
-    );
-  }
-}
-
-class _Card extends StatelessWidget {
-  final Widget child;
-  _Card({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: context.borderCol),
-      ),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textHint,
+          letterSpacing: 1.2,
+        ),
+      );
 }
 
 class _CertBadge extends StatelessWidget {
@@ -761,15 +629,10 @@ class _CertBadge extends StatelessWidget {
   const _CertBadge({required this.label});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.blue.withValues(alpha: 0.1),
+  Widget build(BuildContext context) => AppContainer.tinted(
+        color: AppColors.blue,
         borderRadius: AppBorderRadius.pill,
-        border: Border.all(color: AppColors.blue.withValues(alpha: 0.25)),
-      ),
-      child: Text(label, style: AppTypography.labelXs.copyWith(color: AppColors.blue)),
-    );
-  }
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: AppText.labelXs(label, color: AppColors.blue),
+      );
 }

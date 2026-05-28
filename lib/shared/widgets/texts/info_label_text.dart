@@ -159,14 +159,11 @@ class AppInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderCol = isDark ? context.borderCol : const Color(0xFFE2E8F0);
-
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? context.cardBg : Colors.white,
+        color: context.cardBg,
         borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: borderCol),
+        border: Border.all(color: context.borderCol),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,7 +184,7 @@ class AppInfoCard extends StatelessWidget {
             if (i.isOdd) {
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Divider(height: 1, color: borderCol),
+                child: Divider(height: 1, color: context.borderCol),
               );
             }
             final item = items[i ~/ 2];

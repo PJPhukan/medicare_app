@@ -43,7 +43,6 @@ class AppFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final c      = color ?? AppColors.teal;
 
     final bgColor = selected
@@ -51,8 +50,8 @@ class AppFilterChip extends StatelessWidget {
         : Colors.transparent;
 
     final borderColor = selected
-        ? (outlined ? c : c)
-        : (isDark ? context.borderCol : const Color(0xFFE2E8F0));
+        ? c
+        : context.borderCol;
 
     final labelColor = selected
         ? (outlined ? c : Colors.white)

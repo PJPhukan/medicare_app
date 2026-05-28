@@ -216,8 +216,7 @@ class AppStatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dividerColor = isDark ? context.borderCol : const Color(0xFFE2E8F0);
+    final dividerColor = context.borderCol;
 
     return Padding(
       padding: padding ?? EdgeInsets.zero,

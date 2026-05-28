@@ -137,10 +137,19 @@ abstract class AppStrings {
   static const enableBiometrics     = 'Enable biometrics';
   static const biometricSubtitle    = 'Use Face ID or Fingerprint for quick,\nsecure access every time.';
   static const touchSensor          = 'Touch the sensor to continue';
-  static const enableBiometricsBtn  = 'Enable Biometrics';
-  static const usePassword          = 'Use Password';
-  static const useOtp               = 'Use OTP';
-  static const skipForNow           = 'Skip for now';
+  static const enableBiometricsBtn      = 'Enable Biometrics';
+  static const usePassword              = 'Use Password';
+  static const useOtp                   = 'Use OTP';
+  static const skipForNow               = 'Skip for now';
+  static const biometricChecking        = 'Checking device capabilities…';
+  static const biometricNotAvailable    = 'Biometric authentication is not available on this device.';
+  static const biometricNotAvailableTag = 'Not available';
+  static const biometricAuthReason      = 'Confirm your biometric to enable quick login';
+  static const biometricAuthFailed      = 'Authentication failed. Please try again.';
+  static const biometricFaceId         = 'Face ID';
+  static const biometricIris           = 'Iris';
+  static const biometricFingerprint    = 'Fingerprint';
+  static const biometricVerifying      = 'Verifying…';
 
   // ─── Auth — Emergency screen ─────────────────────────────────────────────────
   static const emergencyBadge       = 'EMERGENCY';
@@ -185,7 +194,7 @@ abstract class AppStrings {
 
   // ─── Auth — Forgot password flow ─────────────────────────────────────────────
   static const forgotPasswordTitle   = 'Forgot password?';
-  static const forgotPasswordSubtitle = "Enter your email or phone and we'll send a reset code.";
+  static const forgotPasswordSubtitle = "Enter your email and we'll send a reset code.";
   static const sendResetCode         = 'Send Reset Code';
   static const forgotOtpTitle        = 'Check your inbox';
   static const forgotOtpSubtitle     = 'Enter the reset code we sent to';
@@ -592,7 +601,6 @@ abstract class AppStrings {
   static const reportTitleRequired = 'Title is required';
   static const uploading = 'Uploading…';
   static const myReports = 'My Reports';
-  static const allDocuments = 'All your medical documents in one place';
   static const selectReportToPreview = 'Tap a report to view details';
 
   // ─── Notes ──────────────────────────────────────────────────────────────────
@@ -805,23 +813,6 @@ abstract class AppStrings {
   static const reminderDeleted      = 'Reminder deleted';
   static const deleteReminder       = 'Delete Reminder';
   static const deleteReminderConfirm = 'Delete this reminder?';
-
-  // ─── Documents ───────────────────────────────────────────────────────────────
-  static const documents            = 'Documents';
-  static const uploadDocument       = 'Upload Document';
-  static const noDocuments          = 'No documents yet';
-  static const noDocumentsDesc      = 'Tap + to upload a document';
-  static const documentTitle        = 'Document Title';
-  static const documentTitleHint    = 'e.g. Blood Test Report';
-  static const documentCategory     = 'Category';
-  static const documentUploaded     = 'Document uploaded';
-  static const documentDeleted      = 'Document deleted';
-  static const deleteDocument       = 'Delete Document';
-  static const deleteDocumentConfirm = 'Delete this document? This cannot be undone.';
-  static const catMedical           = 'Medical';
-  static const catInsurance         = 'Insurance';
-  static const catLegal             = 'Legal';
-  static const catOther             = 'Other';
 
   // ─── Prescriptions ───────────────────────────────────────────────────────────
   static const prescriptions        = 'Prescriptions';

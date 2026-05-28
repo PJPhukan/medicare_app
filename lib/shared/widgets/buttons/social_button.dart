@@ -3,6 +3,7 @@ import '../../../core/theme/app_animations.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/extensions/context_extensions.dart';
 import 'app_base_button.dart';
 
 /// Social / OAuth login buttons (Google, Apple, Facebook, GitHub, Phone).
@@ -204,13 +205,13 @@ class _AppSocialButtonState extends State<AppSocialButton>
 
   _SocialCfg _config(AppSocialProvider p, bool isDark) => switch (p) {
         AppSocialProvider.google => _SocialCfg(
-            bg: isDark ? AppColors.dark700 : Colors.white,
-            fg: isDark ? AppColors.textPrimary : const Color(0xFF1A202C),
-            border: isDark ? AppColors.dark600 : AppColors.light300,
+            bg: context.inputBg,
+            fg: context.primaryText,
+            border: context.borderCol,
           ),
         AppSocialProvider.apple => _SocialCfg(
-            bg: isDark ? Colors.white : const Color(0xFF1A202C),
-            fg: isDark ? const Color(0xFF1A202C) : Colors.white,
+            bg: isDark ? Colors.white : AppColors.textInverse,
+            fg: isDark ? AppColors.textInverse : Colors.white,
           ),
         AppSocialProvider.facebook => _SocialCfg(
             bg: const Color(0xFF1877F2),

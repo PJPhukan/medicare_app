@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../providers/community_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/network/connectivity_monitor.dart';
+import '../../../../core/utils/logger.dart';
 
 const _kCategories = ['General', 'Diabetes', 'Hypertension', 'Mental Health', 'Nutrition', 'Fitness'];
 
-class CreatePostScreen extends StatefulWidget {
+class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key});
 
   @override
-  State<CreatePostScreen> createState() => _CreatePostScreenState();
+  ConsumerState<CreatePostScreen> createState() => _CreatePostScreenState();
 }
 
-class _CreatePostScreenState extends State<CreatePostScreen> {
+class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _contentCtrl = TextEditingController();
   String _category = 'General';
   bool _posting = false;
@@ -28,15 +33,29 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> _post() async {
     if (_contentCtrl.text.trim().isEmpty) return;
+    AppLogger.i('Post create → category:$_category', tag: 'Community');
     setState(() => _posting = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() => _posting = false);
-    Navigator.pop(context, true);
+    try {
+      await ref.read(createPostProvider).call(
+        title: _category,
+        body: _contentCtrl.text.trim(),
+      );
+      AppLogger.i('Post created ✓', tag: 'Community');
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on Exception catch (e) {
+      AppLogger.e('Post create failed', tag: 'Community', error: e);
+      if (!mounted) return;
+      setState(() => _posting = false);
+      AppSnackbar.error(context, e.toString());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Community');
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -48,7 +67,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               surfaceTintColor: Colors.transparent,
               pinned: true,
               expandedHeight: 100,
-              leading: IconButton(
+              leading: AppIconButton(
                 icon: Icon(Icons.close_rounded, color: context.primaryText, size: 22),
                 onPressed: () => Navigator.pop(context),
               ),
@@ -59,28 +78,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     valueListenable: _contentCtrl,
                     builder: (_, val, __) {
                       final canPost = val.text.trim().isNotEmpty && !_posting;
-                      return GestureDetector(
-                        onTap: canPost ? _post : null,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: canPost ? AppColors.teal : context.inputBg,
-                            borderRadius: AppBorderRadius.lgAll,
-                          ),
-                          child: _posting
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
-                                )
-                              : Text(
-                                  AppStrings.createPost,
-                                  style: AppTypography.buttonSm.copyWith(
-                                    color: canPost ? AppColors.textInverse : AppColors.textHint,
-                                  ),
-                                ),
-                        ),
+                      return AppButton.primary(
+                        label: AppStrings.createPost,
+                        size: AppButtonSize.sm,
+                        isLoading: _posting,
+                        onPressed: canPost ? _post : null,
                       );
                     },
                   ),
@@ -88,64 +90,47 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ],
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),
-                title: Text(AppStrings.createPost, style: AppTypography.h2.copyWith(fontSize: 22)),
+                title: AppText.h2(AppStrings.createPost),
                 background: Container(color: context.bg),
               ),
             ),
+
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   // Author row
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: AppColors.teal.withValues(alpha: 0.15),
-                        child: Text('AK', style: AppTypography.labelSm.copyWith(color: AppColors.teal, fontWeight: FontWeight.w700)),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Arjun Kumar', style: AppTypography.bodyMd.copyWith(color: context.primaryText, fontWeight: FontWeight.w600)),
-                          Text('Posting to Community', style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
-                        ],
-                      ),
-                    ],
-                  ),
+                  Builder(builder: (context) {
+                    final user = ref.read(authProvider).user;
+                    final name = user?.name ?? '';
+                    return Row(
+                      children: [
+                        AppAvatar(name: name, size: AppAvatarSize.sm),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppText.bodyMd(name, fontWeight: FontWeight.w600),
+                            AppText.bodyXs('Posting to Community', color: context.secondaryText),
+                          ],
+                        ),
+                      ],
+                    );
+                  }),
                   const SizedBox(height: 20),
-                  // Content input
-                  Container(
-                    constraints: const BoxConstraints(minHeight: 180),
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: AppBorderRadius.lgAll,
-                      border: Border.all(color: context.borderCol),
-                    ),
-                    child: TextField(
-                      controller: _contentCtrl,
-                      maxLines: null,
-                      autofocus: true,
-                      style: AppTypography.bodyMd.copyWith(color: context.primaryText, height: 1.6),
-                      decoration: InputDecoration(
-                        hintText: AppStrings.whatsOnYourMind,
-                        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        filled: true,
-                        fillColor: Colors.transparent,
-                        contentPadding: const EdgeInsets.all(14),
-                      ),
-                    ),
+
+                  AppTextField(
+                    controller: _contentCtrl,
+                    hint: AppStrings.whatsOnYourMind,
+                    autofocus: true,
+                    maxLines: 20,
+                    minLines: 8,
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'CATEGORY',
-                    style: AppTypography.labelXs.copyWith(color: AppColors.textHint, letterSpacing: 1),
-                  ),
+
+                  AppText.labelXs('CATEGORY', color: AppColors.textHint, fontWeight: FontWeight.w600),
                   const SizedBox(height: 10),
+
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -163,26 +148,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               color: sel ? AppColors.teal.withValues(alpha: 0.4) : context.borderCol,
                             ),
                           ),
-                          child: Text(
+                          child: AppText.labelSm(
                             c,
-                            style: AppTypography.labelSm.copyWith(
-                              color: sel ? AppColors.teal : AppColors.textSecondary,
-                              fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                            ),
+                            color: sel ? AppColors.teal : context.secondaryText,
+                            fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 24),
-                  // Guidelines
-                  Container(
+
+                  // Community guidelines
+                  AppContainer.tinted(
+                    color: AppColors.blue,
+                    borderRadius: AppBorderRadius.lgAll,
                     padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.blue.withValues(alpha: 0.06),
-                      borderRadius: AppBorderRadius.lgAll,
-                      border: Border.all(color: AppColors.blue.withValues(alpha: 0.18)),
-                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -190,16 +171,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           children: [
                             const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.blue),
                             const SizedBox(width: 6),
-                            Text('Community Guidelines',
-                                style: AppTypography.labelSm.copyWith(color: AppColors.blue, fontWeight: FontWeight.w700)),
+                            AppText.labelSm('Community Guidelines',
+                                color: AppColors.blue, fontWeight: FontWeight.w700),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
+                        AppText.bodyXs(
                           '• Be respectful and supportive of others\n'
                           '• This is not a replacement for professional medical advice\n'
                           '• Do not share personal medical information of others',
-                          style: AppTypography.bodyXs.copyWith(color: AppColors.blue, height: 1.7),
+                          color: AppColors.blue,
                         ),
                       ],
                     ),

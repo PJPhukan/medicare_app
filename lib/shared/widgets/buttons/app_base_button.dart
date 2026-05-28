@@ -3,6 +3,7 @@ import '../../../core/theme/app_animations.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/extensions/context_extensions.dart';
 
 // ─── Size preset ──────────────────────────────────────────────────────────────
 
@@ -227,7 +228,7 @@ class _AppBaseButtonState extends State<AppBaseButton>
     final bg = isDisabled
         ? (widget.disabledBackgroundColor ??
             widget.backgroundColor?.withValues(alpha: 0.35) ??
-            AppColors.dark700)
+            context.inputBg)
         : (widget.backgroundColor ?? AppColors.teal);
 
     final labelStyle =

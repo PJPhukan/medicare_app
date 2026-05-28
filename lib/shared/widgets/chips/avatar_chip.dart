@@ -89,16 +89,15 @@ class _AppAvatarChipState extends State<AppAvatarChip>
 
   @override
   Widget build(BuildContext context) {
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
     final accent  = widget.color ?? AppColors.teal;
     final sel     = widget.selected;
 
     final bg = sel
         ? accent.withValues(alpha: 0.12)
-        : (isDark ? AppColors.dark700 : AppColors.light200);
+        : context.inputBg;
     final bc = sel
         ? accent.withValues(alpha: 0.4)
-        : (isDark ? AppColors.dark600 : AppColors.light300);
+        : context.borderCol;
 
     final (hzPad, vyPad, labelStyle) = switch (widget.size) {
       AppAvatarChipSize.sm => (8.0, 4.0, AppTypography.labelXs),

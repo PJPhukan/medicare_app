@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../../shared/widgets/skeleton/skeleton_base.dart';
+import '../providers/pro_profile_provider.dart';
 import 'become_professional_screen.dart';
+import '../../../../core/network/connectivity_monitor.dart';
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 
@@ -17,9 +21,6 @@ class _ProProfile {
   final String? license;
   final String? clinic;
   final int? experience;
-  final int? activeClients;
-  final double? rating;
-  final String? availability;
   final String? fee;
 
   const _ProProfile({
@@ -28,38 +29,43 @@ class _ProProfile {
     this.license,
     this.clinic,
     this.experience,
-    this.activeClients,
-    this.rating,
-    this.availability,
     this.fee,
   });
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ProHubScreen extends StatefulWidget {
+class ProHubScreen extends ConsumerWidget {
   const ProHubScreen({super.key});
 
   @override
-  State<ProHubScreen> createState() => _ProHubScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(isOnlineProvider)) {
+      return const OfflinePage(featureName: 'Professional Hub');
+    }
+    final state = ref.watch(proProfileProvider);
 
-class _ProHubScreenState extends State<ProHubScreen> {
-  // Mock: verified professional
-  _ProProfile _profile = _ProProfile(
-    status: _ProStatus.verified,
-    specialty: 'Cardiologist',
-    license: 'MCI-2019-KA-04821',
-    clinic: 'Apollo Hospitals, Bengaluru',
-    experience: 7,
-    activeClients: 24,
-    rating: 4.8,
-    availability: 'Mon–Fri, 10 AM – 4 PM',
-    fee: '₹500 / consultation',
-  );
+    _ProProfile profile;
+    if (state.isLoading && state.profile == null) {
+      profile = const _ProProfile(status: _ProStatus.pending);
+    } else if (state.notFound) {
+      profile = const _ProProfile(status: _ProStatus.notApplied);
+    } else if (state.profile != null) {
+      final e = state.profile!;
+      final currency = e.currency ?? '₹';
+      final fee = e.basePrice != null ? '$currency${e.basePrice!.toStringAsFixed(0)} / consultation' : null;
+      profile = _ProProfile(
+        status: e.isVerified ? _ProStatus.verified : _ProStatus.pending,
+        specialty: e.categoryLabel,
+        license: e.certifications.isNotEmpty ? e.certifications.first : null,
+        clinic: e.address,
+        experience: e.experienceYrs,
+        fee: fee,
+      );
+    } else {
+      profile = const _ProProfile(status: _ProStatus.notApplied);
+    }
 
-  @override
-  Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -73,50 +79,69 @@ class _ProHubScreenState extends State<ProHubScreen> {
               expandedHeight: 100,
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 20, bottom: 14),
-                title: Text(AppStrings.proHubTitle, style: AppTypography.h2.copyWith(fontSize: 20)),
+                title: const Text(AppStrings.proHubTitle, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                 background: Container(color: context.bg),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  if (_profile.status == _ProStatus.notApplied)
-                    _NotAppliedView(onApply: _openApply)
-                  else ...[
-                    _StatusBanner(status: _profile.status),
-                    const SizedBox(height: 16),
-                    if (_profile.status == _ProStatus.verified) ...[
-                      _StatsRow(profile: _profile),
+            if (state.isLoading && state.profile == null)
+              const SliverFillRemaining(child: _LoadingSkeleton())
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    if (profile.status == _ProStatus.notApplied)
+                      _NotAppliedView(onApply: () => _openApply(context))
+                    else ...[
+                      _StatusBanner(status: profile.status),
                       const SizedBox(height: 16),
+                      _ProfileCard(profile: profile, onEdit: () => _openEdit(context)),
                     ],
-                    _ProfileCard(
-                      profile: _profile,
-                      onEdit: _openEdit,
-                    ),
-                  ],
-                ]),
+                  ]),
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  void _openApply() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
-    );
-  }
+  void _openApply(BuildContext context) => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
+      );
 
-  void _openEdit() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const BecomeProfessionalScreen(isEditing: true),
-      ),
-    );
-  }
+  void _openEdit(BuildContext context) => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen(isEditing: true)),
+      );
+}
+
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+
+class _LoadingSkeleton extends StatelessWidget {
+  const _LoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) => AppSkeleton(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBox(width: double.infinity, height: 64, borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(child: SkeletonBox(height: 80, borderRadius: BorderRadius.circular(12))),
+                const SizedBox(width: 10),
+                Expanded(child: SkeletonBox(height: 80, borderRadius: BorderRadius.circular(12))),
+                const SizedBox(width: 10),
+                Expanded(child: SkeletonBox(height: 80, borderRadius: BorderRadius.circular(12))),
+              ]),
+              const SizedBox(height: 16),
+              SkeletonBox(width: double.infinity, height: 240, borderRadius: BorderRadius.circular(12)),
+            ],
+          ),
+        ),
+      );
 }
 
 // ─── Not applied view ─────────────────────────────────────────────────────────
@@ -140,13 +165,13 @@ class _NotAppliedView extends StatelessWidget {
               child: const Icon(Icons.badge_rounded, color: AppColors.purple, size: 40),
             ),
             const SizedBox(height: 24),
-            Text(AppStrings.becomePro, style: AppTypography.h2.copyWith(fontSize: 22)),
+            AppText.h2(AppStrings.becomePro),
             const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
+              child: AppText.bodySm(
                 AppStrings.proApplyDesc,
-                style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
+                color: AppColors.textSecondary,
                 textAlign: TextAlign.center,
               ),
             ),
@@ -162,7 +187,7 @@ class _NotAppliedView extends StatelessWidget {
                     children: [
                       Icon(item.$1, color: item.$3, size: 18),
                       const SizedBox(width: 10),
-                      Text(item.$2, style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary)),
+                      AppText.bodySm(item.$2, color: AppColors.textSecondary),
                     ],
                   ),
                 )),
@@ -176,7 +201,7 @@ class _NotAppliedView extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
               ),
               icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-              label: Text(AppStrings.proApplyNow, style: AppTypography.buttonMd),
+              label: const Text(AppStrings.proApplyNow, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
             ),
           ],
         ),
@@ -210,10 +235,12 @@ class _StatusBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: AppTypography.bodyMd.copyWith(color: color, fontWeight: FontWeight.w700)),
-                Text(
-                  isPending ? 'Your application is under review. We\'ll notify you within 48 hours.' : 'Your profile is live and visible to patients.',
-                  style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary),
+                AppText.bodyMd(label, color: color, fontWeight: FontWeight.w700),
+                AppText.bodyXs(
+                  isPending
+                      ? 'Your application is under review. We\'ll notify you within 48 hours.'
+                      : 'Your profile is live and visible to patients.',
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
@@ -224,68 +251,17 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-// ─── Stats row ────────────────────────────────────────────────────────────────
-
-class _StatsRow extends StatelessWidget {
-  final _ProProfile profile;
-  const _StatsRow({required this.profile});
-
-  @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          _StatCard(label: AppStrings.proClients, value: '${profile.activeClients}', color: AppColors.teal, icon: Icons.people_rounded),
-          const SizedBox(width: 10),
-          _StatCard(label: AppStrings.proRating, value: '${profile.rating}★', color: AppColors.amber, icon: Icons.star_rounded),
-          const SizedBox(width: 10),
-          _StatCard(label: AppStrings.proExperience, value: '${profile.experience}y', color: AppColors.blue, icon: Icons.work_rounded),
-        ],
-      );
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  _StatCard({required this.label, required this.value, required this.color, required this.icon});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: AppBorderRadius.lgAll,
-            border: Border.all(color: context.borderCol),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(height: 6),
-              Text(value, style: AppTypography.h3.copyWith(color: context.primaryText, fontSize: 18)),
-              Text(label, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint, fontSize: 10)),
-            ],
-          ),
-        ),
-      );
-}
-
 // ─── Profile card ─────────────────────────────────────────────────────────────
 
 class _ProfileCard extends StatelessWidget {
   final _ProProfile profile;
   final VoidCallback onEdit;
 
-  _ProfileCard({required this.profile, required this.onEdit});
+  const _ProfileCard({required this.profile, required this.onEdit});
 
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
+  Widget build(BuildContext context) => AppCard(
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -294,22 +270,19 @@ class _ProfileCard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(AppStrings.professionalProfile, style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w700)),
+                  AppText.bodyMd(AppStrings.professionalProfile, fontWeight: FontWeight.w700),
                   GestureDetector(
                     onTap: onEdit,
-                    child: Container(
+                    child: AppContainer.tinted(
+                      color: AppColors.teal,
+                      borderRadius: AppBorderRadius.pill,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.teal.withValues(alpha: 0.1),
-                        borderRadius: AppBorderRadius.pill,
-                        border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
-                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.edit_rounded, color: AppColors.teal, size: 12),
                           const SizedBox(width: 4),
-                          Text(AppStrings.edit, style: AppTypography.labelSm.copyWith(color: AppColors.teal, fontSize: 11)),
+                          const Text(AppStrings.edit, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.teal)),
                         ],
                       ),
                     ),
@@ -322,7 +295,7 @@ class _ProfileCard extends StatelessWidget {
               (AppStrings.proSpecialty, profile.specialty, Icons.local_hospital_rounded, AppColors.teal),
               (AppStrings.proLicense, profile.license, Icons.badge_rounded, AppColors.blue),
               (AppStrings.proClinic, profile.clinic, Icons.business_rounded, AppColors.purple),
-              (AppStrings.proAvailability, profile.availability, Icons.schedule_rounded, AppColors.green),
+              (AppStrings.proExperience, profile.experience != null ? '${profile.experience} yrs' : null, Icons.work_rounded, AppColors.green),
               (AppStrings.proConsultationFee, profile.fee, Icons.payments_rounded, AppColors.amber),
             ].map((row) => _DetailRow(label: row.$1, value: row.$2 ?? '—', icon: row.$3, color: row.$4)),
           ],
@@ -344,16 +317,15 @@ class _DetailRow extends StatelessWidget {
         child: Row(
           children: [
             Icon(icon, color: color, size: 16),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
-                Text(value, style: AppTypography.bodySm.copyWith(color: context.primaryText, fontWeight: FontWeight.w600)),
+                AppText.bodyXs(label, color: AppColors.textHint),
+                AppText.bodySm(value, color: context.primaryText, fontWeight: FontWeight.w600),
               ],
             ),
           ],
         ),
       );
 }
-

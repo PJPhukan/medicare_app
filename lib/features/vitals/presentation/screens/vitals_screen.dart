@@ -2,13 +2,17 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../../shared/widgets/skeleton/skeleton.dart';
+import '../../presentation/providers/vitals_provider.dart';
+import '../../data/models/vital_config_model.dart' as vm;
+import '../../data/models/vital_reading_model.dart' as vrm;
 
 // ─── Data models ──────────────────────────────────────────────────────────────
 
@@ -69,100 +73,50 @@ class _VitalReading {
   });
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Adapters ─────────────────────────────────────────────────────────────────
 
-final _configs = <_VitalConfig>[
-  _VitalConfig(
-    id: 'bp',
-    name: 'Blood Pressure',
-    graphType: _GraphType.line,
-    sortOrder: 0,
-    icon: Icons.favorite_rounded,
-    inputs: const [
-      _VitalInput(id: 'sys', label: 'Systolic', unit: 'mmHg', color: AppColors.teal,
-          normalMin: 90, normalMax: 120, warningMin: 80, warningMax: 140),
-      _VitalInput(id: 'dia', label: 'Diastolic', unit: 'mmHg', color: AppColors.blue,
-          normalMin: 60, normalMax: 80, warningMin: 50, warningMax: 90),
-    ],
-  ),
-  _VitalConfig(
-    id: 'hr',
-    name: 'Heart Rate',
-    graphType: _GraphType.line,
-    sortOrder: 1,
-    icon: Icons.monitor_heart_rounded,
-    inputs: const [
-      _VitalInput(id: 'bpm', label: 'BPM', unit: 'bpm', color: AppColors.red,
-          normalMin: 60, normalMax: 100, warningMin: 50, warningMax: 120),
-    ],
-  ),
-  _VitalConfig(
-    id: 'bg',
-    name: 'Blood Sugar',
-    graphType: _GraphType.bar,
-    sortOrder: 2,
-    icon: Icons.water_drop_rounded,
-    inputs: const [
-      _VitalInput(id: 'glucose', label: 'Glucose', unit: 'mg/dL', color: AppColors.amber,
-          normalMin: 70, normalMax: 140, warningMin: 54, warningMax: 180),
-    ],
-  ),
-  _VitalConfig(
-    id: 'wt',
-    name: 'Weight',
-    graphType: _GraphType.bar,
-    sortOrder: 3,
-    icon: Icons.scale_rounded,
-    inputs: const [
-      _VitalInput(id: 'kg', label: 'Weight', unit: 'kg', color: AppColors.purple,
-          normalMin: 50, normalMax: 90, warningMin: 40, warningMax: 110),
-    ],
-  ),
-  _VitalConfig(
-    id: 'spo2',
-    name: 'SpO₂',
-    graphType: _GraphType.line,
-    sortOrder: 4,
-    icon: Icons.air_rounded,
-    inputs: const [
-      _VitalInput(id: 'pct', label: 'Oxygen', unit: '%', color: AppColors.blue,
-          normalMin: 95, normalMax: 100, warningMin: 90, warningMax: 100),
-    ],
-  ),
-];
-
-List<_VitalReading> _generateReadings(String configId, List<_VitalInput> inputs, int days) {
-  final rng = math.Random(configId.hashCode);
-  final now = DateTime.now();
-  final readings = <_VitalReading>[];
-
-  final baseValues = <String, double>{
-    'sys': 118, 'dia': 76, 'bpm': 72, 'glucose': 105,
-    'kg': 72.4, 'pct': 97.5,
-  };
-
-  for (int i = days; i >= 0; i--) {
-    if (rng.nextDouble() < 0.25) continue; // skip some days
-    final date = now.subtract(Duration(days: i, hours: rng.nextInt(12)));
-    final values = inputs.map((inp) {
-      final base = baseValues[inp.id] ?? ((inp.normalMin + inp.normalMax) / 2);
-      final jitter = (rng.nextDouble() - 0.5) * (inp.normalMax - inp.normalMin) * 0.3;
-      return _ReadingValue(inp.id, (base + jitter).clamp(inp.warningMin, inp.warningMax));
-    }).toList();
-    readings.add(_VitalReading(
-      id: '$configId-$i',
-      vitalConfigId: configId,
-      measuredAt: date,
-      notes: rng.nextDouble() < 0.15 ? 'After morning exercise' : null,
-      values: values,
-    ));
-  }
-  return readings..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+Color _hexColor(String hex) {
+  final h = hex.replaceFirst('#', '');
+  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
 }
 
-final _allReadings = {
-  for (final c in _configs) c.id: _generateReadings(c.id, c.inputs, 30),
-};
+IconData _iconForVital(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('blood pressure') || n.contains(' bp')) return Icons.favorite_rounded;
+  if (n.contains('heart')) return Icons.monitor_heart_rounded;
+  if (n.contains('sugar') || n.contains('glucose')) return Icons.water_drop_rounded;
+  if (n.contains('weight')) return Icons.scale_rounded;
+  if (n.contains('spo2') || n.contains('oxygen') || n.contains('saturation')) return Icons.air_rounded;
+  return Icons.monitor_heart_outlined;
+}
+
+_VitalInput _toVitalInput(vm.VitalInput i) => _VitalInput(
+      id: i.id,
+      label: i.label,
+      unit: i.unit,
+      color: _hexColor(i.color),
+      normalMin: i.normalMin,
+      normalMax: i.normalMax,
+      warningMin: i.warningMin,
+      warningMax: i.warningMax,
+    );
+
+_VitalConfig _toVitalConfig(vm.VitalConfig c) => _VitalConfig(
+      id: c.id,
+      name: c.name,
+      graphType: c.graphType.toUpperCase() == 'BAR' ? _GraphType.bar : _GraphType.line,
+      sortOrder: c.sortOrder,
+      inputs: c.inputs.map(_toVitalInput).toList(),
+      icon: _iconForVital(c.name),
+    );
+
+_VitalReading _toVitalReading(vrm.VitalReading r) => _VitalReading(
+      id: r.id,
+      vitalConfigId: r.vitalConfigId,
+      measuredAt: r.measuredAtDate,
+      notes: r.notes,
+      values: r.values.map((v) => _ReadingValue(v.inputId, v.value)).toList(),
+    );
 
 // ─── Status helper ────────────────────────────────────────────────────────────
 
@@ -178,22 +132,53 @@ final _allReadings = {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class VitalsScreen extends StatefulWidget {
+class VitalsScreen extends ConsumerStatefulWidget {
   const VitalsScreen({super.key});
 
   @override
-  State<VitalsScreen> createState() => _VitalsScreenState();
+  ConsumerState<VitalsScreen> createState() => _VitalsScreenState();
 }
 
-class _VitalsScreenState extends State<VitalsScreen> {
-  String _activeConfigId = _configs.first.id;
+class _VitalsScreenState extends ConsumerState<VitalsScreen> {
+  String _activeConfigId = '';
   bool _is7d = true;
 
-  _VitalConfig get _activeConfig =>
-      _configs.firstWhere((c) => c.id == _activeConfigId);
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(vitalsProvider, (_, state) {
+      if (!state.isLoading && state.configs.isNotEmpty && _activeConfigId.isEmpty && mounted) {
+        setState(() => _activeConfigId = state.configs.first.id);
+      }
+    });
+  }
+
+  List<_VitalConfig> get _configs =>
+      ref.watch(vitalsProvider).configs.map(_toVitalConfig).toList();
+
+  Map<String, List<_VitalReading>> get _readingsByConfig {
+    final map = <String, List<_VitalReading>>{};
+    for (final r in ref.watch(vitalsProvider).readings) {
+      (map[r.vitalConfigId] ??= []).add(_toVitalReading(r));
+    }
+    for (final v in map.values) {
+      v.sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
+    }
+    return map;
+  }
+
+  _VitalConfig get _activeConfig {
+    final configs = _configs;
+    if (configs.isEmpty) {
+      return _VitalConfig(id: '', name: '', graphType: _GraphType.line,
+          sortOrder: 0, inputs: const [], icon: Icons.monitor_heart_outlined);
+    }
+    return configs.firstWhere((c) => c.id == _activeConfigId,
+        orElse: () => configs.first);
+  }
 
   List<_VitalReading> get _activeReadings {
-    final all = _allReadings[_activeConfigId] ?? [];
+    final all = _readingsByConfig[_activeConfigId] ?? [];
     final cutoff = DateTime.now().subtract(Duration(days: _is7d ? 7 : 30));
     return all.where((r) => r.measuredAt.isAfter(cutoff)).toList()
       ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
@@ -206,11 +191,13 @@ class _VitalsScreenState extends State<VitalsScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _LogReadingSheet(
         config: _activeConfig,
-        onSaved: (reading) {
-          setState(() {
-            _allReadings[_activeConfigId]!.insert(0, reading);
-          });
-        },
+        onSaved: (reading) => ref.read(vitalsProvider.notifier).addReading(
+          vitalConfigId: _activeConfigId,
+          values: reading.values
+              .map((v) => <String, dynamic>{'inputId': v.inputId, 'value': v.value})
+              .toList(),
+          notes: reading.notes,
+        ),
       ),
     );
   }
@@ -219,10 +206,13 @@ class _VitalsScreenState extends State<VitalsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? context.bg : AppColors.light100;
+    final isLoading = ref.watch(vitalsProvider).isLoading;
 
     return Scaffold(
       backgroundColor: bg,
-      body: CustomScrollView(
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(vitalsProvider.notifier).load(),
+        child: CustomScrollView(
         slivers: [
           // ── App bar ──────────────────────────────────────────────────────
           SliverAppBar(
@@ -235,8 +225,8 @@ class _VitalsScreenState extends State<VitalsScreen> {
               onPressed: openAppSidebar,
               tooltip: 'Menu',
             ),
-            title: Text(AppStrings.myVitals,
-                style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700, fontSize: 20)),
+            title: const Text(AppStrings.myVitals,
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
             actions: [
               IconButton(
                 icon: const Icon(Icons.add_rounded),
@@ -247,18 +237,42 @@ class _VitalsScreenState extends State<VitalsScreen> {
             ],
           ),
 
+          // ── Loading skeleton ──────────────────────────────────────────────
+          if (isLoading)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, __) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: AppSkeleton(
+                      child: Container(
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: isDark ? context.cardBg : Colors.white,
+                          borderRadius: AppBorderRadius.lgAll,
+                        ),
+                      ),
+                    ),
+                  ),
+                  childCount: 3,
+                ),
+              ),
+            ),
+
           // ── Vital type tabs ───────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 48,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _configs.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final cfg = _configs[i];
-                  final active = cfg.id == _activeConfigId;
+          if (!isLoading)
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _configs.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final cfg = _configs[i];
+                    final active = cfg.id == _activeConfigId;
                   return GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
@@ -281,9 +295,9 @@ class _VitalsScreenState extends State<VitalsScreen> {
                             color: active ? AppColors.textInverse : AppColors.textSecondary),
                         const SizedBox(width: 6),
                         Text(cfg.name,
-                            style: AppTypography.labelSm.copyWith(
+                            style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0,
                               color: active ? AppColors.textInverse : AppColors.textSecondary,
-                              letterSpacing: 0,
                             )),
                       ]),
                     ),
@@ -293,64 +307,67 @@ class _VitalsScreenState extends State<VitalsScreen> {
             ),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          if (!isLoading) ...[
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-          // ── Range toggle ──────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _RangeToggle(is7d: _is7d, onChanged: (v) => setState(() => _is7d = v)),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-          // ── Latest reading summary ─────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: _activeReadings.isEmpty
-                ? const SizedBox.shrink()
-                : _LatestReadingRow(
-                    reading: _activeReadings.first,
-                    config: _activeConfig,
-                  ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-          // ── Graph card ────────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _GraphCard(
-                config: _activeConfig,
-                readings: _activeReadings,
+            // ── Range toggle ──────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _RangeToggle(is7d: _is7d, onChanged: (v) => setState(() => _is7d = v)),
               ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-          // ── Recent readings ────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _RecentReadingsCard(
-                config: _activeConfig,
-                readings: _activeReadings,
+            // ── Latest reading summary ─────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: _activeReadings.isEmpty
+                  ? const SizedBox.shrink()
+                  : _LatestReadingRow(
+                      reading: _activeReadings.first,
+                      config: _activeConfig,
+                    ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // ── Graph card ────────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _GraphCard(
+                  config: _activeConfig,
+                  readings: _activeReadings,
+                ),
               ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // ── Recent readings ────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _RecentReadingsCard(
+                  config: _activeConfig,
+                  readings: _activeReadings,
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
         ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openLog,
         backgroundColor: AppColors.teal,
         foregroundColor: AppColors.textInverse,
         icon: const Icon(Icons.add_rounded),
-        label: Text(AppStrings.logReading,
-            style: AppTypography.buttonMd.copyWith(color: AppColors.textInverse)),
+        label: const Text(AppStrings.logReading,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
       ),
     );
   }
@@ -402,10 +419,9 @@ class _RangeBtn extends StatelessWidget {
           ),
           child: Center(
             child: Text(label,
-                style: AppTypography.labelSm.copyWith(
+                style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0,
                   color: active ? AppColors.textInverse : AppColors.textSecondary,
-                  letterSpacing: 0,
-                  fontSize: 12,
                 )),
           ),
         ),
@@ -441,20 +457,19 @@ class _LatestReadingRow extends StatelessWidget {
                   border: Border.all(color: status.color.withValues(alpha: 0.25)),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(input.label, style: AppTypography.bodyXs.copyWith(color: status.color)),
+                  AppText.bodyXs(input.label, color: status.color),
                   const SizedBox(height: 2),
                   Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
                     Text(
                       rv.value.toStringAsFixed(input.unit == '%' || input.unit == 'bpm' ? 0 : 1),
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 28, fontWeight: FontWeight.w800, color: status.color, height: 1),
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: status.color, height: 1),
                     ),
                     const SizedBox(width: 4),
-                    Text(input.unit, style: AppTypography.bodySm.copyWith(color: status.color.withValues(alpha: 0.7))),
+                    AppText.bodySm(input.unit, color: status.color.withValues(alpha: 0.7)),
                   ]),
                   const SizedBox(height: 2),
                   Text(status.label,
-                      style: AppTypography.labelXs.copyWith(color: status.color, letterSpacing: 0.3)),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: status.color, letterSpacing: 0.3)),
                 ]),
               ),
             );
@@ -494,12 +509,9 @@ class _GraphCard extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${config.name} ${AppStrings.trends}',
-                  style: AppTypography.h3.copyWith(fontSize: 15)),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               if (latest != null)
-                Text(
-                  'Last: ${_fmtDateTime(latest.measuredAt)}',
-                  style: AppTypography.bodySm,
-                ),
+                AppText.bodySm('Last: ${_fmtDateTime(latest.measuredAt)}'),
             ]),
           ),
         ]),
@@ -518,7 +530,7 @@ class _GraphCard extends StatelessWidget {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.show_chart_rounded, size: 28, color: AppColors.textHint),
                 const SizedBox(height: 8),
-                Text(AppStrings.noReadingsInRange, style: AppTypography.bodySm),
+                AppText.bodySm(AppStrings.noReadingsInRange),
               ]),
             ),
           )
@@ -535,7 +547,7 @@ class _GraphCard extends StatelessWidget {
             children: config.inputs.map((inp) => Row(mainAxisSize: MainAxisSize.min, children: [
               Container(width: 20, height: 2, color: inp.color),
               const SizedBox(width: 6),
-              Text('${inp.label} (${inp.unit})', style: AppTypography.bodyXs),
+              AppText.bodyXs('${inp.label} (${inp.unit})'),
             ])).toList(),
           ),
         ],
@@ -635,7 +647,7 @@ class _LineGraph extends StatelessWidget {
                 reservedSize: 36,
                 getTitlesWidget: (val, _) => Text(
                   val.toInt().toString(),
-                  style: AppTypography.bodyXs.copyWith(color: labelColor, fontSize: 9),
+                  style: TextStyle(fontSize: 9, color: labelColor),
                 ),
               ),
             ),
@@ -652,7 +664,7 @@ class _LineGraph extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(label,
-                        style: AppTypography.bodyXs.copyWith(color: labelColor, fontSize: 9)),
+                        style: TextStyle(fontSize: 9, color: labelColor)),
                   );
                 },
               ),
@@ -666,7 +678,7 @@ class _LineGraph extends StatelessWidget {
                 final inp = config.inputs[spot.barIndex];
                 return LineTooltipItem(
                   '${spot.y.toStringAsFixed(1)} ${inp.unit}',
-                  AppTypography.labelSm.copyWith(color: inp.color, letterSpacing: 0),
+                  TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: inp.color, letterSpacing: 0),
                 );
               }).toList(),
             ),
@@ -744,7 +756,7 @@ class _BarGraph extends StatelessWidget {
                 reservedSize: 36,
                 getTitlesWidget: (val, _) => Text(
                   val.toInt().toString(),
-                  style: AppTypography.bodyXs.copyWith(color: labelColor, fontSize: 9),
+                  style: TextStyle(fontSize: 9, color: labelColor),
                 ),
               ),
             ),
@@ -761,7 +773,7 @@ class _BarGraph extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(label,
-                        style: AppTypography.bodyXs.copyWith(color: labelColor, fontSize: 9)),
+                        style: TextStyle(fontSize: 9, color: labelColor)),
                   );
                 },
               ),
@@ -772,7 +784,7 @@ class _BarGraph extends StatelessWidget {
               getTooltipColor: (_) => isDark ? context.inputBg : AppColors.light200,
               getTooltipItem: (group, _, rod, __) => BarTooltipItem(
                 '${rod.toY.toStringAsFixed(1)} ${inp.unit}',
-                AppTypography.labelSm.copyWith(color: inp.color, letterSpacing: 0),
+                TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: inp.color, letterSpacing: 0),
               ),
             ),
           ),
@@ -804,7 +816,7 @@ class _RecentReadingsCard extends StatelessWidget {
         border: Border.all(color: border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(AppStrings.recentReadings, style: AppTypography.h3.copyWith(fontSize: 15)),
+        Text(AppStrings.recentReadings, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
 
         if (readings.isEmpty)
@@ -814,7 +826,7 @@ class _RecentReadingsCard extends StatelessWidget {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.timeline_rounded, size: 28, color: AppColors.textHint),
                 const SizedBox(height: 8),
-                Text(AppStrings.noReadingsYet, style: AppTypography.bodySm),
+                AppText.bodySm(AppStrings.noReadingsYet),
               ]),
             ),
           )
@@ -849,21 +861,19 @@ class _RecentReadingsCard extends StatelessWidget {
                       spacing: 10,
                       children: reading.values.map((rv) {
                         final inp = config.inputs.firstWhere((i) => i.id == rv.inputId);
-                        return Text(
+                        return AppText.labelMd(
                           '${rv.value.toStringAsFixed(inp.unit == '%' || inp.unit == 'bpm' ? 0 : 1)} ${inp.unit}',
-                          style: AppTypography.labelMd,
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 2),
-                    Text(_fmtDateTime(reading.measuredAt), style: AppTypography.bodyXs),
+                    AppText.bodyXs(_fmtDateTime(reading.measuredAt)),
                     if (reading.notes != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(reading.notes!,
-                            style: AppTypography.bodyXs.copyWith(
-                              fontStyle: FontStyle.italic,
-                              color: AppColors.textHint,
+                            style: const TextStyle(
+                              fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.textHint,
                             )),
                       ),
                   ]),
@@ -875,7 +885,7 @@ class _RecentReadingsCard extends StatelessWidget {
                     borderRadius: AppBorderRadius.pill,
                   ),
                   child: Text(worstLabel,
-                      style: AppTypography.labelXs.copyWith(color: worstColor, letterSpacing: 0.3)),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: worstColor, letterSpacing: 0.3)),
                 ),
               ]),
             );
@@ -889,7 +899,7 @@ class _RecentReadingsCard extends StatelessWidget {
 
 class _LogReadingSheet extends StatefulWidget {
   final _VitalConfig config;
-  final ValueChanged<_VitalReading> onSaved;
+  final Future<void> Function(_VitalReading) onSaved;
   const _LogReadingSheet({required this.config, required this.onSaved});
 
   @override
@@ -921,31 +931,32 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
     return v.isNotEmpty && double.tryParse(v) != null;
   });
 
-  void _save() {
-    if (!_canSave) return;
+  Future<void> _save() async {
+    if (!_canSave || _saving) return;
     setState(() => _saving = true);
 
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
-      final values = widget.config.inputs.map((inp) {
-        return _ReadingValue(inp.id, double.parse(_ctrls[inp.id]!.text));
-      }).toList();
+    final values = widget.config.inputs.map((inp) {
+      return _ReadingValue(inp.id, double.parse(_ctrls[inp.id]!.text));
+    }).toList();
 
-      final reading = _VitalReading(
-        id: 'new-${DateTime.now().millisecondsSinceEpoch}',
-        vitalConfigId: widget.config.id,
-        measuredAt: DateTime.now(),
-        notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-        values: values,
-      );
-      widget.onSaved(reading);
+    final reading = _VitalReading(
+      id: 'new-${DateTime.now().millisecondsSinceEpoch}',
+      vitalConfigId: widget.config.id,
+      measuredAt: DateTime.now(),
+      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      values: values,
+    );
+
+    try {
+      await widget.onSaved(reading);
+      if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Reading logged'),
-        backgroundColor: context.inputBg,
-        behavior: SnackBarBehavior.floating,
-      ));
-    });
+      AppSnackbar.success(context, 'Reading logged');
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppSnackbar.error(context, e.toString());
+    }
   }
 
   @override
@@ -966,7 +977,7 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
           ),
           const SizedBox(height: 20),
 
-          Text('Log ${widget.config.name}', style: AppTypography.h2.copyWith(fontSize: 20)),
+          Text('Log ${widget.config.name}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: 20),
 
           // Input fields
@@ -979,8 +990,8 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
               child: StatefulBuilder(
                 builder: (_, setLocal) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Text('${inp.label} ', style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
-                    Text('(${inp.unit})', style: AppTypography.bodySm),
+                    Text('${inp.label} ', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
+                    AppText.bodySm('(${inp.unit})'),
                     const Spacer(),
                     if (status != null)
                       Container(
@@ -990,7 +1001,7 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
                           borderRadius: AppBorderRadius.pill,
                         ),
                         child: Text(status.label,
-                            style: AppTypography.labelXs.copyWith(color: status.color, letterSpacing: 0.3)),
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: status.color, letterSpacing: 0.3)),
                       ),
                   ]),
                   const SizedBox(height: 6),
@@ -1007,10 +1018,10 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
                     child: TextField(
                       controller: _ctrls[inp.id],
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: AppTypography.bodyMd,
+                      style: TextStyle(fontSize: 14, color: context.primaryText),
                       decoration: InputDecoration(
                         hintText: '${inp.normalMin}–${inp.normalMax}',
-                        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary),
+                        hintStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
@@ -1018,8 +1029,7 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Text('${AppStrings.normalRange}: ${inp.normalMin}–${inp.normalMax} ${inp.unit}',
-                      style: AppTypography.bodyXs),
+                  AppText.bodyXs('${AppStrings.normalRange}: ${inp.normalMin}–${inp.normalMax} ${inp.unit}'),
                 ]),
               ),
             );
@@ -1027,7 +1037,7 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
 
           // Notes
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppStrings.notes, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+            Text(AppStrings.notes, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
             const SizedBox(height: 6),
             Container(
               decoration: BoxDecoration(
@@ -1038,10 +1048,10 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
               child: TextField(
                 controller: _notesCtrl,
                 maxLines: 2,
-                style: AppTypography.bodyMd,
+                style: TextStyle(fontSize: 14, color: context.primaryText),
                 decoration: InputDecoration(
                   hintText: '${AppStrings.optional}…',
-                  hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary),
+                  hintStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
@@ -1060,8 +1070,8 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   side: BorderSide(color: border),
                 ),
-                child: Text(AppStrings.cancel,
-                    style: AppTypography.buttonMd.copyWith(color: AppColors.textSecondary)),
+                child: const Text(AppStrings.cancel,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
               ),
             ),
             const SizedBox(width: 12),
@@ -1076,7 +1086,7 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: Text(_saving ? AppStrings.saving : AppStrings.save,
-                      style: AppTypography.buttonLg.copyWith(color: AppColors.textInverse)),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
                 ),
               ),
             ),

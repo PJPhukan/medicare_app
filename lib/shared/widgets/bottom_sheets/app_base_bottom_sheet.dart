@@ -108,9 +108,8 @@ class AppBaseBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark     = Theme.of(context).brightness == Brightness.dark;
-    final bg         = backgroundColor ?? (isDark ? context.cardBg : Colors.white);
-    final borderCol  = isDark ? context.borderCol : const Color(0xFFE2E8F0);
+    final bg         = backgroundColor ?? context.cardBg;
+    final borderCol  = context.borderCol;
     final bottomPad  = MediaQuery.paddingOf(context).bottom;
     final hasHeader  = title != null || showClose;
 
