@@ -91,7 +91,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   textAlign: TextAlign.center,
                   maxLength: 3,
                   onChanged: (_) => setState(() => _ageError = null),
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.teal),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
                   decoration: InputDecoration(
                     hintText: AppStrings.ageHint,
                     hintStyle: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.borderCol),

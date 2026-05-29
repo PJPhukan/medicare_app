@@ -198,22 +198,54 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
       value: context.overlayStyle,
       child: Scaffold(
         backgroundColor: context.bg,
-        body: CustomScrollView(
+        body: RefreshIndicator(
+          onRefresh: () => ref.read(professionalsProvider.notifier).load(),
+          child: CustomScrollView(
           slivers: [
             SliverAppBar(
               pinned: true,
+              floating: false,
               backgroundColor: context.bg,
               surfaceTintColor: Colors.transparent,
-              expandedHeight: 96,
+              toolbarHeight: 68,
+              automaticallyImplyLeading: false,
               leading: AppIconButton(
-                icon: const Icon(Icons.menu_rounded, size: 22),
+                icon: Icon(Icons.menu_rounded, size: 22, color: context.primaryText),
                 tooltip: 'Menu',
                 onPressed: openAppSidebar,
+                backgroundColor: Colors.transparent,
               ),
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-                title: AppText.h3(AppStrings.browseProfessionals),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText.h3(AppStrings.browseProfessionals, color: context.primaryText),
+                  AppText.bodySm('Find and connect with professionals', color: context.secondaryText),
+                ],
               ),
+              actions: [
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
+                  ),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppColors.teal.withValues(alpha: 0.12),
+                      borderRadius: AppBorderRadius.pill,
+                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.workspace_premium_rounded, size: 14, color: AppColors.teal),
+                        const SizedBox(width: 5),
+                        AppText.labelSm('Become Pro', color: AppColors.teal, fontWeight: FontWeight.w700),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             // Search + filter button
@@ -298,62 +330,6 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
               ),
             ),
 
-            // Become a professional banner
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.teal.withValues(alpha: 0.18),
-                          AppColors.blue.withValues(alpha: 0.12),
-                        ],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: AppBorderRadius.lgAll,
-                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.35)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: AppColors.teal.withValues(alpha: 0.20),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.workspace_premium_rounded, color: AppColors.teal, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              AppText.labelMd(AppStrings.becomeProfessional,
-                                  color: AppColors.teal, fontWeight: FontWeight.w700),
-                              const SizedBox(height: 2),
-                              AppText.bodyXs(AppStrings.earnMoney,
-                                  color: AppColors.teal.withValues(alpha: 0.75)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(Icons.arrow_forward_ios_rounded,
-                            size: 14, color: AppColors.teal.withValues(alpha: 0.7)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
             // Results or empty
@@ -411,6 +387,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
                 ),
               ),
           ],
+        ),
         ),
       ),
     );

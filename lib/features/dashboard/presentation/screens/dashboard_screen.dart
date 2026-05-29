@@ -14,6 +14,7 @@ import '../../../../shared/widgets/graphs/charts.dart';
 import '../../../../shared/widgets/skeleton/skeleton.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../providers/dashboard_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../schedule/data/models/appointment_model.dart' as dash_model;
 import '../../../vitals/data/models/vital_reading_model.dart' as vrm;
 
@@ -112,9 +113,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    BannerConfig.fetch().then((c) {
-      if (mounted) setState(() => _bannerConfig = c);
-    });
+    _loadBanners();
+  }
+
+  Future<void> _loadBanners() async {
+    final c = await BannerConfig.fetch();
+    if (mounted) setState(() => _bannerConfig = c);
   }
 
   String get _greeting {
@@ -139,6 +143,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final state      = ref.watch(dashboardProvider);
     final isLoading  = state.isLoading;
     final stats      = state.stats;
+    final user       = ref.watch(authProvider.select((s) => s.user));
     final doses      = state.doses.map(_toLocalDose).toList();
     final takenCount = doses.where((d) => d.status == _DoseStatus.taken).length;
     final adherence  = stats != null
@@ -150,7 +155,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       backgroundColor: context.bg,
       body: RefreshIndicator(
-        onRefresh: () => ref.read(dashboardProvider.notifier).load(),
+        onRefresh: () => Future.wait([
+          ref.read(dashboardProvider.notifier).load(),
+          _loadBanners(),
+        ]),
         child: CustomScrollView(
           slivers: [
 
@@ -162,14 +170,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               toolbarHeight: 70,
               automaticallyImplyLeading: false,
               leading: AppIconButton(
-                icon: const Icon(Icons.menu_rounded, size: 22),
+                icon: const Icon(Icons.menu_rounded, size: 28),
                 onPressed: openAppSidebar,
                 tooltip: 'Menu',
+                backgroundColor: Colors.transparent,
               ),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppText.h3('$_greeting, Arjun 👋'),
+                  AppText.h3('$_greeting, ${user?.displayName ?? 'there'} 👋'),
                   AppText.bodySm(AppStrings.todayOverview, color: context.secondaryText),
                 ],
               ),
@@ -183,80 +192,75 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: AppAvatar(name: 'Arjun Kumar', size: AppAvatarSize.xs),
+                    child: AppAvatar(
+                      name: user?.displayName ?? '',
+                      imageUrl: user?.avatarUrl,
+                      size: AppAvatarSize.sm,
+                    ),
                   ),
                 ),
               ],
             ),
 
             // ── Promo banners ────────────────────────────────────────────────
-            if (_bannerConfig != null && _bannerConfig!.shouldShow)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 18),
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: FractionallySizedBox(
-                      widthFactor: 0.98,
-                      child: _BannerCarousel(banners: _bannerConfig!.banners),
-                    ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 18),
+                child: Align(
+                  alignment: Alignment.center,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.98,
+                    child: _bannerConfig == null
+                        ? const BannerCarouselSkeleton()
+                        : _bannerConfig!.shouldShow
+                            ? _BannerCarousel(banners: _bannerConfig!.banners)
+                            : const SizedBox.shrink(),
                   ),
                 ),
               ),
+            ),
 
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 68 + 16),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
 
                   // ── Stat cards ───────────────────────────────────────────
-                  if (isLoading)
-                    AppSkeleton(
-                      child: Row(children: [
-                        Expanded(child: SkeletonBox(height: 130, borderRadius: BorderRadius.circular(12))),
-                        const SizedBox(width: 10),
-                        Expanded(child: SkeletonBox(height: 130, borderRadius: BorderRadius.circular(12))),
-                        const SizedBox(width: 10),
-                        Expanded(child: SkeletonBox(height: 130, borderRadius: BorderRadius.circular(12))),
-                      ]),
-                    )
-                  else
-                    Row(children: [
-                      Expanded(child: _StatCard(
-                        icon: Icons.trending_up_rounded,
-                        value: '$adherence%',
-                        label: AppStrings.adherenceRate,
-                        color: AppColors.teal,
-                        badge: _StatBadge(
-                          icon: Icons.arrow_upward_rounded,
-                          label: '12% vs last week',
-                          color: AppColors.green,
-                        ),
-                      )),
-                      const SizedBox(width: 10),
-                      Expanded(child: _StatCard(
-                        icon: Icons.calendar_month_rounded,
-                        value: '${stats?.pendingCount ?? 0}',
-                        label: AppStrings.upcoming,
-                        color: AppColors.purple,
-                        badge: _StatBadge(label: 'Appointments', color: AppColors.purple),
-                      )),
-                      const SizedBox(width: 10),
-                      Expanded(child: _StatCard(
-                        icon: Icons.inventory_2_outlined,
-                        value: '${stats?.lowStockCount ?? 0}',
-                        label: 'Low stock',
-                        color: AppColors.amber,
-                        badge: _StatBadge(label: 'View details', color: AppColors.amber),
-                      )),
-                    ]),
+                  Row(children: [
+                    Expanded(child: _StatCard(
+                      icon: Icons.trending_up_rounded,
+                      value: '$adherence%',
+                      label: AppStrings.adherenceRate,
+                      color: AppColors.teal,
+                      subLabel: 'This week',
+                      isLoading: isLoading,
+                    )),
+                    const SizedBox(width: 10),
+                    Expanded(child: _StatCard(
+                      icon: Icons.medication_rounded,
+                      value: '${doses.length}',
+                      label: 'Doses',
+                      color: AppColors.blue,
+                      subLabel: '$takenCount taken',
+                      isLoading: isLoading,
+                    )),
+                    const SizedBox(width: 10),
+                    Expanded(child: _StatCard(
+                      icon: Icons.inventory_2_outlined,
+                      value: '${stats?.lowStockCount ?? 0}',
+                      label: 'Low stock',
+                      color: AppColors.amber,
+                      subLabel: 'Medicines',
+                      isLoading: isLoading,
+                    )),
+                  ]),
                   const SizedBox(height: 24),
 
                   // ── Today's medicines ────────────────────────────────────
                   _SectionHeader(
                     title: AppStrings.todayMedicines,
                     subtitle: '$takenCount/${doses.length} ${AppStrings.taken}',
-                    onViewAll: () {},
+                    onViewAll: () => switchToTab('medicines'),
                   ),
                   const SizedBox(height: 10),
                   if (isLoading)
@@ -311,7 +315,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const SizedBox(height: 24),
 
                   // ── Recent vitals ────────────────────────────────────────
-                  _SectionHeader(title: AppStrings.recentVitals, onViewAll: () {}),
+                  _SectionHeader(title: AppStrings.recentVitals, onViewAll: () => switchToTab('vitals')),
                   const SizedBox(height: 10),
                   if (isLoading)
                     AppCard(
@@ -396,30 +400,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       _QuickAction(
                         icon: Icons.medication_outlined,
                         label: AppStrings.addMedicine,
-                        subtitle: 'Set medicine reminder',
+                        subtitle: 'Add to your medicine list',
                         color: AppColors.teal,
-                        onTap: () {},
+                        onTap: () => switchToTab('medicines'),
                       ),
                       _QuickAction(
                         icon: Icons.monitor_heart_outlined,
                         label: AppStrings.addVital,
                         subtitle: 'Record your health',
                         color: AppColors.blue,
-                        onTap: () {},
+                        onTap: () => switchToTab('vitals'),
                       ),
                       _QuickAction(
-                        icon: Icons.calendar_today_outlined,
-                        label: AppStrings.addAppointment,
-                        subtitle: 'Schedule a visit',
-                        color: AppColors.purple,
-                        onTap: () {},
+                        icon: Icons.alarm_add_rounded,
+                        label: AppStrings.addDose,
+                        subtitle: 'Manage dose schedule',
+                        color: AppColors.amber,
+                        onTap: () => switchToTab('schedule'),
                       ),
                       _QuickAction(
                         icon: Icons.emergency_outlined,
                         label: AppStrings.sos,
                         subtitle: 'Emergency assistance',
                         color: AppColors.error,
-                        onTap: () {},
+                        onTap: () => switchToTab('emergency'),
                       ),
                     ],
                   ),
@@ -446,8 +450,9 @@ class _NotifBell extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         AppIconButton(
-          icon: const Icon(Icons.notifications_outlined, size: 24),
+          icon: const Icon(Icons.notifications_outlined, size: 28),
           color: context.secondaryText,
+          backgroundColor: Colors.transparent,
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
@@ -482,84 +487,85 @@ class _StatCard extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
-    required this.badge,
+    this.subLabel,
+    this.isLoading = false,
   });
 
   final IconData icon;
-  final String  value;
-  final String  label;
-  final Color   color;
-  final Widget  badge;
+  final String   value;
+  final String   label;
+  final Color    color;
+  final String?  subLabel;
+  final bool     isLoading;
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
       padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppContainer.tinted(
-                color: color,
-                borderRadius: AppBorderRadius.smAll,
-                padding: const EdgeInsets.all(7),
-                child: Icon(icon, size: 17, color: color),
+      child: isLoading
+          ? AppSkeleton(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      SkeletonBox(width: 34, height: 34, borderRadius: AppBorderRadius.smAll),
+                      const Spacer(),
+                      SkeletonBox(width: 44, height: 22, borderRadius: BorderRadius.circular(6)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SkeletonBox(width: 68, height: 10, borderRadius: BorderRadius.circular(5)),
+                  const SizedBox(height: 4),
+                  SkeletonBox(width: 48, height: 9, borderRadius: BorderRadius.circular(5)),
+                ],
               ),
-              const Spacer(),
-              const Icon(Icons.more_horiz_rounded, size: 16, color: AppColors.textHint),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: color,
-              height: 1,
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    AppContainer.tinted(
+                      color: color,
+                      borderRadius: AppBorderRadius.smAll,
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(icon, size: 17, color: color),
+                    ),
+                    const Spacer(),
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                AppText.bodyXs(
+                  label,
+                  color: context.primaryText,
+                  fontWeight: FontWeight.w600,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subLabel != null) ...[
+                  const SizedBox(height: 1),
+                  AppText.bodyXs(
+                    subLabel!,
+                    color: AppColors.textHint,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
             ),
-          ),
-          const SizedBox(height: 2),
-          AppText.bodyXs(label, color: AppColors.textHint, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 10),
-          badge,
-        ],
-      ),
     );
   }
 }
 
-// ─── Stat badge ───────────────────────────────────────────────────────────────
-
-class _StatBadge extends StatelessWidget {
-  const _StatBadge({required this.label, required this.color, this.icon});
-  final String    label;
-  final Color     color;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppContainer.tinted(
-      color: color,
-      borderRadius: AppBorderRadius.pill,
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 10, color: color),
-            const SizedBox(width: 3),
-          ],
-          Flexible(
-            child: AppText.labelXs(label, color: color, overflow: TextOverflow.ellipsis),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Section header ───────────────────────────────────────────────────────────
 

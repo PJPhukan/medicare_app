@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
@@ -174,7 +175,15 @@ class _SplashScreenState extends State<SplashScreen>
     // Light mode needs a stronger glow so it's visible on white
     final glowAlpha = isDark ? 0.08 : 0.18;
 
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: bg,
+        systemNavigationBarDividerColor: isDark ? const Color(0xFF1F2D3F) : const Color(0xFFE2E8F0),
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      ),
+      child: Scaffold(
       backgroundColor: bg,
       body: Stack(
         children: [
@@ -329,6 +338,7 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         ],
       ),
+    ),
     );
   }
 }

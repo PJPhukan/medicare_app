@@ -356,6 +356,7 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                   color: context.primaryText),
               onPressed: openAppSidebar,
               tooltip: 'Menu',
+              backgroundColor: Colors.transparent,
             ),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

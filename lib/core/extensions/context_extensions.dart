@@ -18,6 +18,19 @@ extension ThemeX on BuildContext {
   Color get hintText      => isDark ? AppColors.textHint           : AppColors.textHintLight;
 
   // ── System UI ───────────────────────────────────────────────────────────────
-  SystemUiOverlayStyle get overlayStyle =>
-      isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark;
+  SystemUiOverlayStyle get overlayStyle => isDark
+      ? SystemUiOverlayStyle(
+          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: const Color(0xFF131920),
+          systemNavigationBarDividerColor: const Color(0xFF1F2D3F),
+          systemNavigationBarIconBrightness: Brightness.light,
+        )
+      : SystemUiOverlayStyle(
+          statusBarBrightness: Brightness.light,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.white,
+          systemNavigationBarDividerColor: const Color(0xFFE2E8F0),
+          systemNavigationBarIconBrightness: Brightness.dark,
+        );
 }

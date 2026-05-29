@@ -53,6 +53,7 @@ class _SlugMeta {
 
 const _slugMeta = <String, _SlugMeta>{
   'home':          _SlugMeta(outlineIcon: Icons.home_outlined, filledIcon: Icons.home_rounded, color: AppColors.teal, section: 'Overview'),
+  'dashboard':     _SlugMeta(outlineIcon: Icons.home_outlined, filledIcon: Icons.home_rounded, color: AppColors.teal, section: 'Overview'),
   'medicines':     _SlugMeta(outlineIcon: Icons.medication_outlined, filledIcon: Icons.medication_rounded, color: AppColors.green, section: 'Overview'),
   'vitals':        _SlugMeta(outlineIcon: Icons.monitor_heart_outlined, filledIcon: Icons.monitor_heart_rounded, color: AppColors.red, section: 'Health'),
   'professionals': _SlugMeta(outlineIcon: Icons.people_outline_rounded, filledIcon: Icons.people_rounded, color: AppColors.teal, section: 'Health'),
@@ -79,6 +80,7 @@ const _slugMeta = <String, _SlugMeta>{
 // Push screens by slug — null means tab-switch only or special action
 Widget? _pushScreenForSlug(String slug) => switch (slug) {
   'home'          => const DashboardScreen(),
+  'dashboard'     => const DashboardScreen(),
   'medicines'     => const MedicinesScreen(),
   'vitals'        => const VitalsScreen(),
   'professionals' => const ProfessionalsScreen(),
@@ -147,6 +149,32 @@ class _AppShellState extends ConsumerState<AppShell> {
   bool _navVisible = true;
   // Cache screen instances so they survive tab list rebuilds
   final _screenCache = <String, Widget>{};
+  List<_CoreTab> _coreTabs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    registerTabSwitcher(_switchBySlug);
+  }
+
+  @override
+  void dispose() {
+    unregisterTabSwitcher();
+    super.dispose();
+  }
+
+  void _switchBySlug(String slug) {
+    final i = _coreTabs.indexWhere((t) => t.slug == slug);
+    if (i >= 0) {
+      _switchTab(i);
+    } else {
+      final ctx = appShellKey.currentContext;
+      if (ctx == null) return;
+      Navigator.of(ctx).push(
+        MaterialPageRoute(builder: (_) => const _ComingSoonScreen()),
+      );
+    }
+  }
 
   void _switchTab(int index) {
     appShellKey.currentState?.closeDrawer();
@@ -172,16 +200,20 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Widget _screenFor(String slug) {
-    return _screenCache.putIfAbsent(slug, () => _pushScreenForSlug(slug) ?? const SizedBox.shrink());
+    return _screenCache.putIfAbsent(slug, () => _pushScreenForSlug(slug) ?? const _ComingSoonScreen());
   }
 
   List<_CoreTab> _buildCoreTabs(List<TabConfigModel> tabs) {
-    final core = tabs
-        .where((t) => t.isActive && t.tabType == 'CORE' && _slugMeta.containsKey(t.slug))
+    final navTabs = tabs
+        .where((t) => t.isActive && t.allowView && t.showInBottomNav && _slugMeta.containsKey(t.slug))
         .toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    if (core.isEmpty) return _fallbackCoreTabs();
-    return core.map((t) => _CoreTab(
+      ..sort((a, b) {
+        final n = a.navOrder.compareTo(b.navOrder);
+        return n != 0 ? n : a.sortOrder.compareTo(b.sortOrder);
+      });
+    final capped = navTabs.take(7).toList();
+    if (capped.isEmpty) return _fallbackCoreTabs();
+    return capped.map((t) => _CoreTab(
       slug: t.slug,
       label: t.label,
       meta: _slugMeta[t.slug]!,
@@ -207,15 +239,21 @@ class _AppShellState extends ConsumerState<AppShell> {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final tabsAsync = ref.watch(tabsProvider);
 
-    final coreTabs = tabsAsync.when(
+    _coreTabs = tabsAsync.when(
       data: _buildCoreTabs,
       loading: _fallbackCoreTabs,
       error: (_, __) => _fallbackCoreTabs(),
     );
 
+    final coreTabs = _coreTabs;
     final safeIndex = _index.clamp(0, coreTabs.length - 1);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() { _index = 0; _navVisible = true; });
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
         key: appShellKey,
@@ -224,17 +262,26 @@ class _AppShellState extends ConsumerState<AppShell> {
           onSwitchTab: _switchTab,
           coreSlugs: coreTabs.map((t) => t.slug).toList(),
           allTabs: tabsAsync.valueOrNull ?? [],
+          activeSlug: coreTabs.isNotEmpty ? coreTabs[safeIndex].slug : null,
         ),
-        body: Column(
+        body: SafeArea(
+          bottom: false,
+          child: Column(
           children: [
             const OfflineBanner(),
             Expanded(child: Stack(
               children: [
-                NotificationListener<ScrollNotification>(
-                  onNotification: _onScrollNotification,
-                  child: IndexedStack(
-                    index: safeIndex,
-                    children: coreTabs.map((t) => t.screen).toList(),
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () { if (!_navVisible) setState(() => _navVisible = true); },
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _onScrollNotification,
+                      child: IndexedStack(
+                        index: safeIndex,
+                        children: coreTabs.map((t) => t.screen).toList(),
+                      ),
+                    ),
                   ),
                 ),
                 Positioned(
@@ -261,7 +308,9 @@ class _AppShellState extends ConsumerState<AppShell> {
               ],
             )),
           ],
+          ),
         ),
+      ),
       ),
     );
   }
@@ -284,6 +333,16 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navBg = isDark
+        ? const Color(0xFF131920).withValues(alpha: 0.88)
+        : Colors.white.withValues(alpha: 0.94);
+    final navBorderColor = isDark ? const Color(0xFF1F2D3F) : const Color(0xFFE2E8F0);
+    final inactiveColor = isDark ? AppColors.textHint : const Color(0xFF94A3B8);
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.45)
+        : Colors.black.withValues(alpha: 0.08);
+
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: BackdropFilter(
@@ -292,11 +351,11 @@ class _BottomNav extends StatelessWidget {
           height: 68 + bottomPadding,
           padding: EdgeInsets.only(bottom: bottomPadding),
           decoration: BoxDecoration(
-            color: const Color(0xFF131920).withValues(alpha: 0.88),
+            color: navBg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: const Border(top: BorderSide(color: Color(0xFF1F2D3F), width: 0.5)),
+            border: Border(top: BorderSide(color: navBorderColor, width: 0.5)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 24, offset: const Offset(0, -4)),
+              BoxShadow(color: shadowColor, blurRadius: 24, offset: const Offset(0, -4)),
               BoxShadow(color: AppColors.teal.withValues(alpha: 0.04), blurRadius: 20, offset: const Offset(0, -2)),
             ],
           ),
@@ -367,14 +426,14 @@ class _BottomNav extends StatelessWidget {
                                           width: 22,
                                           height: 22,
                                           colorFilter: ColorFilter.mode(
-                                            active ? AppColors.teal : AppColors.textHint,
+                                            active ? AppColors.teal : inactiveColor,
                                             BlendMode.srcIn,
                                           ),
                                         )
                                       : Icon(
                                           active ? tab.meta.filledIcon : tab.meta.outlineIcon,
                                           size: 22,
-                                          color: active ? AppColors.teal : AppColors.textHint,
+                                          color: active ? AppColors.teal : inactiveColor,
                                         ),
                                 ),
                                 const SizedBox(height: 4),
@@ -384,7 +443,7 @@ class _BottomNav extends StatelessWidget {
                                     fontSize: 10,
                                     fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                                     letterSpacing: 0,
-                                    color: active ? AppColors.teal : AppColors.textHint,
+                                    color: active ? AppColors.teal : inactiveColor,
                                   ),
                                   child: Text(tab.label),
                                 ),
@@ -411,11 +470,13 @@ class _AppSidebar extends ConsumerWidget {
   final void Function(int) onSwitchTab;
   final List<String> coreSlugs;
   final List<TabConfigModel> allTabs;
+  final String? activeSlug;
 
   const _AppSidebar({
     required this.onSwitchTab,
     required this.coreSlugs,
     required this.allTabs,
+    this.activeSlug,
   });
 
   @override
@@ -440,45 +501,22 @@ class _AppSidebar extends ConsumerWidget {
     }
 
     return Drawer(
-      width: 280,
+      width: MediaQuery.of(context).size.width * 0.75,
       backgroundColor: bg,
       child: SafeArea(
         child: Column(
           children: [
             // ── Brand header ──────────────────────────────────────────────────
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               decoration: BoxDecoration(border: Border(bottom: BorderSide(color: border))),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.teal.withValues(alpha: 0.12),
-                      borderRadius: AppBorderRadius.mdAll,
-                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
-                    ),
-                    child: const Icon(Icons.favorite_rounded, size: 18, color: AppColors.teal),
-                  ),
-                  const SizedBox(width: 10),
-                  Text.rich(TextSpan(children: [
-                    TextSpan(
-                      text: 'Medi',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
-                          color: isDark ? context.primaryText : const Color(0xFF1A202C)),
-                    ),
-                    const TextSpan(
-                      text: 'Forze',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.teal),
-                    ),
-                  ])),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.close_rounded, size: 20,
-                        color: isDark ? AppColors.textSecondary : const Color(0xFF64748B)),
-                  ),
-                ],
+              child: Image.asset(
+                isDark
+                    ? 'assets/images/logo_text_dark.png'
+                    : 'assets/images/logo_text_light.png',
+                height: 32,
+                fit: BoxFit.contain,
+                alignment: Alignment.centerLeft,
               ),
             ),
 
@@ -502,6 +540,7 @@ class _AppSidebar extends ConsumerWidget {
                             svgIcon: tab.iconSvg,
                             label: tab.label,
                             color: meta.color,
+                            isActive: tab.slug == activeSlug,
                             onTap: () {
                               if (coreIdx >= 0) {
                                 onSwitchTab(coreIdx);
@@ -509,11 +548,13 @@ class _AppSidebar extends ConsumerWidget {
                                 Scaffold.of(context).closeDrawer();
                                 showFeedbackSheet(context);
                               } else {
-                                final screen = _pushScreenForSlug(tab.slug);
-                                if (screen != null) {
-                                  Navigator.pop(context);
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-                                }
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => _pushScreenForSlug(tab.slug) ?? const _ComingSoonScreen(),
+                                  ),
+                                );
                               }
                             },
                           );
@@ -544,6 +585,7 @@ class _AppSidebar extends ConsumerWidget {
                 ),
                 trailing: _ThemeToggle(
                   value: themeMode == ThemeMode.dark || (themeMode == ThemeMode.system && isDark),
+                  isDark: isDark,
                   onChanged: (on) {
                     ref.read(themeModeProvider.notifier).state =
                         on ? ThemeMode.dark : ThemeMode.light;
@@ -659,6 +701,7 @@ class _SidebarItem extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final String? svgIcon;
+  final bool isActive;
 
   const _SidebarItem({
     required this.icon,
@@ -666,28 +709,37 @@ class _SidebarItem extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.svgIcon,
+    this.isActive = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasSvg = svgIcon != null && svgIcon!.isNotEmpty;
+    final iconBg = isActive
+        ? color.withValues(alpha: 0.14)
+        : (isDark ? const Color(0xFF1E2A3A) : const Color(0xFFF1F5F9));
+    final iconColor = isActive
+        ? color
+        : (isDark ? AppColors.textHint : const Color(0xFF94A3B8));
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        margin: const EdgeInsets.only(bottom: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           borderRadius: AppBorderRadius.mdAll,
-          color: Colors.transparent,
+          color: isActive
+              ? color.withValues(alpha: 0.07)
+              : Colors.transparent,
         ),
         child: Row(
           children: [
             Container(
-              width: 32, height: 32,
+              width: 30, height: 30,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
+                color: iconBg,
                 borderRadius: AppBorderRadius.smAll,
               ),
               child: hasSvg
@@ -695,17 +747,23 @@ class _SidebarItem extends StatelessWidget {
                       padding: const EdgeInsets.all(7),
                       child: SvgPicture.string(
                         svgIcon!,
-                        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
                       ),
                     )
-                  : Icon(icon, size: 16, color: color),
+                  : Icon(icon, size: 15, color: iconColor),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0,
-                    color: isDark ? context.primaryText : const Color(0xFF1A202C)),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  letterSpacing: 0,
+                  color: isActive
+                      ? color
+                      : (isDark ? context.primaryText : const Color(0xFF1A202C)),
+                ),
               ),
             ),
           ],
@@ -718,8 +776,9 @@ class _SidebarItem extends StatelessWidget {
 // ─── Smooth animated theme toggle ────────────────────────────────────────────
 
 class _ThemeToggle extends StatefulWidget {
-  const _ThemeToggle({required this.value, required this.onChanged});
+  const _ThemeToggle({required this.value, required this.isDark, required this.onChanged});
   final bool value;
+  final bool isDark;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -730,30 +789,16 @@ class _ThemeToggleState extends State<_ThemeToggle>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _position;
-  late final Animation<Color?> _trackBg;
-  late final Animation<Color?> _trackBorder;
-  late final Animation<Color?> _thumb;
-
-  static const _offTrack  = Color(0xFF1A2332);
-  static const _onTrack   = Color(0x2E4D9EFF);
-  static const _offBorder = Color(0xFF1F2D3F);
-  static const _onBorder  = AppColors.blue;
-  static const _offThumb  = Color(0xFF2A3A4E);
-  static const _onThumb   = AppColors.blue;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: const Duration(milliseconds: 280),
       value: widget.value ? 1.0 : 0.0,
     );
-    final curved = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOutCubic);
-    _position    = curved;
-    _trackBg     = ColorTween(begin: _offTrack,  end: _onTrack).animate(curved);
-    _trackBorder = ColorTween(begin: _offBorder, end: _onBorder).animate(curved);
-    _thumb       = ColorTween(begin: _offThumb,  end: _onThumb).animate(curved);
+    _position = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOutCubic);
   }
 
   @override
@@ -773,41 +818,132 @@ class _ThemeToggleState extends State<_ThemeToggle>
   @override
   Widget build(BuildContext context) {
     const thumbTravel = 22.0;
+    final isDark = widget.isDark;
+
+    // Off/on colors per theme
+    final offTrack  = isDark ? const Color(0xFF1A2332) : const Color(0xFFF1F5F9);
+    final onTrack   = isDark ? const Color(0x2E4D9EFF) : const Color(0xFFDBEAFE);
+    final offBorder = isDark ? const Color(0xFF1F2D3F) : const Color(0xFFCBD5E1);
+    final onBorder  = AppColors.blue;
+    final offThumb  = isDark ? const Color(0xFF2A3A4E) : const Color(0xFF94A3B8);
+    const onThumb   = AppColors.blue;
+
     return GestureDetector(
       onTap: () => widget.onChanged(!widget.value),
       child: AnimatedBuilder(
         animation: _ctrl,
-        builder: (_, __) => Container(
-          width: 46, height: 26,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(13),
-            color: _trackBg.value,
-            border: Border.all(color: _trackBorder.value!, width: 1.5),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: _position.value * thumbTravel,
-                top: 0, bottom: 0,
-                child: Center(
-                  child: Container(
-                    width: 18, height: 18,
-                    decoration: BoxDecoration(color: _thumb.value, shape: BoxShape.circle),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
-                      child: Icon(
-                        widget.value ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                        key: ValueKey(widget.value),
-                        size: 10,
-                        color: Colors.white,
+        builder: (_, __) {
+          final t = _position.value;
+          return Container(
+            width: 46, height: 26,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(13),
+              color: Color.lerp(offTrack, onTrack, t),
+              border: Border.all(color: Color.lerp(offBorder, onBorder, t)!, width: 1.5),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  left: t * thumbTravel,
+                  top: 0, bottom: 0,
+                  child: Center(
+                    child: Container(
+                      width: 18, height: 18,
+                      decoration: BoxDecoration(
+                        color: Color.lerp(offThumb, onThumb, t),
+                        shape: BoxShape.circle,
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: Icon(
+                          widget.value ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                          key: ValueKey(widget.value),
+                          size: 10,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── Coming soon placeholder ──────────────────────────────────────────────────
+
+class _ComingSoonScreen extends StatelessWidget {
+  const _ComingSoonScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: context.bg,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.12),
+                    borderRadius: AppBorderRadius.lgAll,
+                  ),
+                  child: const Icon(
+                    Icons.rocket_launch_rounded,
+                    size: 34,
+                    color: AppColors.teal,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Coming Soon',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? AppColors.textPrimary : AppColors.textPrimaryLight,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This feature is on its way.\nCheck back soon!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    height: 1.5,
+                    color: isDark ? AppColors.textSecondary : AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                if (Navigator.canPop(context))
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.teal,
+                      side: const BorderSide(color: AppColors.teal, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.mdAll),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                    ),
+                    child: const Text(
+                      'Go Back',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

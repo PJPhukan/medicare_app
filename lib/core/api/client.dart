@@ -35,7 +35,7 @@ final dioProvider = Provider<Dio>((ref) {
     if (kDebugMode)
       PrettyDioLogger(
         requestHeader: true,
-        requestBody: true,
+        requestBody: false, // body logged (redacted) by SanitizeInterceptor
         responseBody: true,
         responseHeader: false,
         error: true,

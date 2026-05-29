@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/api/client.dart';
@@ -187,9 +188,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _msg(Exception e) {
-    final s = e.toString();
-    final match = RegExp(r'message: (.+)').firstMatch(s);
-    return match?.group(1) ?? s;
+    if (e is DioException) {
+      return e.message ?? 'An unexpected error occurred';
+    }
+    return e.toString();
   }
 }
 

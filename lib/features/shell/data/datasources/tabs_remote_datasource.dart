@@ -8,7 +8,10 @@ class TabsRemoteDataSource {
   final Dio _dio;
 
   Future<List<TabConfigModel>> getMyTabs() async {
-    final res = await _dio.get<Map<String, dynamic>>(ApiConstants.myTabs);
+    final res = await _dio.get<Map<String, dynamic>>(
+      ApiConstants.myTabs,
+      queryParameters: {'platform': 'APP'},
+    );
     final list = res.data!['data'] as List<dynamic>;
     return list
         .map((e) => TabConfigModel.fromJson(e as Map<String, dynamic>))

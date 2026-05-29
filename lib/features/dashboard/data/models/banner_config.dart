@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/api_constants.dart';
 
 class DashboardBanner {
@@ -66,7 +69,28 @@ class BannerConfig {
 
   bool get shouldShow => enabled && banners.isNotEmpty;
 
+  static const _cacheKey = 'banner_config_v1';
+
+  static BannerConfig? _fromPrefs(SharedPreferences prefs) {
+    final raw = prefs.getString(_cacheKey);
+    if (raw == null) return null;
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      final enabled = json['enabled'] as bool? ?? true;
+      final rawBanners = json['banners'] as List<dynamic>? ?? [];
+      final banners = rawBanners
+          .whereType<Map<String, dynamic>>()
+          .map(DashboardBanner.fromJson)
+          .toList();
+      if (banners.isEmpty) return null;
+      return BannerConfig(enabled: enabled, banners: banners);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<BannerConfig> fetch() async {
+    final prefs = await SharedPreferences.getInstance();
     try {
       final dio = Dio(BaseOptions(
         baseUrl: ApiConstants.baseUrl,
@@ -77,7 +101,9 @@ class BannerConfig {
       final response = await dio.get<Map<String, dynamic>>(ApiConstants.bannerConfig);
       final data = response.data?['data'] as Map<String, dynamic>?;
 
-      if (data == null) return const BannerConfig(enabled: true, banners: _kFallbackBanners);
+      if (data == null) {
+        return _fromPrefs(prefs) ?? const BannerConfig(enabled: true, banners: _kFallbackBanners);
+      }
 
       final enabled = data['enabled'] as bool? ?? false;
       final rawBanners = data['banners'] as List<dynamic>? ?? [];
@@ -86,9 +112,23 @@ class BannerConfig {
           .map(DashboardBanner.fromJson)
           .toList();
 
-      return BannerConfig(enabled: enabled, banners: banners);
+      final config = BannerConfig(enabled: enabled, banners: banners);
+
+      // Persist so offline loads still show last-known banners
+      if (banners.isNotEmpty) {
+        unawaited(prefs.setString(_cacheKey, jsonEncode({
+          'enabled': enabled,
+          'banners': banners.map((b) => {
+            'id': b.id,
+            'imageUrl': b.imageUrl,
+            'actionUrl': b.actionUrl,
+          }).toList(),
+        })));
+      }
+
+      return config;
     } catch (_) {
-      return const BannerConfig(enabled: true, banners: _kFallbackBanners);
+      return _fromPrefs(prefs) ?? const BannerConfig(enabled: true, banners: _kFallbackBanners);
     }
   }
 }

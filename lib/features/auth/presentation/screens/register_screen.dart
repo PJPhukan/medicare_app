@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/data/country_codes.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/widgets/inputs/phone_input.dart';
@@ -35,6 +36,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _passCtrl;
   final Map<String, String?> _errors = {};
+  CountryCode _phoneCountry = kDefaultCountry;
 
   @override
   void initState() {
@@ -69,11 +71,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return errs.values.every((e) => e == null);
   }
 
+  String get _e164Phone {
+    final raw = _phoneCtrl.text.trim();
+    if (raw.isEmpty || raw.startsWith('+')) return raw;
+    return '${_phoneCountry.code}$raw';
+  }
+
   Future<void> _continue() async {
     if (!_validate()) return;
     widget.draft.name     = _nameCtrl.text.trim();
     widget.draft.email    = _emailCtrl.text.trim();
-    widget.draft.phone    = _phoneCtrl.text.trim();
+    widget.draft.phone    = _e164Phone;
     widget.draft.password = _passCtrl.text;
     try {
       await ref.read(authProvider.notifier).register(
@@ -147,6 +155,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   enabled: !isLoading,
                   error: isLoading ? null : _errors['phone'],
                   onChanged: (_) => setState(() => _errors.remove('phone')),
+                  onCountryChanged: (region) {
+                    final country = kCountryCodes.firstWhere(
+                      (c) => c.region == region,
+                      orElse: () => kDefaultCountry,
+                    );
+                    setState(() => _phoneCountry = country);
+                  },
                 ),
                 const SizedBox(height: 14),
 

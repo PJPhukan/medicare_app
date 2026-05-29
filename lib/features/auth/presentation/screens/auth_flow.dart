@@ -94,7 +94,7 @@ class _AuthFlowState extends State<AuthFlow> {
       case _AuthStep.register:
         return RegisterScreen(
           draft: _draft,
-          onContinue: () => _go(_AuthStep.quiz),
+          onContinue: widget.onAuthenticated ?? () {},
           onLogin: () => _go(_AuthStep.login),
           onBack: _back,
         );

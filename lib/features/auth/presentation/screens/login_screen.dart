@@ -3,15 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/data/country_codes.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../../../shared/widgets/inputs/email_phone_input.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_shell.dart';
-import '../../../../shared/widgets/inputs/email_phone_input.dart';
 import 'auth_flow.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({
+  final AuthDraft draft;
+  final VoidCallback onSentOtp;
+  final VoidCallback onRegister;
+  final VoidCallback? onLoggedIn;
+  final VoidCallback? onForgotPassword;
+
+ const LoginScreen({
     super.key,
     required this.draft,
     required this.onSentOtp,
@@ -19,12 +26,6 @@ class LoginScreen extends ConsumerStatefulWidget {
     this.onLoggedIn,
     this.onForgotPassword,
   });
-
-  final AuthDraft draft;
-  final VoidCallback onSentOtp;
-  final VoidCallback onRegister;
-  final VoidCallback? onLoggedIn;
-  final VoidCallback? onForgotPassword;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -36,6 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _useOtp = false;
   String? _idError;
   String? _passError;
+  CountryCode _country = kDefaultCountry;
 
   @override
   void initState() {
@@ -55,6 +57,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool get _canSubmit => _idCtrl.text.trim().isNotEmpty &&
       (_useOtp || _passCtrl.text.isNotEmpty);
 
+  /// Returns the identifier with country code prepended for phone numbers.
+  String get _identifier {
+    final raw = _idCtrl.text.trim();
+    // If it has no '@' and no leading '+', it's a bare phone number — prepend country code.
+    if (!raw.contains('@') && !raw.startsWith('+')) return '${_country.code}$raw';
+    return raw;
+  }
+
   bool _validate() {
     final idErr   = Validators.emailOrPhone(_idCtrl.text);
     final passErr = _useOtp ? null : Validators.password(_passCtrl.text);
@@ -64,7 +74,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_validate()) return;
-    final id   = _idCtrl.text.trim();
+    final id   = _identifier;
     final pass = _passCtrl.text;
     widget.draft.identifier = id;
     widget.draft.password   = pass;
@@ -115,6 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             error: isLoading ? null : _idError,
             enabled: !isLoading,
             onChanged: (_) => setState(() => _idError = null),
+            onCountryChanged: (c) => setState(() => _country = c),
           ),
           const SizedBox(height: 14),
 

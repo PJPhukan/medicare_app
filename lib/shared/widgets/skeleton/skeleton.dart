@@ -1,5 +1,6 @@
 export 'skeleton_base.dart';
 export 'box_skeleton.dart';
+export 'banner_skeleton.dart';
 export 'text_skeleton.dart';
 export 'button_skeleton.dart';
 export 'avatar_skeleton.dart';

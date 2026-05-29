@@ -224,6 +224,7 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
               icon: const Icon(Icons.menu_rounded, size: 22),
               onPressed: openAppSidebar,
               tooltip: 'Menu',
+              style: IconButton.styleFrom(backgroundColor: Colors.transparent),
             ),
             title: const Text(AppStrings.myVitals,
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),

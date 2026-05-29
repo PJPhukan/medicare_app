@@ -54,6 +54,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                 icon: const Icon(Icons.menu_rounded, size: 22),
                 onPressed: openAppSidebar,
                 tooltip: 'Menu',
+                style: IconButton.styleFrom(backgroundColor: Colors.transparent),
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
