@@ -3,12 +3,12 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../voice_search/voice_search_modal.dart';
 
-/// Pill-shaped search input with both text entry and a voice/mic button.
-///
-/// Wire [onMicTap] to a speech-to-text package. While recording, pass
-/// [isRecording] = true and update [controller] text with the live
-/// transcription. The widget handles all visual state automatically.
+/// Pill-shaped search input with an integrated voice search modal.
+/// Tapping the mic automatically opens [VoiceSearchModal] — no external
+/// STT wiring needed. The modal result populates [controller] and calls
+/// [onChanged] automatically.
 class AppSearchTextVoiceInput extends StatefulWidget {
   const AppSearchTextVoiceInput({
     super.key,
@@ -18,8 +18,6 @@ class AppSearchTextVoiceInput extends StatefulWidget {
     this.onChanged,
     this.onSubmitted,
     this.onClear,
-    this.onMicTap,
-    this.isRecording = false,
     this.enabled = true,
     this.autofocus = false,
     this.backgroundColor,
@@ -36,15 +34,6 @@ class AppSearchTextVoiceInput extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final VoidCallback? onClear;
-
-  /// Called when the user taps the mic button.
-  /// Toggle your STT recording here and flip [isRecording] accordingly.
-  final VoidCallback? onMicTap;
-
-  /// Set to true while voice recording is active. The mic icon turns red
-  /// and a pulsing ring animates around it.
-  final bool isRecording;
-
   final bool enabled;
   final bool autofocus;
   final Color? backgroundColor;
@@ -59,10 +48,8 @@ class AppSearchTextVoiceInput extends StatefulWidget {
       _AppSearchTextVoiceInputState();
 }
 
-class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
-    with SingleTickerProviderStateMixin {
+class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput> {
   late final TextEditingController _ctrl;
-  late final AnimationController _pulse;
   bool _hasText = false;
 
   @override
@@ -70,11 +57,6 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
     super.initState();
     _ctrl = widget.controller ?? TextEditingController();
     _ctrl.addListener(_onTextChange);
-
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
   }
 
   void _onTextChange() {
@@ -83,21 +65,9 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
   }
 
   @override
-  void didUpdateWidget(AppSearchTextVoiceInput old) {
-    super.didUpdateWidget(old);
-    if (widget.isRecording && !old.isRecording) {
-      _pulse.repeat(reverse: true);
-    } else if (!widget.isRecording && old.isRecording) {
-      _pulse.stop();
-      _pulse.reset();
-    }
-  }
-
-  @override
   void dispose() {
     _ctrl.removeListener(_onTextChange);
     if (widget.controller == null) _ctrl.dispose();
-    _pulse.dispose();
     super.dispose();
   }
 
@@ -107,27 +77,34 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
     widget.onClear?.call();
   }
 
+  void _openVoiceModal() {
+    VoiceSearchModal.show(
+      context,
+      onSearch: (query) {
+        _ctrl.text = query;
+        _ctrl.selection = TextSelection.fromPosition(
+          TextPosition(offset: query.length),
+        );
+        widget.onChanged?.call(query);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final micColor  = widget.micColor ?? AppColors.teal;
-
+    final micColor = widget.micColor ?? AppColors.teal;
     final bg = widget.backgroundColor ?? context.inputBg;
-    final borderCol = widget.borderColor ??
-        (widget.isRecording ? AppColors.error : context.borderCol);
+    final borderCol = widget.borderColor ?? context.borderCol;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+    return Container(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: AppBorderRadius.pill,
-        border: Border.all(
-          color: borderCol,
-          width: widget.isRecording ? 1.5 : 1.0,
-        ),
+        border: Border.all(color: borderCol),
       ),
       child: Row(
         children: [
-          // ── Search icon ──────────────────────────────────────────────────
+          // ── Search icon ────────────────────────────────────────────────────
           const Padding(
             padding: EdgeInsets.only(left: 14),
             child: Icon(
@@ -137,7 +114,7 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
             ),
           ),
 
-          // ── Text field ───────────────────────────────────────────────────
+          // ── Text field ─────────────────────────────────────────────────────
           Expanded(
             child: TextField(
               controller: _ctrl,
@@ -149,22 +126,11 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
               onChanged: widget.onChanged,
               onSubmitted: widget.onSubmitted,
               style: widget.textStyle ??
-                  AppTypography.bodyMd.copyWith(
-                    color: context.primaryText,
-                    fontStyle: widget.isRecording
-                        ? FontStyle.italic
-                        : FontStyle.normal,
-                  ),
+                  AppTypography.bodyMd.copyWith(color: context.primaryText),
               decoration: InputDecoration(
-                hintText: widget.isRecording
-                    ? 'Listening…'
-                    : (widget.hint ?? 'Search…'),
+                hintText: widget.hint ?? 'Search…',
                 hintStyle: widget.hintStyle ??
-                    AppTypography.bodyMd.copyWith(
-                      color: widget.isRecording
-                          ? AppColors.error.withValues(alpha: 0.7)
-                          : AppColors.textHint,
-                    ),
+                    AppTypography.bodyMd.copyWith(color: AppColors.textHint),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -176,8 +142,8 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
             ),
           ),
 
-          // ── Clear button (shown when text exists and not recording) ───────
-          if (_hasText && !widget.isRecording)
+          // ── Clear button ───────────────────────────────────────────────────
+          if (_hasText)
             GestureDetector(
               onTap: _clear,
               child: const Padding(
@@ -190,83 +156,25 @@ class _AppSearchTextVoiceInputState extends State<AppSearchTextVoiceInput>
               ),
             ),
 
-          // ── Mic button ───────────────────────────────────────────────────
+          // ── Mic button ─────────────────────────────────────────────────────
           GestureDetector(
-            onTap: widget.enabled ? widget.onMicTap : null,
+            onTap: widget.enabled ? _openVoiceModal : null,
             child: Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: _MicButton(
-                isRecording: widget.isRecording,
-                pulseController: _pulse,
-                color: micColor,
-                enabled: widget.enabled,
+              child: Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: micColor.withValues(alpha: 0.12),
+                ),
+                child: Icon(Icons.mic_rounded, size: 18, color: micColor),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── Mic button with pulse ring ────────────────────────────────────────────────
-
-class _MicButton extends StatelessWidget {
-  const _MicButton({
-    required this.isRecording,
-    required this.pulseController,
-    required this.color,
-    required this.enabled,
-  });
-
-  final bool isRecording;
-  final AnimationController pulseController;
-  final Color color;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final iconColor = !enabled
-        ? AppColors.textHint
-        : isRecording
-            ? Colors.white
-            : color;
-
-    final bgColor = !enabled
-        ? AppColors.textHint.withValues(alpha: 0.1)
-        : isRecording
-            ? AppColors.error
-            : color.withValues(alpha: 0.12);
-
-    return AnimatedBuilder(
-      animation: pulseController,
-      builder: (_, child) {
-        final pulseRadius = isRecording ? (4.0 * pulseController.value) : 0.0;
-        return Container(
-          width: 36 + pulseRadius * 2,
-          height: 36 + pulseRadius * 2,
-          margin: EdgeInsets.all(4 - pulseRadius.clamp(0, 4)),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: bgColor,
-            boxShadow: isRecording
-                ? [
-                    BoxShadow(
-                      color: AppColors.error
-                          .withValues(alpha: 0.35 - pulseController.value * 0.25),
-                      blurRadius: 8 + pulseRadius * 3,
-                      spreadRadius: pulseRadius,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-            size: 18,
-            color: iconColor,
-          ),
-        );
-      },
     );
   }
 }

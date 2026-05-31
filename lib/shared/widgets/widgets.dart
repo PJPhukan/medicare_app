@@ -41,3 +41,4 @@ export 'feedback/sync_indicator.dart';
 export 'tables/app_table.dart';
 export 'search_inputs/search_text_input.dart';
 export 'search_inputs/search_text_voice_input.dart';
+export 'voice_search/voice_search_modal.dart';

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
@@ -96,8 +95,6 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
   int _statusFilter = 0; // 0=All, 1=Active, 2=LowStock, 3=PRN
   String _scopeFilter = 'all';
   String _search = '';
-  final _speech = SpeechToText();
-  bool _isListening = false;
 
   final _statusLabels = [
     AppStrings.filterAll,
@@ -138,35 +135,8 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
 
   @override
   void dispose() {
-    _speech.cancel();
     _searchCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _toggleListen() async {
-    if (_isListening) {
-      await _speech.stop();
-      setState(() => _isListening = false);
-      return;
-    }
-    final available = await _speech.initialize(
-      onError: (_) { if (mounted) setState(() => _isListening = false); },
-      onStatus: (status) {
-        if ((status == 'done' || status == 'notListening') && mounted) {
-          setState(() => _isListening = false);
-        }
-      },
-    );
-    if (!available || !mounted) return;
-    setState(() => _isListening = true);
-    _speech.listen(onResult: (result) {
-      if (!mounted) return;
-      _searchCtrl.text = result.recognizedWords;
-      _searchCtrl.selection = TextSelection.fromPosition(
-        TextPosition(offset: _searchCtrl.text.length),
-      );
-      setState(() => _search = result.recognizedWords);
-    });
   }
 
   // ─── Detail sheet ─────────────────────────────────────────────────────────
@@ -422,81 +392,13 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                   Row(
                     children: [
                       Expanded(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: BoxDecoration(
-                            color: isDark ? context.inputBg : Colors.white,
-                            borderRadius: AppBorderRadius.pill,
-                            border: Border.all(
-                              color: _isListening ? AppColors.teal : border,
-                              width: _isListening ? 1.5 : 1.0,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 14),
-                              Icon(Icons.search_rounded, size: 18,
-                                  color: _isListening ? AppColors.teal : AppColors.textSecondary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchCtrl,
-                                  style: const TextStyle(fontSize: 14),
-                                  decoration: InputDecoration(
-                                    hintText: _isListening
-                                        ? AppStrings.listeningHint
-                                        : AppStrings.searchMedicines,
-                                    hintStyle: TextStyle(
-                                      fontSize: 14,
-                                      color: _isListening
-                                          ? AppColors.teal.withValues(alpha: 0.8)
-                                          : AppColors.textSecondary,
-                                    ),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    filled: true,
-                                    fillColor: Colors.transparent,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 0, vertical: 13),
-                                  ),
-                                ),
-                              ),
-                              if (_search.isNotEmpty)
-                                GestureDetector(
-                                  onTap: () {
-                                    _searchCtrl.clear();
-                                    setState(() => _search = '');
-                                  },
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 6),
-                                    child: Icon(Icons.close_rounded, size: 16,
-                                        color: AppColors.textSecondary),
-                                  ),
-                                ),
-                              GestureDetector(
-                                onTap: _toggleListen,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 4, right: 12),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    width: 28, height: 28,
-                                    decoration: BoxDecoration(
-                                      color: _isListening
-                                          ? AppColors.teal.withValues(alpha: 0.15)
-                                          : Colors.transparent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      _isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
-                                      size: 16,
-                                      color: _isListening ? AppColors.teal : AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: AppSearchTextVoiceInput(
+                          controller: _searchCtrl,
+                          hint: AppStrings.searchMedicines,
+                          backgroundColor: isDark ? context.cardBg : Colors.white,
+                          borderColor: border,
+                          onChanged: (v) => setState(() => _search = v),
+                          onClear: () => setState(() => _search = ''),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -513,7 +415,7 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                               decoration: BoxDecoration(
                                 color: _activeFilterCount > 0
                                     ? AppColors.teal.withValues(alpha: 0.10)
-                                    : (isDark ? context.inputBg : Colors.white),
+                                    : (isDark ? context.cardBg : Colors.white),
                                 borderRadius: AppBorderRadius.pill,
                                 border: Border.all(
                                   color: _activeFilterCount > 0 ? AppColors.teal : border,
@@ -1612,9 +1514,6 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
   bool _catalogLoading = false;
   bool _showRequest = false;
   final _reqNameCtrl = TextEditingController();
-  final _speech = SpeechToText();
-  bool _isListening = false;
-
   // Step 1
   String _whoMode = 'self';
 
@@ -1693,39 +1592,12 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
 
   @override
   void dispose() {
-    _speech.cancel();
     _medSearchCtrl.dispose();
     _reqNameCtrl.dispose();
     _doseCtrl.dispose();
     _qtyCtrl.dispose();
     _expiryCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _toggleListen() async {
-    if (_isListening) {
-      await _speech.stop();
-      setState(() => _isListening = false);
-      return;
-    }
-    final available = await _speech.initialize(
-      onError: (_) { if (mounted) setState(() => _isListening = false); },
-      onStatus: (status) {
-        if ((status == 'done' || status == 'notListening') && mounted) {
-          setState(() => _isListening = false);
-        }
-      },
-    );
-    if (!available || !mounted) return;
-    setState(() => _isListening = true);
-    _speech.listen(onResult: (result) {
-      if (!mounted) return;
-      _medSearchCtrl.text = result.recognizedWords;
-      _medSearchCtrl.selection = TextSelection.fromPosition(
-        TextPosition(offset: _medSearchCtrl.text.length),
-      );
-      setState(() => _medSearch = result.recognizedWords);
-    });
   }
 
   @override
@@ -1871,83 +1743,18 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
     final cardBg = isDark ? context.inputBg : AppColors.light100;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // Voice search
-      AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: isDark ? context.inputBg : AppColors.light200,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(
-            color: _isListening ? AppColors.teal : border,
-            width: _isListening ? 1.5 : 1.0,
-          ),
-        ),
-        child: Row(children: [
-          const SizedBox(width: 12),
-          Icon(Icons.search_rounded, size: 18,
-              color: _isListening ? AppColors.teal : AppColors.textSecondary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: _medSearchCtrl,
-              style: const TextStyle(fontSize: 14),
-              decoration: InputDecoration(
-                hintText: _isListening
-                    ? AppStrings.listeningHint
-                    : AppStrings.searchMedicines,
-                hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: _isListening
-                      ? AppColors.teal.withValues(alpha: 0.8)
-                      : AppColors.textSecondary,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 0, vertical: 12),
-              ),
-              onChanged: (v) {
-                setState(() { _medSearch = v; _showRequest = false; });
-                _loadCatalog(v);
-              },
-            ),
-          ),
-          if (_medSearch.isNotEmpty)
-            GestureDetector(
-              onTap: () {
-                _medSearchCtrl.clear();
-                setState(() { _medSearch = ''; _showRequest = false; });
-              },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
-              ),
-            ),
-          GestureDetector(
-            onTap: _toggleListen,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 4, right: 10),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: _isListening
-                      ? AppColors.teal.withValues(alpha: 0.15)
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
-                  size: 16,
-                  color: _isListening ? AppColors.teal : AppColors.textSecondary,
-                ),
-              ),
-            ),
-          ),
-        ]),
+      AppSearchTextVoiceInput(
+        controller: _medSearchCtrl,
+        hint: AppStrings.searchMedicines,
+        backgroundColor: isDark ? context.cardBg : AppColors.light200,
+        borderColor: border,
+        onChanged: (v) {
+          setState(() { _medSearch = v; _showRequest = false; });
+          _loadCatalog(v);
+        },
+        onClear: () {
+          setState(() { _medSearch = ''; _showRequest = false; });
+        },
       ),
 
       const SizedBox(height: 16),
