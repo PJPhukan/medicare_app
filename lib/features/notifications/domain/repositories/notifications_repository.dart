@@ -5,5 +5,6 @@ abstract interface class NotificationsRepository {
       getNotifications({int take});
   Future<void> markRead(String id);
   Future<void> markAllRead();
+  Future<void> deleteNotification(String id);
   Future<void> registerPushToken(String token, String platform);
 }

@@ -384,6 +384,10 @@ abstract class AppStrings {
   static const normalRange       = 'Normal range';
   static const measuredAt        = 'Measured at';
   static const noVitalsConfigured = 'No vital types configured yet. The admin will set these up.';
+  static const noVitalsConfiguredTitle = 'No vitals to track yet';
+  static const severityCritical = 'Critical';
+  static const severityHigh = 'High';
+  static const severityLow = 'Low';
   static const bloodPressure = 'Blood Pressure';
   static const heartRate = 'Heart Rate';
   static const bloodSugar = 'Blood Sugar';

@@ -43,7 +43,7 @@ class ProProfileState {
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
 class ProProfileNotifier extends StateNotifier<ProProfileState> {
-  ProProfileNotifier(this._fetch, this._ref) : super(const ProProfileState()) {
+  ProProfileNotifier(this._fetch, this._repo, this._ref) : super(const ProProfileState()) {
     load();
     _ref.listen<bool>(isOnlineProvider, (prev, next) {
       if (next && (prev == false || prev == null)) load();
@@ -51,7 +51,27 @@ class ProProfileNotifier extends StateNotifier<ProProfileState> {
   }
 
   final FetchMyProProfileUseCase _fetch;
+  final ProProfileRepository _repo;
   final Ref _ref;
+
+  /// Create (or, when [isEditing], update) the professional profile.
+  /// Throws on failure so the caller can show the error inline.
+  Future<ProProfileEntity> submit(
+    Map<String, dynamic> data, {
+    required bool isEditing,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final entity = isEditing
+          ? await _repo.updateProProfile(data)
+          : await _repo.createProProfile(data);
+      state = state.copyWith(profile: entity, isLoading: false, notFound: false);
+      return entity;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
 
   Future<void> load() async {
     AppLogger.d('Pro profile load', tag: 'ProProfile');
@@ -92,5 +112,9 @@ final _fetchProProfileUseCaseProvider = Provider<FetchMyProProfileUseCase>(
 final proProfileProvider =
     StateNotifierProvider<ProProfileNotifier, ProProfileState>((ref) {
   ref.watch(authTokenProvider);
-  return ProProfileNotifier(ref.read(_fetchProProfileUseCaseProvider), ref);
+  return ProProfileNotifier(
+    ref.read(_fetchProProfileUseCaseProvider),
+    ref.read(_proProfileRepositoryProvider),
+    ref,
+  );
 });

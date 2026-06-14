@@ -6,7 +6,6 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/data/country_codes.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/widgets.dart';
-import '../../../../shared/widgets/inputs/phone_input.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_shell.dart';
 import '../widgets/password_strength_bar.dart';

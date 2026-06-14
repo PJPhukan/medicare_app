@@ -84,6 +84,7 @@ class VitalsNotifier extends StateNotifier<VitalsState> {
   Future<void> addReading({
     required String vitalConfigId,
     required List<Map<String, dynamic>> values,
+    String? measuredAt,
     String? notes,
   }) async {
     AppLogger.i('Vital reading add → configId:$vitalConfigId', tag: 'Vitals');
@@ -91,7 +92,7 @@ class VitalsNotifier extends StateNotifier<VitalsState> {
       final reading = await _addReading(
         vitalConfigId: vitalConfigId,
         values: values,
-        measuredAt: DateTime.now().toIso8601String(),
+        measuredAt: measuredAt ?? DateTime.now().toIso8601String(),
         notes: notes,
       );
       state = state.copyWith(

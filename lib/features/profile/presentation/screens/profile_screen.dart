@@ -7,6 +7,7 @@ import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
 
 // ─── Profile data model ───────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isVerifiedPro = ref.watch(proProfileProvider.select((s) => s.profile?.isVerified ?? false));
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -203,6 +205,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                                 ),
                               ),
+                              if (isVerifiedPro)
+                                Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 26,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: context.bg, width: 2),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.green.withValues(alpha: 0.35),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                                  ),
+                                ),
                             ],
                           ),
                           SizedBox(height: 14),

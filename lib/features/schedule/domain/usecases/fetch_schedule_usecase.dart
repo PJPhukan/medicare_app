@@ -6,5 +6,6 @@ class FetchScheduleUseCase {
 
   final ScheduleRepository _repository;
 
-  Future<List<DoseEntity>> call() => _repository.getTodayDoses();
+  Future<List<DoseEntity>> call({String? date}) =>
+      _repository.getTodayDoses(date: date);
 }

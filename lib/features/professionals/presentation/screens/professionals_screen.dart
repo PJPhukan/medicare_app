@@ -9,8 +9,10 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/widgets/skeleton/skeleton.dart';
 import '../../presentation/providers/professionals_provider.dart';
+import '../../presentation/providers/location_provider.dart';
 import '../../data/models/professional_model.dart' as pro_model;
 import 'professional_detail_screen.dart';
+import 'map_picker_screen.dart';
 import '../../../professional_profile/presentation/screens/become_professional_screen.dart';
 import '../../../connections/presentation/providers/connections_provider.dart';
 import '../../../../core/utils/logger.dart';
@@ -74,7 +76,6 @@ Color _categoryColor(String name) {
   if (n.contains('physio')) return AppColors.green;
   return AppColors.teal;
 }
-
 // ─── Adapter ──────────────────────────────────────────────────────────────────
 
 ProData _toPro(pro_model.Professional p) => ProData(
@@ -136,32 +137,83 @@ class ProfessionalsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
-  final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
   String? _selectedCategoryId;
   _ProFilter _filter = const _ProFilter();
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() {
-      ref.read(professionalsProvider.notifier).setSearch(_searchCtrl.text.trim());
+    _scrollCtrl.addListener(_onScroll);
+    // Load saved location and auto-detect if permission is granted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeLocation();
     });
+  }
+
+  void _initializeLocation() {
+    final locState = ref.read(locationProvider);
+    if (locState.hasLocation) {
+      // Already have saved location
+      _loadForCurrentLocation();
+    } else {
+      // No saved location - check permission status
+      _checkPermissionAndInitialize();
+    }
+  }
+
+  void _checkPermissionAndInitialize() async {
+    // Try to auto-detect if permission is already granted
+    await ref.read(locationProvider.notifier).checkAndDetectLocation();
+
+    if (!mounted) return;
+
+    final locState = ref.read(locationProvider);
+    if (locState.hasLocation) {
+      // Permission was granted and location was detected
+      _loadForCurrentLocation();
+    } else {
+      // No permission or detection failed - show picker
+      _openLocationPicker();
+    }
   }
 
   @override
   void dispose() {
-    _searchCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
+
+
+  void _loadForCurrentLocation() {
+    final loc = ref.read(locationProvider);
+    ref.read(professionalsProvider.notifier).loadForLocation(
+          pincode: loc.pincode,
+          areaId: loc.area?.id,
+        );
+  }
+
+  // ── Infinite scroll ─────────────────────────────────────────────────────────
+
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 320) {
+      final loc = ref.read(locationProvider);
+      ref.read(professionalsProvider.notifier).loadMore(
+            pincode: loc.pincode,
+            areaId: loc.area?.id,
+          );
+    }
+  }
+
+  // ── Client-side post-filters (rate / rating) ───────────────────────────────
 
   List<ProData> get _filtered {
     List<ProData> list =
         ref.watch(professionalsProvider).professionals.map(_toPro).toList();
     if (_filter.maxHourlyRate != null) {
       list = list.where((p) => (p.hourlyRate ?? 0) <= _filter.maxHourlyRate!).toList();
-    }
-    if (_filter.location != null) {
-      list = list.where((p) => p.address.contains(_filter.location!)).toList();
     }
     if (_filter.minRating != null) {
       list = list.where((p) => p.averageRating >= _filter.minRating!).toList();
@@ -170,13 +222,36 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
   }
 
   void _showFilterSheet() async {
-    final result = await showModalBottomSheet<_ProFilter>(
+    final cats = ref
+        .read(professionalsProvider)
+        .categories
+        .map((c) => (id: c.id, name: c.name, color: _categoryColor(c.name)))
+        .toList();
+    final result =
+        await showModalBottomSheet<({_ProFilter filter, String? categoryId})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _FilterSheet(current: _filter),
+      builder: (_) => _FilterSheet(
+        current: _filter,
+        categories: cats,
+        selectedCategoryId: _selectedCategoryId,
+      ),
     );
-    if (result != null) setState(() => _filter = result);
+    if (result == null) return;
+
+    setState(() => _filter = result.filter);
+
+    // Category is server-side: reload pros if it changed.
+    if (result.categoryId != _selectedCategoryId) {
+      setState(() => _selectedCategoryId = result.categoryId);
+      final loc = ref.read(locationProvider);
+      ref.read(professionalsProvider.notifier).filterByCategory(
+            categoryId: result.categoryId,
+            pincode: loc.pincode,
+            areaId: loc.area?.id,
+          );
+    }
   }
 
   void _showConnect(ProData pro) {
@@ -188,206 +263,252 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
     );
   }
 
+  Future<void> _openLocationPicker() async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _LocationPickerSheet(),
+    );
+    if (changed == true && mounted) _loadForCurrentLocation();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!ref.watch(isOnlineProvider)) {
       return const OfflinePage(featureName: 'Professionals', showAppBar: false);
     }
+
+    final state    = ref.watch(professionalsProvider);
+    final locState = ref.watch(locationProvider);
     final filtered = _filtered;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
         backgroundColor: context.bg,
         body: RefreshIndicator(
-          onRefresh: () => ref.read(professionalsProvider.notifier).load(),
+          onRefresh: () async => _loadForCurrentLocation(),
           child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              pinned: true,
-              floating: false,
-              backgroundColor: context.bg,
-              surfaceTintColor: Colors.transparent,
-              toolbarHeight: 68,
-              automaticallyImplyLeading: false,
-              leading: AppIconButton(
-                icon: Icon(Icons.menu_rounded, size: 22, color: context.primaryText),
-                tooltip: 'Menu',
-                onPressed: openAppSidebar,
-                backgroundColor: Colors.transparent,
-              ),
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppText.h3(AppStrings.browseProfessionals, color: context.primaryText),
-                  AppText.bodySm('Find and connect with professionals', color: context.secondaryText),
-                ],
-              ),
-              actions: [
-                GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
-                  ),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: AppColors.teal.withValues(alpha: 0.12),
-                      borderRadius: AppBorderRadius.pill,
-                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.35)),
+            controller: _scrollCtrl,
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                floating: false,
+                backgroundColor: context.bg,
+                surfaceTintColor: Colors.transparent,
+                toolbarHeight: 68,
+                automaticallyImplyLeading: false,
+                leading: AppIconButton(
+                  icon: Icon(Icons.menu_rounded, size: 22, color: context.primaryText),
+                  tooltip: 'Menu',
+                  onPressed: openAppSidebar,
+                  backgroundColor: Colors.transparent,
+                ),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppText.h3(AppStrings.browseProfessionals, color: context.primaryText),
+                    AppText.bodySm('Find and connect with professionals', color: context.secondaryText),
+                  ],
+                ),
+                actions: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
                     ),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withValues(alpha: 0.12),
+                        borderRadius: AppBorderRadius.pill,
+                        border: Border.all(color: AppColors.teal.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.workspace_premium_rounded, size: 14, color: AppColors.teal),
+                          const SizedBox(width: 5),
+                          AppText.labelSm('Become Pro', color: AppColors.teal, fontWeight: FontWeight.w700),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                // Pinned location chip + filter button — stays fixed while
+                // the category chips and the list scroll underneath.
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(60),
+                  child: Container(
+                    color: context.bg,
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.workspace_premium_rounded, size: 14, color: AppColors.teal),
-                        const SizedBox(width: 5),
-                        AppText.labelSm('Become Pro', color: AppColors.teal, fontWeight: FontWeight.w700),
+                        Expanded(
+                          child: _LocationChip(
+                            location: locState,
+                            onTap: _openLocationPicker,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _showFilterSheet,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.teal.withValues(alpha: 0.12),
+                              borderRadius: AppBorderRadius.lgAll,
+                              border: Border.all(
+                                color: AppColors.teal.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.tune_rounded,
+                                  size: 18,
+                                  color: AppColors.teal,
+                                ),
+                                if (_filter.isActive) ...[
+                                  const SizedBox(width: 5),
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.teal,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '${_filter.activeCount}',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: context.bg,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
 
-            // Search + filter button
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: AppSearchField(
-                        controller: _searchCtrl,
-                        hint: AppStrings.searchProfessionals,
-                        onClear: _searchCtrl.clear,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: _showFilterSheet,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: _filter.isActive
-                              ? AppColors.teal.withValues(alpha: 0.12)
-                              : context.inputBg,
-                          borderRadius: AppBorderRadius.lgAll,
-                          border: Border.all(
-                            color: _filter.isActive
-                                ? AppColors.teal.withValues(alpha: 0.4)
-                                : context.borderCol,
+              // Category chips
+              SliverToBoxAdapter(
+                child: _CategoryChips(
+                  categories: state.categories
+                      .map((c) => (id: c.id, name: c.name, color: AppColors.teal))
+                      .toList(),
+                  selectedId: _selectedCategoryId,
+                  onSelect: (id) {
+                    final newId = _selectedCategoryId == id ? null : id;
+                    setState(() => _selectedCategoryId = newId);
+                    final loc = ref.read(locationProvider);
+                    ref.read(professionalsProvider.notifier).filterByCategory(
+                          categoryId: newId,
+                          pincode: loc.pincode,
+                          areaId: loc.area?.id,
+                        );
+                  },
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+              // Fallback banner — shown when no pros in user's exact area
+              if (state.isFallback && state.fallbackDistrict != null)
+                SliverToBoxAdapter(
+                  child: _FallbackBanner(district: state.fallbackDistrict!),
+                ),
+
+              // Body
+              if (!locState.hasLocation && !state.isLoading)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _NoLocationState(onPick: _openLocationPicker),
+                )
+              else if (state.isLoading)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, __) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: AppSkeleton(
+                          child: Container(
+                            height: 130,
+                            decoration: BoxDecoration(
+                              color: context.cardBg,
+                              borderRadius: AppBorderRadius.lgAll,
+                            ),
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.tune_rounded,
-                              size: 18,
-                              color: _filter.isActive ? AppColors.teal : AppColors.textHint,
-                            ),
-                            if (_filter.isActive) ...[
-                              const SizedBox(width: 5),
-                              Container(
-                                width: 16,
-                                height: 16,
-                                decoration: const BoxDecoration(
+                      ),
+                      childCount: 5,
+                    ),
+                  ),
+                )
+              else if (filtered.isEmpty)
+                SliverFillRemaining(
+                  child: Center(
+                    child: AppEmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: AppStrings.noProfessionalsFound,
+                      subtitle: 'No professionals serve ${locState.area?.name ?? 'this area'} yet',
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) {
+                        // Loading-more spinner at the very end
+                        if (i == filtered.length) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                   color: AppColors.teal,
-                                  shape: BoxShape.circle,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  '${_filter.activeCount}',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: context.bg,
-                                    fontWeight: FontWeight.w800,
-                                  ),
                                 ),
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Category chips
-            SliverToBoxAdapter(
-              child: _CategoryChips(
-                categories: ref.watch(professionalsProvider).categories
-                    .map((c) => (id: c.id, name: c.name, color: _categoryColor(c.name)))
-                    .toList(),
-                selectedId: _selectedCategoryId,
-                onSelect: (id) {
-                  final newId = _selectedCategoryId == id ? null : id;
-                  setState(() => _selectedCategoryId = newId);
-                  ref.read(professionalsProvider.notifier).filterByCategory(newId);
-                },
-              ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-            // Results or empty
-            if (ref.watch(professionalsProvider).isLoading)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, __) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: AppSkeleton(
-                        child: Container(
-                          height: 130,
-                          decoration: BoxDecoration(
-                            color: context.cardBg,
-                            borderRadius: AppBorderRadius.lgAll,
+                            ),
+                          );
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ProCard(
+                            pro: filtered[i],
+                            onViewProfile: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProfessionalDetailScreen(pro: filtered[i]),
+                              ),
+                            ),
+                            onConnect: () => _showConnect(filtered[i]),
                           ),
-                        ),
-                      ),
+                        );
+                      },
+                      childCount: filtered.length + (state.isLoadingMore ? 1 : 0),
                     ),
-                    childCount: 5,
                   ),
                 ),
-              )
-            else if (filtered.isEmpty)
-              SliverFillRemaining(
-                child: Center(
-                  child: AppEmptyState(
-                    icon: Icons.search_off_rounded,
-                    title: AppStrings.noProfessionalsFound,
-                    subtitle: AppStrings.tryDifferentSearch,
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _ProCard(
-                        pro: filtered[i],
-                        onViewProfile: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProfessionalDetailScreen(pro: filtered[i]),
-                          ),
-                        ),
-                        onConnect: () => _showConnect(filtered[i]),
-                      ),
-                    ),
-                    childCount: filtered.length,
-                  ),
-                ),
-              ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -400,7 +521,13 @@ const _kLocations = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Pu
 
 class _FilterSheet extends StatefulWidget {
   final _ProFilter current;
-  const _FilterSheet({required this.current});
+  final List<({String id, String name, Color color})> categories;
+  final String? selectedCategoryId;
+  const _FilterSheet({
+    required this.current,
+    this.categories = const [],
+    this.selectedCategoryId,
+  });
 
   @override
   State<_FilterSheet> createState() => _FilterSheetState();
@@ -410,16 +537,22 @@ class _FilterSheetState extends State<_FilterSheet> {
   late int? _maxRate;
   late String? _location;
   late double? _minRating;
+  late String? _categoryId;
 
   @override
   void initState() {
     super.initState();
-    _maxRate   = widget.current.maxHourlyRate;
-    _location  = widget.current.location;
-    _minRating = widget.current.minRating;
+    _maxRate    = widget.current.maxHourlyRate;
+    _location   = widget.current.location;
+    _minRating  = widget.current.minRating;
+    _categoryId = widget.selectedCategoryId;
   }
 
-  bool get _isActive => _maxRate != null || _location != null || _minRating != null;
+  bool get _isActive =>
+      _maxRate != null ||
+      _location != null ||
+      _minRating != null ||
+      _categoryId != null;
 
   @override
   Widget build(BuildContext context) {
@@ -428,8 +561,12 @@ class _FilterSheetState extends State<_FilterSheet> {
         color: context.cardBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -456,13 +593,37 @@ class _FilterSheetState extends State<_FilterSheet> {
               if (_isActive)
                 GestureDetector(
                   onTap: () => setState(() {
-                    _maxRate = null; _location = null; _minRating = null;
+                    _maxRate = null; _location = null; _minRating = null; _categoryId = null;
                   }),
                   child: AppText.labelSm('Clear all', color: AppColors.red),
                 ),
             ],
           ),
           const SizedBox(height: 20),
+
+          // ── Category ───────────────────────────────────────────────────────
+          if (widget.categories.isNotEmpty) ...[
+            _FilterSectionLabel('Category'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8, runSpacing: 8,
+              children: [
+                _FilterChip(
+                  label: 'All',
+                  active: _categoryId == null,
+                  onTap: () => setState(() => _categoryId = null),
+                ),
+                ...widget.categories.map((c) => _FilterChip(
+                  label: c.name,
+                  active: _categoryId == c.id,
+                  onTap: () => setState(
+                    () => _categoryId = _categoryId == c.id ? null : c.id,
+                  ),
+                )),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
 
           // ── Pricing ────────────────────────────────────────────────────────
           _FilterSectionLabel('Pricing (Hourly Rate)'),
@@ -515,10 +676,18 @@ class _FilterSheetState extends State<_FilterSheet> {
             isFullWidth: true,
             onPressed: () => Navigator.pop(
               context,
-              _ProFilter(maxHourlyRate: _maxRate, location: _location, minRating: _minRating),
+              (
+                filter: _ProFilter(
+                  maxHourlyRate: _maxRate,
+                  location: _location,
+                  minRating: _minRating,
+                ),
+                categoryId: _categoryId,
+              ),
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -554,22 +723,24 @@ class _FilterChip extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: active ? AppColors.teal.withValues(alpha: 0.12) : context.inputBg,
+            // Reversed: selected is a solid teal fill (white text); unselected
+            // keeps the light teal tint with teal text.
+            color: active ? AppColors.teal : AppColors.teal.withValues(alpha: 0.12),
             borderRadius: AppBorderRadius.pill,
             border: Border.all(
-              color: active ? AppColors.teal.withValues(alpha: 0.45) : context.borderCol,
+              color: active ? AppColors.teal : AppColors.teal.withValues(alpha: 0.45),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 11, color: active ? AppColors.teal : AppColors.textHint),
+                Icon(icon, size: 11, color: active ? Colors.white : AppColors.teal),
                 const SizedBox(width: 4),
               ],
               AppText.labelSm(
                 label,
-                color: active ? AppColors.teal : AppColors.textSecondary,
+                color: active ? Colors.white : AppColors.teal,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
               ),
             ],
@@ -598,19 +769,21 @@ class _CategoryChips extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          _Chip(
+          AppCategoryChip(
             label: AppStrings.filterAll,
             color: AppColors.teal,
-            isSelected: selectedId == null,
+            selected: selectedId == null,
+            solidSelected: true,
             onTap: () => onSelect(null),
           ),
           const SizedBox(width: 8),
           ...categories.map((c) => Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: _Chip(
+                child: AppCategoryChip(
                   label: c.name,
                   color: c.color,
-                  isSelected: selectedId == c.id,
+                  selected: selectedId == c.id,
+                  solidSelected: true,
                   onTap: () => onSelect(c.id),
                 ),
               )),
@@ -620,33 +793,444 @@ class _CategoryChips extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final bool isSelected;
+// ─── Location chip (header) ───────────────────────────────────────────────────
+
+class _LocationChip extends StatelessWidget {
+  final LocationState location;
   final VoidCallback onTap;
-  const _Chip({required this.label, required this.color, required this.isSelected, required this.onTap});
+  const _LocationChip({required this.location, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final detecting = location.status == LocationStatus.detecting;
+    final area = location.area;
+
+    // Match the filter button: tinted teal background once a location is set.
+    final hasArea = area != null;
+
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      onTap: detecting ? null : onTap,
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.15) : context.cardBg,
-          borderRadius: AppBorderRadius.pill,
+          color: hasArea
+              ? AppColors.teal.withValues(alpha: 0.12)
+              : context.inputBg,
+          borderRadius: AppBorderRadius.lgAll,
           border: Border.all(
-            color: isSelected ? color : context.borderCol,
-            width: isSelected ? 1.5 : 1,
+            color: hasArea
+                ? AppColors.teal.withValues(alpha: 0.4)
+                : context.borderCol,
           ),
         ),
-        child: AppText.labelSm(
-          label,
-          color: isSelected ? color : AppColors.textSecondary,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        child: Row(
+          children: [
+            Icon(
+              detecting ? Icons.my_location_rounded : Icons.place_rounded,
+              size: 17,
+              color: AppColors.teal,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: detecting
+                  ? AppText.bodySm('Detecting location…', color: context.secondaryText)
+                  : area == null
+                      ? AppText.bodySm('Select your location', color: context.secondaryText)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AppText.labelSm(
+                              area.name,
+                              color: context.primaryText,
+                              fontWeight: FontWeight.w700,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            AppText.bodyXs(
+                              location.pincode != null
+                                  ? '${area.district} · ${location.pincode}'
+                                  : area.district,
+                              color: context.secondaryText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+            ),
+            if (!detecting) ...[
+              const SizedBox(width: 6),
+              AppText.labelXs('Change', color: AppColors.teal, fontWeight: FontWeight.w700),
+              const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.teal),
+            ],
+          ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Fallback banner ──────────────────────────────────────────────────────────
+
+class _FallbackBanner extends StatelessWidget {
+  final String district;
+  const _FallbackBanner({required this.district});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.amber.withValues(alpha: 0.08),
+        borderRadius: AppBorderRadius.mdAll,
+        border: Border.all(color: AppColors.amber.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.amber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: AppText.bodySm(
+              'No professionals in your exact area — showing nearest available in $district',
+              color: context.secondaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── No-location empty state ──────────────────────────────────────────────────
+
+class _NoLocationState extends StatelessWidget {
+  final VoidCallback onPick;
+  const _NoLocationState({required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppContainer.tinted(
+              color: AppColors.teal,
+              borderRadius: AppBorderRadius.xlAll,
+              padding: const EdgeInsets.all(18),
+              child: const Icon(Icons.location_off_rounded, size: 32, color: AppColors.teal),
+            ),
+            const SizedBox(height: 18),
+            AppText.h3('Set your location', color: context.primaryText),
+            const SizedBox(height: 6),
+            AppText.bodyMd(
+              'We show healthcare professionals near you. Pick your location to get started.',
+              color: context.secondaryText,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 22),
+            AppButton.primary(label: 'Choose location', onPressed: onPick),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Location picker bottom sheet ─────────────────────────────────────────────
+
+class _LocationPickerSheet extends ConsumerStatefulWidget {
+  const _LocationPickerSheet();
+
+  @override
+  ConsumerState<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
+  final _pincodeCtrl = TextEditingController();
+  bool _busy = false;
+  String? _error;
+  // When permission is already granted, the resolved current-location label
+  // shown under "Use my current location" instead of "Detect via GPS".
+  String? _currentLocationLabel;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentLocationLabel();
+  }
+
+  // Silently resolve the current location (only if permission already granted)
+  // so we can preview it as the GPS option's subtitle.
+  Future<void> _loadCurrentLocationLabel() async {
+    final preview =
+        await ref.read(locationProvider.notifier).previewCurrentLocation();
+    if (!mounted || preview == null) return;
+    setState(() => _currentLocationLabel =
+        '${preview.area.name}, ${preview.area.district}');
+  }
+
+  @override
+  void dispose() {
+    _pincodeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _useGps() async {
+    setState(() { _busy = true; _error = null; });
+    // detectFromGps() triggers the OS permission dialog when permission is
+    // not yet granted (and re-requestable).
+    await ref.read(locationProvider.notifier).detectFromGps();
+    if (!mounted) return;
+    final state = ref.read(locationProvider);
+    setState(() => _busy = false);
+
+    if (state.hasLocation) {
+      Navigator.pop(context, true);
+    } else if (state.status == LocationStatus.permissionDenied) {
+      // If the OS won't show the dialog anymore, guide the user to settings.
+      final permanentlyDenied =
+          await ref.read(locationProvider.notifier).isPermanentlyDenied();
+      if (!mounted) return;
+      if (permanentlyDenied) {
+        _showOpenSettingsDialog();
+      } else {
+        setState(() => _error = state.error ?? 'Location permission denied');
+      }
+    } else {
+      setState(() => _error = state.error ?? 'Could not detect location');
+    }
+  }
+
+  void _showOpenSettingsDialog() async {
+    final confirmed = await AppDialog.confirm(
+      context,
+      title: 'Location permission needed',
+      message:
+          'Location access is turned off for this app. Open settings to enable it, '
+          'or pick your location on the map / enter a pincode instead.',
+      confirmLabel: 'Open settings',
+      cancelLabel: 'Cancel',
+    );
+    if (confirmed == true) {
+      await ref.read(locationProvider.notifier).openSettings();
+    }
+  }
+
+  Future<void> _selectOnMap() async {
+    final picked = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const MapPickerScreen()),
+    );
+    if (!mounted) return;
+    if (picked == true && ref.read(locationProvider).hasLocation) {
+      Navigator.pop(context, true);
+    }
+  }
+
+  Future<void> _usePincode() async {
+    final pincode = _pincodeCtrl.text.trim();
+    if (pincode.length != 6) {
+      setState(() => _error = 'Enter a valid 6-digit pincode');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    await ref.read(locationProvider.notifier).resolveFromPincode(pincode);
+    if (!mounted) return;
+    final state = ref.read(locationProvider);
+    setState(() => _busy = false);
+
+    if (state.hasLocation && state.pincode == pincode) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() => _error = state.error ?? 'No service area found for this pincode');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      margin: EdgeInsets.only(bottom: bottom),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: context.dividerCol, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Icon(Icons.place_rounded, size: 18, color: AppColors.teal),
+              const SizedBox(width: 8),
+              AppText.h3('Choose location'),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // Use current location (GPS)
+          GestureDetector(
+            onTap: _busy ? null : _useGps,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.teal.withValues(alpha: 0.08),
+                borderRadius: AppBorderRadius.lgAll,
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  AppContainer.tinted(
+                    color: AppColors.teal,
+                    borderRadius: AppBorderRadius.mdAll,
+                    padding: const EdgeInsets.all(10),
+                    child: const Icon(Icons.my_location_rounded, size: 18, color: AppColors.teal),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText.labelMd('Use my current location', color: context.primaryText),
+                        AppText.bodySm(
+                          _currentLocationLabel ?? 'Detect via GPS',
+                          color: context.secondaryText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.teal),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Select on map (OpenStreetMap — free)
+          GestureDetector(
+            onTap: _busy ? null : _selectOnMap,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.blue.withValues(alpha: 0.08),
+                borderRadius: AppBorderRadius.lgAll,
+                border: Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  AppContainer.tinted(
+                    color: AppColors.blue,
+                    borderRadius: AppBorderRadius.mdAll,
+                    padding: const EdgeInsets.all(10),
+                    child: const Icon(Icons.map_rounded, size: 18, color: AppColors.blue),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText.labelMd('Select on map', color: context.primaryText),
+                        AppText.bodySm('Drop a pin on your location', color: context.secondaryText),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.blue),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(child: Divider(color: context.dividerCol)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: AppText.bodySm('or enter pincode', color: AppColors.textHint),
+              ),
+              Expanded(child: Divider(color: context.dividerCol)),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // Pincode entry
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _pincodeCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  style: const TextStyle(fontSize: 15, letterSpacing: 2),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    hintText: '6-digit pincode',
+                    prefixIcon: const Icon(Icons.pin_drop_rounded, size: 18, color: AppColors.teal),
+                    filled: true,
+                    fillColor: AppColors.teal.withValues(alpha: 0.08),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: AppBorderRadius.lgAll,
+                      borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.3)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppBorderRadius.lgAll,
+                      borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: AppBorderRadius.lgAll,
+                      borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.5)),
+                    ),
+                  ),
+                  onChanged: (_) { if (_error != null) setState(() => _error = null); },
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: _busy ? null : _usePincode,
+                child: Container(
+                  height: 52,
+                  width: 52,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal,
+                    borderRadius: AppBorderRadius.lgAll,
+                  ),
+                  child: _busy
+                      ? const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 14, color: AppColors.red),
+                const SizedBox(width: 6),
+                Expanded(child: AppText.bodySm(_error!, color: AppColors.red)),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -780,7 +1364,7 @@ class _ProCard extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     _MetaChip(icon: Icons.work_outline_rounded, label: '${pro.experienceYrs} yrs'),
-                    _MetaChip(icon: Icons.location_on_outlined, label: pro.address),
+                    _MetaChip(icon: Icons.place_outlined, label: pro.address),
                   ],
                 ),
 
@@ -933,12 +1517,32 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
   }
 
   Future<void> _submit() async {
-    AppLogger.i('Connection request send → userId:${widget.pro.userId}', tag: 'Professionals');
+    final meta = _planMeta(_selected);
+    if (meta.rate == null) {
+      AppSnackbar.error(context, '${meta.label} is not offered by ${widget.pro.name}.');
+      return;
+    }
+    final planType = switch (_selected) {
+      ProPlanType.hourly => 'HOURLY',
+      ProPlanType.daily => 'DAILY',
+      ProPlanType.monthly => 'MONTHLY',
+    };
+    final areaId = ref.read(locationProvider).area?.id;
+
+    AppLogger.i('Connection request send → pro:${widget.pro.id} plan:$planType', tag: 'Professionals');
     setState(() => _sending = true);
     try {
-      await ref.read(sendConnectionRequestProvider).call(widget.pro.userId);
+      // Free request — no money moves until the pro accepts and the patient
+      // pays from the Connections › Sent tab (pay-on-acceptance).
+      await ref.read(sendConnectionRequestProvider).call(
+            professionalId: widget.pro.id,
+            planType: planType,
+            areaId: areaId,
+          );
+
       AppLogger.i('Connection request sent ✓', tag: 'Professionals');
       AppLogger.track('connection.request_sent');
+      ref.read(connectionsProvider.notifier).load();
       if (!mounted) return;
       Navigator.pop(context);
       AppSnackbar.success(context, AppStrings.connectionRequestSent);

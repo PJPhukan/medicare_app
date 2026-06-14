@@ -84,26 +84,85 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
   List<_Dose> _doses = [];
-  late final List<DateTime> _week;
+  late DateTime _visibleMonth; // first day of the month shown in the strip
+  List<DateTime> _days = [];
+  final ScrollController _stripController = ScrollController();
+
+  static const double _chipExtent = 56; // width 50 + horizontal margin 6
+
+  void _buildDays() {
+    final daysInMonth = DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0).day;
+    _days = List.generate(
+      daysInMonth,
+      (i) => DateTime(_visibleMonth.year, _visibleMonth.month, i + 1),
+    );
+  }
+
+  void _changeMonth(int delta) {
+    setState(() {
+      _visibleMonth = DateTime(_visibleMonth.year, _visibleMonth.month + delta);
+      _buildDays();
+    });
+    // Bring today (if in view) or the start of the month into view.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_stripController.hasClients) return;
+      final idx = _days.indexWhere(_isToday);
+      final target = (idx > 0 ? idx * _chipExtent - 120 : 0.0)
+          .clamp(0.0, _stripController.position.maxScrollExtent);
+      _stripController.animateTo(target,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    });
+  }
+
+  String _monthLabel(DateTime d) {
+    const mo = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+        'August', 'September', 'October', 'November', 'December'];
+    return '${mo[d.month - 1]} ${d.year}';
+  }
 
   @override
   void initState() {
     super.initState();
     final today = DateTime.now();
-    _week = List.generate(14, (i) => today.subtract(const Duration(days: 3)).add(Duration(days: i)));
+    _visibleMonth = DateTime(today.year, today.month);
+    _buildDays();
     // Populate from provider once loaded
     ref.listenManual(scheduleProvider, (prev, next) {
       if (!next.isLoading && (prev?.isLoading ?? true) && mounted) {
         setState(() => _doses = next.doses.map(_toDose).toList());
       }
     });
-    // Sync immediately if provider already has data
+    // Sync immediately if provider already has data, and centre today.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final s = ref.read(scheduleProvider);
       if (!s.isLoading && s.doses.isNotEmpty && mounted) {
         setState(() => _doses = s.doses.map(_toDose).toList());
       }
+      _scrollToSelected();
     });
+  }
+
+  void _scrollToSelected() {
+    if (!_stripController.hasClients) return;
+    final idx = _days.indexWhere((d) => _isSameDay(d, _selectedDate));
+    if (idx < 0) return;
+    final target = (idx * _chipExtent - 120)
+        .clamp(0.0, _stripController.position.maxScrollExtent);
+    _stripController.animateTo(target,
+        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  }
+
+  /// Switch the viewed day and fetch that date's doses from the backend.
+  void _selectDate(DateTime day) {
+    if (_isSameDay(day, _selectedDate)) return;
+    setState(() => _selectedDate = day);
+    ref.read(scheduleProvider.notifier).load(date: day);
+  }
+
+  @override
+  void dispose() {
+    _stripController.dispose();
+    super.dispose();
   }
 
   Future<void> _openAddDose() async {
@@ -134,6 +193,13 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+
+  String _fmtSelectedDate(DateTime d) {
+    if (_isToday(d)) return 'Today';
+    const wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${wd[d.weekday - 1]}, ${d.day} ${mo[d.month - 1]}';
+  }
 
   Map<String, List<_Dose>> get _grouped {
     final order = ['Morning', 'Afternoon', 'Evening', 'Night'];
@@ -202,11 +268,17 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             pinned: true,
             floating: false,
             toolbarHeight: 60,
-            leading: IconButton(
-              icon: Icon(Icons.menu_rounded, size: 22, color: textColor),
-              onPressed: openAppSidebar,
-              tooltip: 'Menu',
-            ),
+            leading: Navigator.of(context).canPop()
+                ? IconButton(
+                    icon: Icon(Icons.arrow_back_rounded, size: 22, color: textColor),
+                    onPressed: () => Navigator.pop(context),
+                    tooltip: 'Back',
+                  )
+                : IconButton(
+                    icon: Icon(Icons.menu_rounded, size: 22, color: textColor),
+                    onPressed: openAppSidebar,
+                    tooltip: 'Menu',
+                  ),
             title: Text(AppStrings.doseSchedule,
                 style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w800,
@@ -227,54 +299,120 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Month header with prev/next ──────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 12, 0),
+                  child: Row(
+                    children: [
+                      Text(
+                        _monthLabel(_visibleMonth),
+                        style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w800,
+                          color: textColor, letterSpacing: -0.3,
+                        ),
+                      ),
+                      const Spacer(),
+                      _MonthArrow(
+                        icon: Icons.chevron_left_rounded,
+                        onTap: () => _changeMonth(-1),
+                        border: border,
+                        textColor: textColor,
+                      ),
+                      const SizedBox(width: 8),
+                      _MonthArrow(
+                        icon: Icons.chevron_right_rounded,
+                        onTap: () => _changeMonth(1),
+                        border: border,
+                        textColor: textColor,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+
                 // ── Date strip ──────────────────────────────────────────────
                 SizedBox(
-                  height: 80,
+                  height: 96,
                   child: ListView.builder(
+                    controller: _stripController,
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: _week.length,
+                    itemCount: _days.length,
                     itemBuilder: (_, i) {
-                      final day = _week[i];
+                      final day = _days[i];
                       final selected = _isSameDay(day, _selectedDate);
                       final isToday = _isToday(day);
                       return GestureDetector(
-                        onTap: () => setState(() => _selectedDate = day),
+                        onTap: () => _selectDate(day),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                          width: 48,
+                          curve: Curves.easeOut,
+                          margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 8),
+                          width: 50,
+                          padding: const EdgeInsets.symmetric(vertical: 7),
                           decoration: BoxDecoration(
+                            // Selected day floats in a soft pill outline.
                             color: selected
-                                ? AppColors.teal
-                                : isDark ? context.cardBg : Colors.white,
-                            borderRadius: AppBorderRadius.lgAll,
+                                ? AppColors.teal.withValues(alpha: 0.06)
+                                : Colors.transparent,
+                            borderRadius: AppBorderRadius.pill,
                             border: Border.all(
                               color: selected
-                                  ? AppColors.teal
-                                  : isToday
-                                      ? AppColors.teal.withValues(alpha: 0.4)
-                                      : border,
+                                  ? AppColors.teal.withValues(alpha: 0.5)
+                                  : Colors.transparent,
                             ),
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                ['Mo','Tu','We','Th','Fr','Sa','Su'][day.weekday - 1],
+                                ['M','T','W','T','F','S','S'][day.weekday - 1],
                                 style: TextStyle(
-                                  fontSize: 10, fontWeight: FontWeight.w600,
+                                  fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2,
                                   color: selected
-                                      ? AppColors.textInverse
+                                      ? AppColors.teal
                                       : isToday ? AppColors.teal : secondary,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text('${day.day}',
-                                  style: TextStyle(
-                                    fontSize: 17, fontWeight: FontWeight.w800,
-                                    color: selected ? AppColors.textInverse : textColor,
-                                  )),
+                              const SizedBox(height: 6),
+                              // Date inside a circle — gradient fill when selected.
+                              Container(
+                                width: 34,
+                                height: 34,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: selected
+                                      ? const LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [AppColors.teal, AppColors.blue],
+                                        )
+                                      : null,
+                                  color: selected
+                                      ? null
+                                      : isToday
+                                          ? AppColors.teal.withValues(alpha: 0.12)
+                                          : (isDark
+                                              ? context.inputBg
+                                              : AppColors.teal.withValues(alpha: 0.05)),
+                                  border: selected
+                                      ? null
+                                      : Border.all(
+                                          color: isToday
+                                              ? AppColors.teal
+                                              : AppColors.teal.withValues(alpha: 0.55),
+                                          width: 1.5,
+                                        ),
+                                ),
+                                child: Text('${day.day}',
+                                    style: TextStyle(
+                                      fontSize: 15, fontWeight: FontWeight.w800,
+                                      color: selected
+                                          ? Colors.white
+                                          : isToday ? AppColors.teal : textColor.withValues(alpha: 0.7),
+                                    )),
+                              ),
                             ],
                           ),
                         ),
@@ -282,6 +420,25 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                     },
                   ),
                 ),
+
+                // ── Selected-date label ──────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.event_note_rounded, size: 15, color: AppColors.teal),
+                      const SizedBox(width: 6),
+                      Text(
+                        _fmtSelectedDate(_selectedDate),
+                        style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700,
+                          color: textColor, letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
 
                 // ── Summary chips ────────────────────────────────────────────
                 if (_doses.isNotEmpty)
@@ -349,6 +506,39 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           ),
         ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Month nav arrow ──────────────────────────────────────────────────────────
+
+class _MonthArrow extends StatelessWidget {
+  const _MonthArrow({
+    required this.icon,
+    required this.onTap,
+    required this.border,
+    required this.textColor,
+  });
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color border;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: AppBorderRadius.mdAll,
+          border: Border.all(color: border),
+        ),
+        child: Icon(icon, size: 20, color: textColor),
       ),
     );
   }

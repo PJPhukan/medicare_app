@@ -9,6 +9,8 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/widgets/skeleton/skeleton_base.dart';
 import '../providers/pro_profile_provider.dart';
 import 'become_professional_screen.dart';
+import 'service_areas_screen.dart';
+import 'payout_details_screen.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 
 // ─── Model ────────────────────────────────────────────────────────────────────
@@ -70,7 +72,11 @@ class ProHubScreen extends ConsumerWidget {
       value: context.overlayStyle,
       child: Scaffold(
         backgroundColor: context.bg,
-        body: CustomScrollView(
+        body: RefreshIndicator(
+          color: AppColors.teal,
+          onRefresh: () => ref.read(proProfileProvider.notifier).load(),
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverAppBar(
               backgroundColor: context.bg,
@@ -96,11 +102,16 @@ class ProHubScreen extends ConsumerWidget {
                       _StatusBanner(status: profile.status),
                       const SizedBox(height: 16),
                       _ProfileCard(profile: profile, onEdit: () => _openEdit(context)),
+                      const SizedBox(height: 12),
+                      _ServiceAreasCard(onTap: () => _openServiceAreas(context)),
+                      const SizedBox(height: 12),
+                      _PayoutDetailsCard(onTap: () => _openPayoutDetails(context)),
                     ],
                   ]),
                 ),
               ),
           ],
+        ),
         ),
       ),
     );
@@ -113,6 +124,109 @@ class ProHubScreen extends ConsumerWidget {
   void _openEdit(BuildContext context) => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen(isEditing: true)),
       );
+
+  void _openServiceAreas(BuildContext context) => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ServiceAreasScreen()),
+      );
+
+  void _openPayoutDetails(BuildContext context) => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const PayoutDetailsScreen()),
+      );
+}
+
+// ─── Payout details card ──────────────────────────────────────────────────────
+
+class _PayoutDetailsCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _PayoutDetailsCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: AppBorderRadius.lgAll,
+          border: Border.all(color: context.borderCol),
+        ),
+        child: Row(
+          children: [
+            AppContainer.tinted(
+              color: AppColors.green,
+              borderRadius: AppBorderRadius.mdAll,
+              padding: const EdgeInsets.all(11),
+              child: const Icon(Icons.account_balance_wallet_rounded,
+                  size: 20, color: AppColors.green),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText.labelMd('Payout Details', color: context.primaryText),
+                  const SizedBox(height: 2),
+                  AppText.bodyXs(
+                    'Add the bank account or UPI where you get paid',
+                    color: context.secondaryText,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Service areas card ───────────────────────────────────────────────────────
+
+class _ServiceAreasCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ServiceAreasCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: AppBorderRadius.lgAll,
+          border: Border.all(color: context.borderCol),
+        ),
+        child: Row(
+          children: [
+            AppContainer.tinted(
+              color: AppColors.teal,
+              borderRadius: AppBorderRadius.mdAll,
+              padding: const EdgeInsets.all(11),
+              child: const Icon(Icons.map_rounded, size: 20, color: AppColors.teal),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText.labelMd('Manage Service Areas', color: context.primaryText),
+                  const SizedBox(height: 2),
+                  AppText.bodyXs(
+                    'Choose the localities where patients can find you',
+                    color: context.secondaryText,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Loading skeleton ─────────────────────────────────────────────────────────

@@ -40,10 +40,20 @@ abstract class ApiConstants {
 
   // ── Professionals ─────────────────────────────────────────────────────────
   static const String professionalCategories = '/api/professionals/categories';
+  static const String professionalCategoryRequest = '/api/professionals/categories/request';
   static const String professionals = '/api/professionals';
+  static const String professionalsByLocation = '/api/professionals/by-location';
+  static const String profPincodeResolve = '/api/professionals/pincode';
   static const String myProfProfile = '/api/professionals/profile/me';
   static const String profProfile = '/api/professionals/profile';
   static const String profServiceAreas = '/api/professionals/service-areas';
+  // Area-based service areas (pincode model)
+  static const String profAreasSearch = '/api/professionals/areas/search';
+  static const String profMyAreas = '/api/professionals/my-areas';
+  static const String profMyDistricts = '/api/professionals/my-districts';
+  static const String profPayoutDetails = '/api/professionals/payout-details';
+  static const String profAreaRequest = '/api/professionals/areas/request';
+  static const String profMyAreaRequests = '/api/professionals/areas/my-requests';
 
   // ── Reports ───────────────────────────────────────────────────────────────
   static const String reports = '/api/reports';

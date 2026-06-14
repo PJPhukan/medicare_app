@@ -12,8 +12,25 @@ class ConnectionRequestUser extends ConnectionRequestUserEntity {
       ConnectionRequestUser(
         id: json['id'] as String,
         name: json['name'] as String? ?? '',
-        profilePicture: json['profilePicture'] as String?,
+        // backend uses avatarUrl on the user relation
+        profilePicture:
+            json['avatarUrl'] as String? ?? json['profilePicture'] as String?,
         phone: json['phone'] as String?,
+      );
+}
+
+class ConnectionRequestProfessional extends ConnectionRequestProfessionalEntity {
+  const ConnectionRequestProfessional({
+    required super.id,
+    required super.displayName,
+    super.profileImageUrl,
+  });
+
+  factory ConnectionRequestProfessional.fromJson(Map<String, dynamic> json) =>
+      ConnectionRequestProfessional(
+        id: json['id'] as String,
+        displayName: json['displayName'] as String? ?? 'Professional',
+        profileImageUrl: json['profileImageUrl'] as String?,
       );
 }
 
@@ -21,29 +38,34 @@ class ConnectionRequest extends ConnectionRequestEntity {
   const ConnectionRequest({
     required super.id,
     required super.status,
+    required super.planType,
+    required super.amount,
     required super.createdAt,
-    required ConnectionRequestUser sender,
-    required ConnectionRequestUser receiver,
-  }) : super(sender: sender, receiver: receiver);
+    required ConnectionRequestUser user,
+    required ConnectionRequestProfessional professional,
+    super.note,
+  }) : super(user: user, professional: professional);
 
   @override
-  ConnectionRequestUser get sender =>
-      super.sender as ConnectionRequestUser;
+  ConnectionRequestUser get user => super.user as ConnectionRequestUser;
 
   @override
-  ConnectionRequestUser get receiver =>
-      super.receiver as ConnectionRequestUser;
+  ConnectionRequestProfessional get professional =>
+      super.professional as ConnectionRequestProfessional;
 
   factory ConnectionRequest.fromJson(Map<String, dynamic> json) =>
       ConnectionRequest(
         id: json['id'] as String,
         status: json['status'] as String,
+        planType: json['planType'] as String? ?? 'HOURLY',
+        amount: (json['amount'] as num?)?.toInt() ?? 0,
         createdAt: json['createdAt'] as String,
-        sender: ConnectionRequestUser.fromJson(
-          json['sender'] as Map<String, dynamic>,
+        note: json['note'] as String?,
+        user: ConnectionRequestUser.fromJson(
+          json['user'] as Map<String, dynamic>,
         ),
-        receiver: ConnectionRequestUser.fromJson(
-          json['receiver'] as Map<String, dynamic>,
+        professional: ConnectionRequestProfessional.fromJson(
+          json['professional'] as Map<String, dynamic>,
         ),
       );
 }

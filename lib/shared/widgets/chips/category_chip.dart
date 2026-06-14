@@ -20,6 +20,7 @@ class AppCategoryChip extends StatelessWidget {
     this.icon,
     this.color,
     this.padding,
+    this.solidSelected = false,
   });
 
   final String label;
@@ -35,19 +36,26 @@ class AppCategoryChip extends StatelessWidget {
   /// Custom padding. Defaults to `EdgeInsets.symmetric(horizontal:12, vertical:7)`.
   final EdgeInsetsGeometry? padding;
 
+  /// When true, the selected state is a solid [color] fill with white content
+  /// and the unselected state is a soft [color] tint with [color] content
+  /// (matches the filter-popup chip palette). Works in light and dark mode.
+  final bool solidSelected;
+
   @override
   Widget build(BuildContext context) {
     final c      = color ?? AppColors.teal;
 
-    final bg = selected
-        ? c.withValues(alpha: 0.12)
-        : context.inputBg;
+    final bg = solidSelected
+        ? (selected ? c : c.withValues(alpha: 0.12))
+        : (selected ? c.withValues(alpha: 0.12) : context.inputBg);
 
-    final borderColor = selected
-        ? c.withValues(alpha: 0.4)
-        : context.borderCol;
+    final borderColor = solidSelected
+        ? (selected ? c : c.withValues(alpha: 0.45))
+        : (selected ? c.withValues(alpha: 0.4) : context.borderCol);
 
-    final contentColor = selected ? c : AppColors.textSecondary;
+    final contentColor = solidSelected
+        ? (selected ? Colors.white : c)
+        : (selected ? c : AppColors.textSecondary);
 
     return GestureDetector(
       onTap: onTap,

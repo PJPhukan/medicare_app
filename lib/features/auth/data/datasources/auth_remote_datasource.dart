@@ -95,6 +95,7 @@ class AuthRemoteDataSource {
     return (
       token: AuthTokenModel(
         token: data['token'] as String,
+        refreshToken: data['refreshToken'] as String?,
         isNewUser: data['isNewUser'] as bool? ?? false,
       ),
       user: UserModel.fromJson(data['user'] as Map<String, dynamic>),

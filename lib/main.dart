@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:io';
 import 'core/utils/logger.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/theme_provider.dart';
@@ -10,18 +13,66 @@ import 'core/local_db/local_cache.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/services/biometric_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/firebase_messaging_service.dart';
 import 'core/services/event_log_service.dart';
+import 'core/api/client.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/splash/presentation/screens/splash_screen.dart';
 import 'features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'features/auth/presentation/screens/auth_flow.dart';
 import 'features/shell/presentation/screens/app_shell.dart';
+import 'features/professionals/presentation/providers/location_provider.dart';
+import 'firebase_options.dart';
 
 void main() async {
+  print('MAIN: Starting app initialization');
   WidgetsFlutterBinding.ensureInitialized();
+  print('MAIN: Flutter binding initialized');
+
   await AppLogger.init();
+  print('MAIN: AppLogger initialized');
+
+  // Initialize Firebase with explicit options so it works on iOS even when
+  // GoogleService-Info.plist isn't bundled into the Xcode target.
+  print('MAIN: About to initialize Firebase');
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  print('MAIN: Firebase initialized');
+
+  print('MAIN: Getting shared preferences');
   final prefs = await SharedPreferences.getInstance();
+  print('MAIN: SharedPreferences ready');
+
+  print('MAIN: Initializing NotificationService');
   await NotificationService.init();
+  print('MAIN: NotificationService initialized');
+
+  // Initialize Firebase Messaging (push notifications)
+  print('MAIN: About to initialize FCM');
+  try {
+    await FirebaseMessagingService.initialize();
+    print('MAIN: FCM initialization completed successfully');
+  } catch (e) {
+    print('MAIN: FCM initialization ERROR: $e');
+  }
+
+  // Get and register FCM token with backend
+  print('MAIN: Getting FCM token...');
+  try {
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    print('MAIN: FCM Token: $fcmToken');
+    if (fcmToken != null) {
+      AppLogger.i('FCM Token obtained: $fcmToken', tag: 'FCM');
+      print('MAIN: Registering FCM token with backend...');
+      // Will be registered after auth provider is ready in the app
+    } else {
+      print('MAIN: FCM token is NULL');
+    }
+  } catch (e) {
+    print('MAIN: Failed to get FCM token: $e');
+  }
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -134,6 +185,9 @@ class _AppEntryState extends ConsumerState<_AppEntry>
         AppLogger.i('App backgrounded', tag: 'Lifecycle');
       case AppLifecycleState.detached:
         AppLogger.i('App detached', tag: 'Lifecycle');
+        // App is being terminated ("closed completely") — drop the saved
+        // location so the professionals page starts fresh on next launch.
+        ref.read(locationProvider.notifier).clear();
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
         break;
@@ -149,6 +203,10 @@ class _AppEntryState extends ConsumerState<_AppEntry>
       (previous, next) {
         if (previous == true && !next && _current is AppShell) {
           setState(() => _current = AuthFlow(onAuthenticated: _afterAuth));
+        }
+        // Register FCM token when user authenticates
+        if (previous != true && next) {
+          _registerFcmToken(ref);
         }
       },
     );
@@ -213,6 +271,24 @@ class _AppEntryState extends ConsumerState<_AppEntry>
   void _afterAuth() {
     if (!mounted) return;
     setState(() => _current = const AppShell());
+  }
+
+  Future<void> _registerFcmToken(WidgetRef ref) async {
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null && mounted) {
+        // Get the dio client and register the token
+        final dio = ref.read(dioProvider);
+        final platform = Platform.isAndroid ? 'ANDROID' : 'IOS';
+        await dio.post(
+          '/api/notifications/tokens',
+          data: {'token': fcmToken, 'platform': platform},
+        );
+        AppLogger.i('FCM token registered ($platform): $fcmToken', tag: 'FCM');
+      }
+    } catch (e) {
+      AppLogger.e('Failed to register FCM token: $e', tag: 'FCM');
+    }
   }
 
 }

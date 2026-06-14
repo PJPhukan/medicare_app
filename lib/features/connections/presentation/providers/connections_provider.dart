@@ -6,9 +6,12 @@ import '../../domain/entities/connection_entity.dart';
 import '../../domain/entities/connection_request_entity.dart';
 import '../../domain/repositories/connections_repository.dart';
 import '../../domain/usecases/accept_request_usecase.dart';
+import '../../domain/usecases/confirm_payment_usecase.dart';
 import '../../domain/usecases/decline_request_usecase.dart';
 import '../../domain/usecases/fetch_connections_usecase.dart';
 import '../../domain/usecases/fetch_incoming_requests_usecase.dart';
+import '../../domain/usecases/get_my_requests_usecase.dart';
+import '../../domain/usecases/pay_for_request_usecase.dart';
 import '../../domain/usecases/send_connection_request_usecase.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/utils/logger.dart';
@@ -28,27 +31,45 @@ final sendConnectionRequestProvider = Provider<SendConnectionRequestUseCase>(
   },
 );
 
+final payForRequestProvider = Provider<PayForRequestUseCase>(
+  (ref) {
+    ref.watch(authTokenProvider);
+    return PayForRequestUseCase(ref.read(connectionsRepositoryProvider));
+  },
+);
+
+final confirmPaymentProvider = Provider<ConfirmPaymentUseCase>(
+  (ref) {
+    ref.watch(authTokenProvider);
+    return ConfirmPaymentUseCase(ref.read(connectionsRepositoryProvider));
+  },
+);
+
 class _ConnectionsState {
   const _ConnectionsState({
     this.connections = const [],
+    this.myRequests = const [],
     this.incomingRequests = const [],
     this.isLoading = false,
     this.error,
   });
 
   final List<ConnectionEntity> connections;
+  final List<ConnectionRequestEntity> myRequests;
   final List<ConnectionRequestEntity> incomingRequests;
   final bool isLoading;
   final String? error;
 
   _ConnectionsState copyWith({
     List<ConnectionEntity>? connections,
+    List<ConnectionRequestEntity>? myRequests,
     List<ConnectionRequestEntity>? incomingRequests,
     bool? isLoading,
     String? error,
   }) =>
       _ConnectionsState(
         connections: connections ?? this.connections,
+        myRequests: myRequests ?? this.myRequests,
         incomingRequests: incomingRequests ?? this.incomingRequests,
         isLoading: isLoading ?? this.isLoading,
         error: error,
@@ -56,12 +77,18 @@ class _ConnectionsState {
 }
 
 class _ConnectionsNotifier extends StateNotifier<_ConnectionsState> {
-  _ConnectionsNotifier(this._fetch, this._fetchRequests, this._accept, this._decline)
-      : super(const _ConnectionsState()) {
+  _ConnectionsNotifier(
+    this._fetch,
+    this._fetchMyRequests,
+    this._fetchRequests,
+    this._accept,
+    this._decline,
+  ) : super(const _ConnectionsState()) {
     load();
   }
 
   final FetchConnectionsUseCase _fetch;
+  final GetMyRequestsUseCase _fetchMyRequests;
   final FetchIncomingRequestsUseCase _fetchRequests;
   final AcceptRequestUseCase _accept;
   final DeclineRequestUseCase _decline;
@@ -69,10 +96,15 @@ class _ConnectionsNotifier extends StateNotifier<_ConnectionsState> {
   Future<void> load() async {
     state = state.copyWith(isLoading: true);
     try {
-      final results = await Future.wait([_fetch(), _fetchRequests()]);
+      final results = await Future.wait([
+        _fetch(),
+        _fetchMyRequests(),
+        _fetchRequests(),
+      ]);
       state = state.copyWith(
         connections: results[0] as List<ConnectionEntity>,
-        incomingRequests: results[1] as List<ConnectionRequestEntity>,
+        myRequests: results[1] as List<ConnectionRequestEntity>,
+        incomingRequests: results[2] as List<ConnectionRequestEntity>,
         isLoading: false,
       );
     } catch (e) {
@@ -118,6 +150,7 @@ final connectionsProvider =
   final repo = ref.read(connectionsRepositoryProvider);
   return _ConnectionsNotifier(
     FetchConnectionsUseCase(repo),
+    GetMyRequestsUseCase(repo),
     FetchIncomingRequestsUseCase(repo),
     AcceptRequestUseCase(repo),
     DeclineRequestUseCase(repo),

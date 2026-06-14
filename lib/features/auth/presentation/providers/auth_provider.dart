@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/api/client.dart';
+import '../../../../core/api/session_events.dart';
 import '../../../../core/utils/logger.dart';
 import '../../data/datasources/auth_local_datasource.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
@@ -187,6 +188,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     AppLogger.i('Logged out ✓', tag: 'Auth');
   }
 
+  bool _sessionExpiring = false;
+
+  /// Called when an API returns 401 (invalid/expired token). Clears the session
+  /// so the app redirects to login. Guarded against re-entrancy and only acts
+  /// when currently authenticated.
+  Future<void> handleSessionExpired() async {
+    if (_sessionExpiring || !state.isAuthenticated) return;
+    _sessionExpiring = true;
+    AppLogger.i('Session expired (401) → signing out', tag: 'Auth');
+    try {
+      try {
+        await _logout(); // best-effort server logout; ignore failures
+      } catch (_) {}
+      state = const AuthState();
+    } finally {
+      _sessionExpiring = false;
+    }
+  }
+
   String _msg(Exception e) {
     if (e is DioException) {
       return e.message ?? 'An unexpected error occurred';
@@ -229,12 +249,17 @@ final _verifyOtpUseCaseProvider = Provider<VerifyOtpUseCase>(
 );
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
-  (ref) => AuthNotifier(
-    ref.read(_loginUseCaseProvider),
-    ref.read(_logoutUseCaseProvider),
-    ref.read(_verifyOtpUseCaseProvider),
-    ref.read(authRepositoryProvider),
-  ),
+  (ref) {
+    final notifier = AuthNotifier(
+      ref.read(_loginUseCaseProvider),
+      ref.read(_logoutUseCaseProvider),
+      ref.read(_verifyOtpUseCaseProvider),
+      ref.read(authRepositoryProvider),
+    );
+    // Sign out automatically when any request reports an expired session (401).
+    SessionEvents.instance.onUnauthorized = notifier.handleSessionExpired;
+    return notifier;
+  },
 );
 
 /// Convenience provider — other feature providers watch this to invalidate on logout/login.

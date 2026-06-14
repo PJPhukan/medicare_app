@@ -21,6 +21,8 @@ class AuthRepositoryImpl implements AuthRepository {
     );
     await Future.wait([
       _local.saveToken(result.token.token),
+      if (result.token.refreshToken != null)
+        _local.saveRefreshToken(result.token.refreshToken!),
       _local.saveUser(result.user),
     ]);
     final UserEntity user = result.user;
@@ -45,6 +47,8 @@ class AuthRepositoryImpl implements AuthRepository {
     );
     await Future.wait([
       _local.saveToken(result.token.token),
+      if (result.token.refreshToken != null)
+        _local.saveRefreshToken(result.token.refreshToken!),
       _local.saveUser(result.user),
     ]);
     final UserEntity user = result.user;
@@ -66,6 +70,8 @@ class AuthRepositoryImpl implements AuthRepository {
     );
     await Future.wait([
       _local.saveToken(result.token.token),
+      if (result.token.refreshToken != null)
+        _local.saveRefreshToken(result.token.refreshToken!),
       _local.saveUser(result.user),
     ]);
     final UserEntity user = result.user;

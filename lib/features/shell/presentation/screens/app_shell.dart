@@ -28,6 +28,7 @@ import '../../../patients/presentation/screens/patients_screen.dart';
 import '../../../caretakers/presentation/screens/caretakers_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../professional_profile/presentation/screens/pro_hub_screen.dart';
+import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../shared/widgets/bottom_sheets/feedback_sheet.dart';
@@ -70,7 +71,9 @@ const _slugMeta = <String, _SlugMeta>{
   'settings':      _SlugMeta(outlineIcon: Icons.settings_outlined, filledIcon: Icons.settings_rounded, color: AppColors.textSecondary, section: 'People & Care'),
   'profile':       _SlugMeta(outlineIcon: Icons.person_outline_rounded, filledIcon: Icons.person_rounded, color: AppColors.blue, section: 'Overview'),
   'pro-profile':   _SlugMeta(outlineIcon: Icons.badge_outlined, filledIcon: Icons.badge_rounded, color: AppColors.purple, section: 'My Professional'),
+  'professional-profile': _SlugMeta(outlineIcon: Icons.badge_outlined, filledIcon: Icons.badge_rounded, color: AppColors.purple, section: 'My Professional'),
   'connections':   _SlugMeta(outlineIcon: Icons.group_outlined, filledIcon: Icons.group_rounded, color: AppColors.blue, section: 'My Professional'),
+  '/professionals/connections': _SlugMeta(outlineIcon: Icons.group_outlined, filledIcon: Icons.group_rounded, color: AppColors.blue, section: 'My Professional'),
   'help':          _SlugMeta(outlineIcon: Icons.help_outline_rounded, filledIcon: Icons.help_rounded, color: AppColors.blue, section: 'Help & Support'),
   'support':       _SlugMeta(outlineIcon: Icons.headset_mic_outlined, filledIcon: Icons.headset_mic_rounded, color: AppColors.teal, section: 'Help & Support'),
   'feedback':      _SlugMeta(outlineIcon: Icons.rate_review_outlined, filledIcon: Icons.rate_review_rounded, color: AppColors.green, section: 'Help & Support'),
@@ -97,18 +100,54 @@ Widget? _pushScreenForSlug(String slug) => switch (slug) {
   'settings'      => const SettingsScreen(),
   'profile'       => const ProfileScreen(),
   'pro-profile'   => const ProHubScreen(),
+  'professional-profile' => const ProHubScreen(),
   'connections'   => const ConnectionsScreen(),
+  '/professionals/connections' => const ConnectionsScreen(),
   'help'          => const SupportScreen(),
   'support'       => const SupportScreen(),
   'privacy'       => const SupportScreen(),
   _               => null,
 };
 
+// Tab configs sometimes carry a leading '/' on the slug and sometimes don't
+// (easy to forget when configuring in admin). Resolve slugs tolerantly so a
+// missing or extra leading slash never silently hides a tab.
+String _stripSlash(String s) => s.startsWith('/') ? s.substring(1) : s;
+
+_SlugMeta? _metaForSlug(String slug) =>
+    _slugMeta[slug] ??
+    _slugMeta[_stripSlash(slug)] ??
+    _slugMeta['/${_stripSlash(slug)}'];
+
+Widget? _resolveScreen(String slug) =>
+    _pushScreenForSlug(slug) ??
+    _pushScreenForSlug(_stripSlash(slug)) ??
+    _pushScreenForSlug('/${_stripSlash(slug)}');
+
+bool _isProGatedSlug(String slug) =>
+    _proGatedSlugs.contains(slug) ||
+    _proGatedSlugs.contains(_stripSlash(slug)) ||
+    _proGatedSlugs.contains('/${_stripSlash(slug)}');
+
 // Sidebar section order and danger flags
 const _sectionOrder = [
   'Overview', 'Health', 'Emergency', 'People & Care', 'My Professional', 'Help & Support',
 ];
 const _dangerSections = {'Emergency'};
+
+// Professional working tabs — shown only to VERIFIED professionals. The
+// pro-profile hub itself is intentionally NOT here, so anyone can open it to
+// apply or check their application status.
+const _proGatedSlugs = {
+  'connections',
+  '/professionals/connections',
+  'professional-requests',
+  'professional-my-requests',
+  '/professionals/requests',
+};
+
+bool _isProGated(String slug, String tabType) =>
+    tabType == 'ROLE_ONLY' || _isProGatedSlug(slug);
 
 // Fallback CORE tabs when backend is unavailable
 const _fallbackSlugs = ['home', 'medicines', 'vitals', 'professionals', 'messages'];
@@ -150,6 +189,10 @@ class _AppShellState extends ConsumerState<AppShell> {
   // Cache screen instances so they survive tab list rebuilds
   final _screenCache = <String, Widget>{};
   List<_CoreTab> _coreTabs = [];
+  // Track which tabs the user has actually visited, so each screen's initState
+  // (and any side-effects like location prompts) only runs on first visit —
+  // not eagerly at app launch.
+  final _activatedIndices = <int>{0};
 
   @override
   void initState() {
@@ -164,7 +207,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   void _switchBySlug(String slug) {
-    final i = _coreTabs.indexWhere((t) => t.slug == slug);
+    final i = _coreTabs.indexWhere((t) => _stripSlash(t.slug) == _stripSlash(slug));
     if (i >= 0) {
       _switchTab(i);
     } else {
@@ -181,6 +224,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     setState(() {
       _index = index;
       _navVisible = true;
+      _activatedIndices.add(index);
     });
     AppLogger.i('Tab switch → $index', tag: 'Shell');
   }
@@ -200,12 +244,18 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Widget _screenFor(String slug) {
-    return _screenCache.putIfAbsent(slug, () => _pushScreenForSlug(slug) ?? const _ComingSoonScreen());
+    return _screenCache.putIfAbsent(slug, () => _resolveScreen(slug) ?? const _ComingSoonScreen());
   }
 
-  List<_CoreTab> _buildCoreTabs(List<TabConfigModel> tabs) {
+  List<_CoreTab> _buildCoreTabs(List<TabConfigModel> tabs, bool isVerifiedPro) {
     final navTabs = tabs
-        .where((t) => t.isActive && t.allowView && t.showInBottomNav && _slugMeta.containsKey(t.slug))
+        .where((t) =>
+            t.isActive &&
+            t.allowView &&
+            t.showInBottomNav &&
+            _metaForSlug(t.slug) != null &&
+            // Professional-only tabs appear only once the pro is verified.
+            (!_isProGated(t.slug, t.tabType) || isVerifiedPro))
         .toList()
       ..sort((a, b) {
         final n = a.navOrder.compareTo(b.navOrder);
@@ -216,7 +266,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     return capped.map((t) => _CoreTab(
       slug: t.slug,
       label: t.label,
-      meta: _slugMeta[t.slug]!,
+      meta: _metaForSlug(t.slug)!,
       screen: _screenFor(t.slug),
       svgIcon: t.iconSvg,
     )).toList();
@@ -228,7 +278,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       return _CoreTab(
         slug: slug,
         label: _fallbackLabels[i],
-        meta: _slugMeta[slug]!,
+        meta: _metaForSlug(slug)!,
         screen: _screenFor(slug),
       );
     });
@@ -238,15 +288,18 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final tabsAsync = ref.watch(tabsProvider);
+    // Verified professionals get their role-only tabs; rebuild when this changes.
+    final isVerifiedPro = ref.watch(proProfileProvider).profile?.isVerified ?? false;
 
     _coreTabs = tabsAsync.when(
-      data: _buildCoreTabs,
+      data: (tabs) => _buildCoreTabs(tabs, isVerifiedPro),
       loading: _fallbackCoreTabs,
       error: (_, __) => _fallbackCoreTabs(),
     );
 
     final coreTabs = _coreTabs;
     final safeIndex = _index.clamp(0, coreTabs.length - 1);
+    _activatedIndices.add(safeIndex);
 
     return PopScope(
       canPop: _index == 0,
@@ -279,7 +332,13 @@ class _AppShellState extends ConsumerState<AppShell> {
                       onNotification: _onScrollNotification,
                       child: IndexedStack(
                         index: safeIndex,
-                        children: coreTabs.map((t) => t.screen).toList(),
+                        children: List.generate(coreTabs.length, (i) {
+                          // Lazily build each tab's screen only after its first
+                          // visit; keep it alive afterwards so state persists.
+                          return _activatedIndices.contains(i)
+                              ? coreTabs[i].screen
+                              : const SizedBox.shrink();
+                        }),
                       ),
                     ),
                   ),
@@ -299,7 +358,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                         items: coreTabs,
                         onTap: (i) {
                           HapticFeedback.selectionClick();
-                          setState(() { _index = i; _navVisible = true; });
+                          setState(() {
+                            _index = i;
+                            _navVisible = true;
+                            _activatedIndices.add(i);
+                          });
                         },
                       ),
                     ),
@@ -486,11 +549,15 @@ class _AppSidebar extends ConsumerWidget {
     final bg = isDark ? context.bg : Colors.white;
     final border = isDark ? context.borderCol : const Color(0xFFE2E8F0);
 
+    final isVerifiedPro = ref.watch(proProfileProvider).profile?.isVerified ?? false;
+
     // Group all active tabs by section
     final grouped = <String, List<TabConfigModel>>{};
     for (final tab in allTabs) {
       if (!tab.isActive || !tab.allowView) continue;
-      final meta = _slugMeta[tab.slug];
+      // Professional-only tabs appear only once the pro is verified.
+      if (_isProGated(tab.slug, tab.tabType) && !isVerifiedPro) continue;
+      final meta = _metaForSlug(tab.slug);
       if (meta == null) continue;
       grouped.putIfAbsent(meta.section, () => []).add(tab);
     }
@@ -533,7 +600,7 @@ class _AppSidebar extends ConsumerWidget {
                         border: border,
                         isDanger: _dangerSections.contains(section),
                         items: grouped[section]!.map((tab) {
-                          final meta = _slugMeta[tab.slug]!;
+                          final meta = _metaForSlug(tab.slug)!;
                           final coreIdx = coreSlugs.indexOf(tab.slug);
                           return _SidebarItem(
                             icon: meta.filledIcon,
@@ -544,7 +611,7 @@ class _AppSidebar extends ConsumerWidget {
                             onTap: () {
                               if (coreIdx >= 0) {
                                 onSwitchTab(coreIdx);
-                              } else if (tab.slug == 'feedback') {
+                              } else if (_stripSlash(tab.slug) == 'feedback') {
                                 Scaffold.of(context).closeDrawer();
                                 showFeedbackSheet(context);
                               } else {
@@ -552,7 +619,7 @@ class _AppSidebar extends ConsumerWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => _pushScreenForSlug(tab.slug) ?? const _ComingSoonScreen(),
+                                    builder: (_) => _resolveScreen(tab.slug) ?? const _ComingSoonScreen(),
                                   ),
                                 );
                               }

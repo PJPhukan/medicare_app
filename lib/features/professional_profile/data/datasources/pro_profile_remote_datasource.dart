@@ -52,4 +52,21 @@ class ProProfileRemoteDataSource {
   Future<void> removeServiceArea(String serviceAreaId) async {
     await _dio.delete<void>('${ApiConstants.profServiceAreas}/$serviceAreaId');
   }
+
+  Future<void> requestNewArea({
+    required String name,
+    required String pincodes,
+    required String state,
+    required String district,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/api/professionals/areas/request',
+      data: {
+        'name': name,
+        'pincodes': pincodes,
+        'state': state,
+        'district': district,
+      },
+    );
+  }
 }

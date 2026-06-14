@@ -15,18 +15,21 @@ class ScheduleRepositoryImpl implements ScheduleRepository {
   final bool Function() _isOnline;
 
   @override
-  Future<List<DoseEntity>> getTodayDoses() => _ds.getTodayDoses();
+  Future<List<DoseEntity>> getTodayDoses({String? date}) =>
+      _ds.getTodayDoses(date: date);
 
   @override
   Future<void> markDose({
     required String doseTimeId,
     required String status,
+    String? scheduledDate,
     String? skippedReason,
   }) async {
     if (_isOnline()) {
       await _ds.markDose(
         doseTimeId: doseTimeId,
         status: status,
+        scheduledDate: scheduledDate,
         skippedReason: skippedReason,
       );
     } else {
@@ -36,6 +39,7 @@ class ScheduleRepositoryImpl implements ScheduleRepository {
         payload: {
           'doseTimeId': doseTimeId,
           'status': status,
+          if (scheduledDate != null) 'scheduledDate': scheduledDate,
           if (skippedReason != null) 'skippedReason': skippedReason,
         },
       ));

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
@@ -11,6 +12,10 @@ import '../../../shell/presentation/screens/app_shell.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../premium/presentation/screens/subscription_management_screen.dart';
+import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
+import '../../../professional_profile/presentation/screens/become_professional_screen.dart';
+import '../../../professional_profile/presentation/screens/pro_hub_screen.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -39,14 +44,14 @@ const _kLanguages = [
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   _Tab _activeTab = _Tab.profile;
 
   // Notification toggles
@@ -65,6 +70,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _biometricAuth = false;
   bool _autoLock = true;
   String _autoLockDuration = '5 minutes';
+
+  // Device info
+  final String _deviceName = 'My iPhone 15 Pro';
+  final String _lastLogin = 'Today at 2:30 PM';
 
   // Language
   String _language = 'English';
@@ -192,12 +201,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AboutSheet(),
+      builder: (_) => const _AboutSheet(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authProvider.select((s) => s.user));
+    final isVerifiedPro = ref.watch(proProfileProvider.select((s) => s.profile?.isVerified ?? false));
+    final displayName = user?.displayName ?? 'User';
+    final email = user?.email ?? '';
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -217,7 +231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SliverToBoxAdapter(
               child: Column(
                 children: [
-                  // ── Profile card ──────────────────────────────────────────
+                  // ── Profile card with enhanced design ─────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: GestureDetector(
@@ -231,38 +245,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: context.cardBg,
                           borderRadius: AppBorderRadius.lgAll,
                           border: Border.all(color: context.borderCol),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.teal.withValues(alpha: 0.05),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: AppColors.teal.withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
-                              ),
-                              alignment: Alignment.center,
-                              child: const Text(
-                                'RK',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.teal),
-                              ),
+                            AppVerifiedAvatar(
+                              name: displayName,
+                              imageUrl: user?.avatarUrl,
+                              isVerified: isVerifiedPro,
+                              size: AppAvatarSize.lg,
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Ramesh Kumar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                                  Text(displayName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                                   const SizedBox(height: 2),
-                                  AppText.bodySm('ramesh.kumar@email.com'),
-                                  const SizedBox(height: 6),
+                                  AppText.bodySm(email, color: AppColors.textSecondary),
+                                  const SizedBox(height: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: AppColors.teal.withValues(alpha: 0.12),
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppColors.teal.withValues(alpha: 0.15),
+                                          AppColors.teal.withValues(alpha: 0.1),
+                                        ],
+                                      ),
                                       borderRadius: AppBorderRadius.pill,
-                                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+                                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.25)),
                                     ),
                                     child: const Text(AppStrings.freePlan,
                                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: AppColors.teal)),
@@ -270,17 +288,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ],
                               ),
                             ),
-                            const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: context.inputBg,
+                                borderRadius: AppBorderRadius.mdAll,
+                              ),
+                              child: const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // ── Tab bar ───────────────────────────────────────────────
+                  // ── Tab bar with smooth animations ────────────────────────
                   SizedBox(
-                    height: 38,
+                    height: 42,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -289,20 +314,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         return GestureDetector(
                           onTap: () => setState(() => _activeTab = t),
                           child: AnimatedContainer(
-                            duration: Duration(milliseconds: 200),
-                            margin: EdgeInsets.only(right: 8),
-                            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            duration: const Duration(milliseconds: 250),
+                            margin: const EdgeInsets.only(right: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
                               color: active ? AppColors.teal : context.inputBg,
                               borderRadius: AppBorderRadius.pill,
-                              border: Border.all(color: active ? AppColors.teal : context.borderCol),
+                              border: Border.all(
+                                color: active ? AppColors.teal : context.borderCol,
+                                width: active ? 1.5 : 1,
+                              ),
+                              boxShadow: active
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.teal.withValues(alpha: 0.15),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
                             ),
                             child: Text(
                               t.label,
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
+                                fontSize: 12,
+                                fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                                letterSpacing: 0.3,
                                 color: active ? context.bg : AppColors.textSecondary,
                               ),
                             ),
@@ -311,7 +348,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }).toList(),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // ── Tab content ───────────────────────────────────────────
                   Padding(
@@ -340,49 +377,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildProfile() {
     return Column(
       children: [
-        _SettingsGroup(
-          label: 'Personal',
-          children: [
-            _RowItem(
-              icon: Icons.person_outline_rounded,
-              label: AppStrings.editProfile,
-              color: AppColors.teal,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              ),
+        // Account status card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.teal.withValues(alpha: 0.08),
+                AppColors.teal.withValues(alpha: 0.03),
+              ],
             ),
-            _RowItem(
-              icon: Icons.medical_information_outlined,
-              label: AppStrings.healthProfileTitle,
-              color: AppColors.blue,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            borderRadius: AppBorderRadius.lgAll,
+            border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: 0.15),
+                  borderRadius: AppBorderRadius.mdAll,
+                ),
+                child: const Icon(Icons.verified_user_rounded, size: 20, color: AppColors.green),
               ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Account Verified', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    AppText.bodySm('Your account is verified and secure', color: AppColors.textSecondary),
+                  ],
+                ),
+              ),
+              const Icon(Icons.check_circle_rounded, size: 24, color: AppColors.green),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        AppListSection(
+          header: 'Personal',
+          items: [
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.teal.withValues(alpha: 0.15), AppColors.teal.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.teal),
+              ),
+              title: AppStrings.editProfile,
+              showChevron: true,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
             ),
-            _RowItem(
-              icon: Icons.language_rounded,
-              label: AppStrings.language,
-              color: AppColors.purple,
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.blue.withValues(alpha: 0.15), AppColors.blue.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.blue.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.medical_information_outlined, size: 18, color: AppColors.blue),
+              ),
+              title: AppStrings.healthProfileTitle,
+              showChevron: true,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+            ),
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.purple.withValues(alpha: 0.15), AppColors.purple.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.purple.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.language_rounded, size: 18, color: AppColors.purple),
+              ),
+              title: AppStrings.language,
               trailing: AppText.bodySm(_language, color: AppColors.textHint),
               onTap: _openLanguagePicker,
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        _SettingsGroup(
-          label: 'Subscription',
-          children: [
-            _RowItem(
-              icon: Icons.workspace_premium_outlined,
-              label: AppStrings.subscriptionPlan,
-              color: AppColors.amber,
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        const SizedBox(height: 16),
+        AppListSection(
+          header: 'Subscription',
+          items: [
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.teal.withValues(alpha: 0.12),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.amber.withValues(alpha: 0.15), AppColors.amber.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.amber.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.workspace_premium_outlined, size: 18, color: AppColors.amber),
+              ),
+              title: AppStrings.subscriptionPlan,
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [AppColors.teal.withValues(alpha: 0.15), AppColors.teal.withValues(alpha: 0.1)]),
                   borderRadius: AppBorderRadius.pill,
+                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.25)),
                 ),
                 child: const Text(AppStrings.freePlan,
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: AppColors.teal)),
@@ -391,19 +516,219 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+
+        // ── Professional Profile ──────────────────────────────────────────────
+        _buildProfessionalSection(),
       ],
     );
   }
+
+  // ── Professional profile section ─────────────────────────────────────────────
+
+  Widget _buildProfessionalSection() {
+    final proState = ref.watch(proProfileProvider);
+    final profile = proState.profile;
+    final notApplied = proState.notFound || (profile == null && !proState.isLoading);
+
+    // Loading shimmer-ish placeholder
+    if (proState.isLoading && profile == null && !proState.notFound) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text('PROFESSIONAL',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: AppColors.textHint)),
+          ),
+          Container(
+            height: 76,
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: AppBorderRadius.lgAll,
+              border: Border.all(color: context.borderCol),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 20, height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ── Not applied: motivating call-to-action ──────────────────────────────────
+    if (notApplied) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text('PROFESSIONAL',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: AppColors.textHint)),
+          ),
+          GestureDetector(
+            onTap: _openBecomePro,
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.teal.withValues(alpha: 0.16),
+                    AppColors.blue.withValues(alpha: 0.08),
+                  ],
+                ),
+                borderRadius: AppBorderRadius.lgAll,
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppColors.teal, AppColors.blue],
+                          ),
+                          borderRadius: AppBorderRadius.mdAll,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.teal.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.workspace_premium_rounded, size: 24, color: Colors.white),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Become a Professional',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 3),
+                            AppText.bodySm('Offer your services & earn on your terms',
+                                color: AppColors.textSecondary),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Benefit chips
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: const [
+                      _BenefitChip(icon: Icons.payments_rounded, label: 'Set your own rates'),
+                      _BenefitChip(icon: Icons.people_alt_rounded, label: 'Reach more patients'),
+                      _BenefitChip(icon: Icons.verified_rounded, label: 'Verified badge'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.teal, AppColors.blue],
+                      ),
+                      borderRadius: AppBorderRadius.mdAll,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Get Started',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                        SizedBox(width: 6),
+                        Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ── Has profile: verified or pending ────────────────────────────────────────
+    final isVerified = profile!.isVerified;
+    final statusColor = isVerified ? AppColors.green : AppColors.amber;
+    final statusLabel = isVerified ? 'Verified' : 'Pending';
+    final statusIcon = isVerified ? Icons.verified_rounded : Icons.hourglass_top_rounded;
+    final subtitle = isVerified
+        ? (profile.categoryLabel ?? 'Verified professional')
+        : 'Verification in progress';
+
+    return AppListSection(
+      header: 'Professional',
+      items: [
+        AppListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [statusColor.withValues(alpha: 0.15), statusColor.withValues(alpha: 0.08)],
+              ),
+              borderRadius: AppBorderRadius.mdAll,
+              border: Border.all(color: statusColor.withValues(alpha: 0.15)),
+            ),
+            child: Icon(statusIcon, size: 18, color: statusColor),
+          ),
+          title: AppStrings.professionalProfile,
+          subtitle: subtitle,
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              borderRadius: AppBorderRadius.pill,
+            ),
+            child: Text(statusLabel,
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: statusColor)),
+          ),
+          onTap: _openProHub,
+        ),
+      ],
+    );
+  }
+
+  void _openBecomePro() => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
+      );
+
+  void _openProHub() => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProHubScreen()),
+      );
 
   // ── Notifications tab ────────────────────────────────────────────────────────
 
   Widget _buildNotifications() {
     return Column(
       children: [
-        _SettingsGroup(
-          label: 'Health Alerts',
-          children: [
-            _ToggleItem(
+        AppListSection(
+          header: 'Health Alerts',
+          dividerIndent: 56,
+          items: [
+            _buildToggleListTile(
               icon: Icons.medication_outlined,
               label: AppStrings.medicineRemindersSetting,
               description: 'Remind me when it\'s time to take a dose',
@@ -411,7 +736,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.teal,
               onChanged: (v) => setState(() => _medicineReminders = v),
             ),
-            _ToggleItem(
+            _buildToggleListTile(
               icon: Icons.favorite_outline_rounded,
               label: AppStrings.vitalAlerts,
               description: 'Notify me of abnormal vital readings',
@@ -419,7 +744,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.red,
               onChanged: (v) => setState(() => _vitalAlerts = v),
             ),
-            _ToggleItem(
+            _buildToggleListTile(
               icon: Icons.calendar_today_rounded,
               label: 'Appointment Reminders',
               description: 'Remind me 1 hour before appointments',
@@ -429,11 +754,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        _SettingsGroup(
-          label: 'Social',
-          children: [
-            _ToggleItem(
+        const SizedBox(height: 16),
+        AppListSection(
+          header: 'Social',
+          dividerIndent: 56,
+          items: [
+            _buildToggleListTile(
               icon: Icons.people_outline_rounded,
               label: AppStrings.connectionAlerts,
               description: 'Connection requests and messages',
@@ -441,7 +767,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.purple,
               onChanged: (v) => setState(() => _connectionAlerts = v),
             ),
-            _ToggleItem(
+            _buildToggleListTile(
               icon: Icons.campaign_outlined,
               label: 'System Updates',
               description: 'App updates and announcements',
@@ -455,13 +781,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  AppListTile _buildToggleListTile({
+    required IconData icon,
+    required String label,
+    required String? description,
+    required bool value,
+    required Color color,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return AppListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.08)],
+          ),
+          borderRadius: AppBorderRadius.mdAll,
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+        ),
+        child: Icon(icon, size: 18, color: color),
+      ),
+      title: label,
+      subtitle: description,
+      trailing: Switch.adaptive(
+        value: value,
+        onChanged: onChanged,
+        activeThumbColor: context.bg,
+        activeTrackColor: color,
+        inactiveThumbColor: AppColors.textHint,
+        inactiveTrackColor: context.borderCol,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    );
+  }
+
   // ── Appearance tab ───────────────────────────────────────────────────────────
 
   Widget _buildAppearance() {
-    return _SettingsGroup(
-      label: 'Display',
-      children: [
-        _ToggleItem(
+    return AppListSection(
+      header: 'Display',
+      dividerIndent: 56,
+      items: [
+        _buildToggleListTile(
           icon: Icons.dark_mode_outlined,
           label: AppStrings.darkMode,
           description: 'Use dark background throughout the app',
@@ -472,7 +836,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             setState(() => _darkMode = v);
           },
         ),
-        _ToggleItem(
+        _buildToggleListTile(
           icon: Icons.view_compact_outlined,
           label: 'Compact Mode',
           description: 'Reduce spacing for more content on screen',
@@ -480,7 +844,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: AppColors.blue,
           onChanged: (v) => setState(() => _compactMode = v),
         ),
-        _ToggleItem(
+        _buildToggleListTile(
           icon: Icons.timer_outlined,
           label: 'Show Seconds',
           description: 'Show seconds in time displays',
@@ -495,54 +859,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ── Security tab ─────────────────────────────────────────────────────────────
 
   Widget _buildSecurity() {
+    final authItems = [
+      _buildToggleListTile(
+        icon: Icons.fingerprint_rounded,
+        label: AppStrings.biometricAuth,
+        description: AppStrings.biometricDesc,
+        value: _biometricAuth,
+        color: AppColors.teal,
+        onChanged: (v) {
+          AppLogger.i('Biometric auth setting → $v', tag: 'Settings');
+          setState(() => _biometricAuth = v);
+        },
+      ),
+      _buildToggleListTile(
+        icon: Icons.lock_outline_rounded,
+        label: AppStrings.autoLock,
+        description: 'Lock app when inactive',
+        value: _autoLock,
+        color: AppColors.blue,
+        onChanged: (v) => setState(() => _autoLock = v),
+      ),
+    ];
+
     return Column(
       children: [
-        _SettingsGroup(
-          label: 'Authentication',
-          children: [
-            _ToggleItem(
-              icon: Icons.fingerprint_rounded,
-              label: AppStrings.biometricAuth,
-              description: AppStrings.biometricDesc,
-              value: _biometricAuth,
-              color: AppColors.teal,
-              onChanged: (v) {
-                AppLogger.i('Biometric auth setting → $v', tag: 'Settings');
-                setState(() => _biometricAuth = v);
-              },
-            ),
-            _ToggleItem(
-              icon: Icons.lock_outline_rounded,
-              label: AppStrings.autoLock,
-              description: 'Lock app when inactive',
-              value: _autoLock,
-              color: AppColors.blue,
-              onChanged: (v) => setState(() => _autoLock = v),
-            ),
-            if (_autoLock)
-              _RowItem(
-                icon: Icons.timer_outlined,
-                label: AppStrings.autoLockDuration,
-                color: AppColors.amber,
+        AppListSection(
+          header: 'Authentication',
+          dividerIndent: 56,
+          items: authItems,
+        ),
+        if (_autoLock) ...[
+          const SizedBox(height: 12),
+          AppListSection(
+            items: [
+              AppListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.amber.withValues(alpha: 0.15), AppColors.amber.withValues(alpha: 0.08)],
+                    ),
+                    borderRadius: AppBorderRadius.mdAll,
+                    border: Border.all(color: AppColors.amber.withValues(alpha: 0.15)),
+                  ),
+                  child: const Icon(Icons.timer_outlined, size: 18, color: AppColors.amber),
+                ),
+                title: AppStrings.autoLockDuration,
                 trailing: AppText.bodySm(_autoLockDuration, color: AppColors.textHint),
                 onTap: _openAutoLockPicker,
               ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _SettingsGroup(
-          label: 'Data',
-          children: [
-            _RowItem(
-              icon: Icons.download_outlined,
-              label: AppStrings.dataExport,
-              color: AppColors.green,
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
+        AppListSection(
+          header: 'Data',
+          items: [
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.green.withValues(alpha: 0.15), AppColors.green.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.green.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.download_outlined, size: 18, color: AppColors.green),
+              ),
+              title: AppStrings.dataExport,
+              showChevron: true,
               onTap: _openExportSheet,
             ),
-            _RowItem(
-              icon: Icons.cleaning_services_outlined,
-              label: AppStrings.clearCache,
-              color: AppColors.amber,
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.amber.withValues(alpha: 0.15), AppColors.amber.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.amber.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.cleaning_services_outlined, size: 18, color: AppColors.amber),
+              ),
+              title: AppStrings.clearCache,
+              showChevron: true,
               onTap: () => _showSnack(AppStrings.cacheCleared),
             ),
           ],
@@ -556,34 +967,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildAccount() {
     return Column(
       children: [
-        _SettingsGroup(
-          label: 'Support',
-          children: [
-            _RowItem(
-              icon: Icons.help_outline_rounded,
-              label: AppStrings.helpCenter,
-              color: AppColors.blue,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SupportScreen()),
+        // Session & Device section
+        AppListSection(
+          header: 'Session & Device',
+          items: [
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.green.withValues(alpha: 0.15), AppColors.green.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.green.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.smartphone_rounded, size: 18, color: AppColors.green),
+              ),
+              title: _deviceName,
+              subtitle: 'Current device',
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: 0.12),
+                  borderRadius: AppBorderRadius.pill,
+                ),
+                child: const Text('Active',
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppColors.green)),
               ),
             ),
-            _RowItem(
-              icon: Icons.info_outline_rounded,
-              label: AppStrings.aboutApp,
-              color: AppColors.textSecondary,
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.blue.withValues(alpha: 0.15), AppColors.blue.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.blue.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.history_rounded, size: 18, color: AppColors.blue),
+              ),
+              title: 'Last Login',
+              subtitle: _lastLogin,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        AppListSection(
+          header: 'Support',
+          items: [
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.blue.withValues(alpha: 0.15), AppColors.blue.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.blue.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.help_outline_rounded, size: 18, color: AppColors.blue),
+              ),
+              title: AppStrings.helpCenter,
+              showChevron: true,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen())),
+            ),
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.purple.withValues(alpha: 0.15), AppColors.purple.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.purple.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.feedback_outlined, size: 18, color: AppColors.purple),
+              ),
+              title: 'Send Feedback',
+              subtitle: 'Help us improve the app',
+              showChevron: true,
+              onTap: () => _showSnack('Thank you for your feedback!'),
+            ),
+            AppListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.textSecondary.withValues(alpha: 0.15), AppColors.textSecondary.withValues(alpha: 0.08)],
+                  ),
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: AppColors.textSecondary.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.textSecondary),
+              ),
+              title: AppStrings.aboutApp,
               trailing: AppText.bodySm('v1.0.0', color: AppColors.textHint),
               onTap: _openAbout,
             ),
           ],
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 16),
 
         // Sign out button
         GestureDetector(
           onTap: _confirmSignOut,
           child: Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: context.cardBg,
               borderRadius: AppBorderRadius.lgAll,
@@ -591,14 +1097,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.logout_rounded, size: 18, color: AppColors.textSecondary),
-                const SizedBox(width: 12),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.textSecondary.withValues(alpha: 0.1), AppColors.textSecondary.withValues(alpha: 0.05)],
+                    ),
+                    borderRadius: AppBorderRadius.mdAll,
+                  ),
+                  child: const Icon(Icons.logout_rounded, size: 18, color: AppColors.textSecondary),
+                ),
+                const SizedBox(width: 14),
                 AppText.labelMd(AppStrings.signOut, color: AppColors.textSecondary),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
         // Delete account button
         GestureDetector(
@@ -606,21 +1124,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.errorBg,
+              color: AppColors.red.withValues(alpha: 0.08),
               borderRadius: AppBorderRadius.lgAll,
               border: Border.all(color: AppColors.red.withValues(alpha: 0.25)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.delete_forever_outlined, size: 18, color: AppColors.red),
-                const SizedBox(width: 12),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.red.withValues(alpha: 0.12),
+                    borderRadius: AppBorderRadius.mdAll,
+                  ),
+                  child: const Icon(Icons.delete_forever_outlined, size: 18, color: AppColors.red),
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       AppText.labelMd(AppStrings.deleteAccount, color: AppColors.red),
                       const SizedBox(height: 2),
-                      AppText.bodyXs(AppStrings.deleteAccountDesc),
+                      AppText.bodyXs(AppStrings.deleteAccountDesc, color: AppColors.textSecondary),
                     ],
                   ),
                 ),
@@ -633,152 +1159,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// ─── Settings group (card container) ─────────────────────────────────────────
-
-class _SettingsGroup extends StatelessWidget {
-  final String? label;
-  final List<Widget> children;
-  _SettingsGroup({required this.children, this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (label != null) ...[
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(
-              label!.toUpperCase(),
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: AppColors.textHint),
-            ),
-          ),
-        ],
-        Container(
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: AppBorderRadius.lgAll,
-            border: Border.all(color: context.borderCol),
-          ),
-          child: Column(
-            children: [
-              for (var i = 0; i < children.length; i++) ...[
-                children[i],
-                if (i < children.length - 1)
-                  Container(height: 1, margin: EdgeInsets.only(left: 46), color: context.borderCol),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Row item ─────────────────────────────────────────────────────────────────
-
-class _RowItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Widget? trailing;
-  final VoidCallback onTap;
-
-  const _RowItem({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 30, height: 30,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: AppBorderRadius.smAll,
-              ),
-              child: Icon(icon, size: 16, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: AppText.bodyMd(label)),
-            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textHint),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Toggle item ──────────────────────────────────────────────────────────────
-
-class _ToggleItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? description;
-  final bool value;
-  final Color color;
-  final ValueChanged<bool> onChanged;
-
-  const _ToggleItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.onChanged,
-    this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 30, height: 30,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: AppBorderRadius.smAll,
-            ),
-            child: Icon(icon, size: 16, color: color),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppText.bodyMd(label),
-                if (description != null)
-                  AppText.bodyXs(description!, color: AppColors.textHint),
-              ],
-            ),
-          ),
-          SizedBox(width: 8),
-          Switch.adaptive(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: context.bg,
-            activeTrackColor: AppColors.teal,
-            inactiveThumbColor: AppColors.textHint,
-            inactiveTrackColor: context.borderCol,
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Language sheet ───────────────────────────────────────────────────────────
 
@@ -786,7 +1166,7 @@ class _LanguageSheet extends StatelessWidget {
   final String selected;
   final void Function(String) onSelect;
 
-  _LanguageSheet({required this.selected, required this.onSelect});
+  const _LanguageSheet({required this.selected, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
@@ -875,7 +1255,7 @@ class _LanguageSheet extends StatelessWidget {
 
 class _ExportSheet extends StatelessWidget {
   final void Function(String format) onExport;
-  _ExportSheet({required this.onExport});
+  const _ExportSheet({required this.onExport});
 
   @override
   Widget build(BuildContext context) {
@@ -975,7 +1355,7 @@ class _PickerSheet extends StatelessWidget {
   final String selected;
   final void Function(String) onSelect;
 
-  _PickerSheet({
+  const _PickerSheet({
     required this.title,
     required this.options,
     required this.selected,
@@ -1043,7 +1423,7 @@ class _PickerSheet extends StatelessWidget {
 // ─── About sheet ──────────────────────────────────────────────────────────────
 
 class _AboutSheet extends StatelessWidget {
-  _AboutSheet();
+  const _AboutSheet();
 
   @override
   Widget build(BuildContext context) {
@@ -1114,4 +1494,33 @@ class _AboutInfoRow extends StatelessWidget {
           ],
         ),
       );
+}
+
+// ─── Benefit chip (Become-a-Pro CTA) ─────────────────────────────────────────
+
+class _BenefitChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _BenefitChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: context.cardBg.withValues(alpha: 0.6),
+        borderRadius: AppBorderRadius.pill,
+        border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppColors.teal),
+          const SizedBox(width: 5),
+          Text(label,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.teal)),
+        ],
+      ),
+    );
+  }
 }

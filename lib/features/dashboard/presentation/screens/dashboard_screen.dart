@@ -15,6 +15,7 @@ import '../../../../shared/widgets/skeleton/skeleton.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../providers/dashboard_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
 import '../../../schedule/data/models/appointment_model.dart' as dash_model;
 import '../../../vitals/data/models/vital_reading_model.dart' as vrm;
 
@@ -144,6 +145,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final isLoading  = state.isLoading;
     final stats      = state.stats;
     final user       = ref.watch(authProvider.select((s) => s.user));
+    final isVerifiedPro = ref.watch(proProfileProvider.select((s) => s.profile?.isVerified ?? false));
     final doses      = state.doses.map(_toLocalDose).toList();
     final takenCount = doses.where((d) => d.status == _DoseStatus.taken).length;
     final adherence  = stats != null
@@ -192,9 +194,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: AppAvatar(
+                    child: AppVerifiedAvatar(
                       name: user?.displayName ?? '',
                       imageUrl: user?.avatarUrl,
+                      isVerified: isVerifiedPro,
                       size: AppAvatarSize.sm,
                     ),
                   ),

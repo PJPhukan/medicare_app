@@ -95,7 +95,7 @@ class IncomingRequestsScreen extends ConsumerWidget {
     final ok = await AppDialog.confirm(
       context,
       title: AppStrings.declineRequest,
-      message: 'Decline connection request from ${req.sender.name}?',
+      message: 'Decline connection request from ${req.user.name}?',
       confirmLabel: AppStrings.declineRequest,
       cancelLabel: AppStrings.cancel,
       isDanger: true,
@@ -119,7 +119,7 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = request.sender.name;
+    final name = request.user.name;
     final ago = _timeAgo(request.createdAt);
 
     return AppCard(

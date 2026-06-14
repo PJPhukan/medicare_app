@@ -12,4 +12,10 @@ abstract interface class ProProfileRepository {
     String? pincode,
   });
   Future<void> removeServiceArea(String serviceAreaId);
+  Future<void> requestNewArea({
+    required String name,
+    required String pincodes,
+    required String state,
+    required String district,
+  });
 }

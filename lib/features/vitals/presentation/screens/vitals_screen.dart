@@ -64,12 +64,17 @@ class _VitalReading {
   final String? notes;
   final List<_ReadingValue> values;
 
+  /// Worst server-raised, unacknowledged alert severity for this reading
+  /// (`CRITICAL` > `HIGH` > `LOW`), or null when the backend flagged nothing.
+  final String? alertSeverity;
+
   const _VitalReading({
     required this.id,
     required this.vitalConfigId,
     required this.measuredAt,
     this.notes,
     required this.values,
+    this.alertSeverity,
   });
 }
 
@@ -116,7 +121,24 @@ _VitalReading _toVitalReading(vrm.VitalReading r) => _VitalReading(
       measuredAt: r.measuredAtDate,
       notes: r.notes,
       values: r.values.map((v) => _ReadingValue(v.inputId, v.value)).toList(),
+      alertSeverity: _worstSeverity(r.activeAlerts),
     );
+
+/// Reduce a reading's server alerts to its most severe level.
+String? _worstSeverity(List<dynamic> alerts) {
+  const rank = {'CRITICAL': 3, 'HIGH': 2, 'LOW': 1};
+  String? worst;
+  var best = 0;
+  for (final a in alerts) {
+    final sev = a.severity as String;
+    final r = rank[sev] ?? 0;
+    if (r > best) {
+      best = r;
+      worst = sev;
+    }
+  }
+  return worst;
+}
 
 // ─── Status helper ────────────────────────────────────────────────────────────
 
@@ -128,6 +150,20 @@ _VitalReading _toVitalReading(vrm.VitalReading r) => _VitalReading(
     return (color: AppColors.warning, label: AppStrings.warningStatus);
   }
   return (color: AppColors.success, label: AppStrings.normal);
+}
+
+/// Display style for a server-raised alert severity, or null when none.
+({Color color, String label, IconData icon})? _severityStyle(String? severity) {
+  switch (severity) {
+    case 'CRITICAL':
+      return (color: AppColors.error, label: AppStrings.severityCritical, icon: Icons.crisis_alert_rounded);
+    case 'HIGH':
+      return (color: AppColors.warning, label: AppStrings.severityHigh, icon: Icons.trending_up_rounded);
+    case 'LOW':
+      return (color: AppColors.warning, label: AppStrings.severityLow, icon: Icons.trending_down_rounded);
+    default:
+      return null;
+  }
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -156,6 +192,16 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
   List<_VitalConfig> get _configs =>
       ref.watch(vitalsProvider).configs.map(_toVitalConfig).toList();
 
+  /// The selected tab, defensively resolved: falls back to the first config
+  /// when nothing is selected yet or the selection no longer exists (e.g.
+  /// after the admin-managed config list changes, or on screen remount).
+  String get _effectiveConfigId {
+    final configs = _configs;
+    if (configs.isEmpty) return '';
+    if (configs.any((c) => c.id == _activeConfigId)) return _activeConfigId;
+    return configs.first.id;
+  }
+
   Map<String, List<_VitalReading>> get _readingsByConfig {
     final map = <String, List<_VitalReading>>{};
     for (final r in ref.watch(vitalsProvider).readings) {
@@ -173,29 +219,36 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
       return _VitalConfig(id: '', name: '', graphType: _GraphType.line,
           sortOrder: 0, inputs: const [], icon: Icons.monitor_heart_outlined);
     }
-    return configs.firstWhere((c) => c.id == _activeConfigId,
-        orElse: () => configs.first);
+    final id = _effectiveConfigId;
+    return configs.firstWhere((c) => c.id == id, orElse: () => configs.first);
   }
 
   List<_VitalReading> get _activeReadings {
-    final all = _readingsByConfig[_activeConfigId] ?? [];
+    final all = _readingsByConfig[_effectiveConfigId] ?? [];
     final cutoff = DateTime.now().subtract(Duration(days: _is7d ? 7 : 30));
     return all.where((r) => r.measuredAt.isAfter(cutoff)).toList()
       ..sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
   }
 
   void _openLog() {
+    final config = _activeConfig;
+    // Logging requires a config tab with at least one input (admin-defined).
+    if (config.id.isEmpty || config.inputs.isEmpty) {
+      AppSnackbar.info(context, AppStrings.noVitalsConfigured);
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _LogReadingSheet(
-        config: _activeConfig,
+        config: config,
         onSaved: (reading) => ref.read(vitalsProvider.notifier).addReading(
-          vitalConfigId: _activeConfigId,
+          vitalConfigId: config.id,
           values: reading.values
               .map((v) => <String, dynamic>{'inputId': v.inputId, 'value': v.value})
               .toList(),
+          measuredAt: reading.measuredAt.toIso8601String(),
           notes: reading.notes,
         ),
       ),
@@ -206,7 +259,13 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? context.bg : AppColors.light100;
-    final isLoading = ref.watch(vitalsProvider).isLoading;
+    final state = ref.watch(vitalsProvider);
+    final isLoading = state.isLoading;
+    final hasConfigs = _configs.isNotEmpty;
+    // Empty / error states only matter once the first load has settled.
+    final showError = !isLoading && !hasConfigs && state.error != null;
+    final showEmpty = !isLoading && !hasConfigs && state.error == null;
+    final canLog = _activeConfig.id.isNotEmpty && _activeConfig.inputs.isNotEmpty;
 
     return Scaffold(
       backgroundColor: bg,
@@ -232,7 +291,7 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
               IconButton(
                 icon: const Icon(Icons.add_rounded),
                 tooltip: AppStrings.logReading,
-                onPressed: _openLog,
+                onPressed: canLog ? _openLog : null,
               ),
               const SizedBox(width: 4),
             ],
@@ -261,8 +320,42 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
               ),
             ),
 
+          // ── Error state (fetch failed, no configs) ─────────────────────────
+          if (showError)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: state.isOffline
+                  ? AppNoInternetState(
+                      onRetry: () => ref.read(vitalsProvider.notifier).load(),
+                    )
+                  : AppErrorState(
+                      message: state.error,
+                      onRetry: () => ref.read(vitalsProvider.notifier).load(),
+                    ),
+            ),
+
+          // ── Empty state (no vital types configured by admin) ───────────────
+          if (showEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: AppEmptyState(
+                icon: Icons.monitor_heart_outlined,
+                title: AppStrings.noVitalsConfiguredTitle,
+                subtitle: AppStrings.noVitalsConfigured,
+              ),
+            ),
+
+          // ── Offline banner (self-hides when back online) ───────────────────
+          if (!isLoading && hasConfigs)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: OfflineBanner(),
+              ),
+            ),
+
           // ── Vital type tabs ───────────────────────────────────────────────
-          if (!isLoading)
+          if (!isLoading && hasConfigs)
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 48,
@@ -273,7 +366,7 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
                     final cfg = _configs[i];
-                    final active = cfg.id == _activeConfigId;
+                    final active = cfg.id == _effectiveConfigId;
                   return GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
@@ -308,7 +401,7 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
             ),
           ),
 
-          if (!isLoading) ...[
+          if (!isLoading && hasConfigs) ...[
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
             // ── Range toggle ──────────────────────────────────────────────────
@@ -362,14 +455,16 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
         ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openLog,
-        backgroundColor: AppColors.teal,
-        foregroundColor: AppColors.textInverse,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(AppStrings.logReading,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
-      ),
+      floatingActionButton: canLog
+          ? FloatingActionButton.extended(
+              onPressed: _openLog,
+              backgroundColor: AppColors.teal,
+              foregroundColor: AppColors.textInverse,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(AppStrings.logReading,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
+            )
+          : null,
     );
   }
 }
@@ -833,20 +928,29 @@ class _RecentReadingsCard extends StatelessWidget {
           )
         else
           ...readings.take(10).map((reading) {
-            // Worst status across all values
+            // Prefer the backend's server-raised alert (authoritative — it's
+            // what triggered notifications). Fall back to client-side bands.
+            final serverAlert = _severityStyle(reading.alertSeverity);
             Color worstColor = AppColors.success;
             String worstLabel = AppStrings.normal;
-            for (final rv in reading.values) {
-              final inp = config.inputs.firstWhere((i) => i.id == rv.inputId);
-              final st = _valueStatus(rv.value, inp);
-              if (st.label == AppStrings.highRisk) {
-                worstColor = AppColors.error;
-                worstLabel = st.label;
-                break;
-              }
-              if (st.label == AppStrings.warningStatus) {
-                worstColor = AppColors.warning;
-                worstLabel = st.label;
+            IconData? badgeIcon;
+            if (serverAlert != null) {
+              worstColor = serverAlert.color;
+              worstLabel = serverAlert.label;
+              badgeIcon = serverAlert.icon;
+            } else {
+              for (final rv in reading.values) {
+                final inp = config.inputs.firstWhere((i) => i.id == rv.inputId);
+                final st = _valueStatus(rv.value, inp);
+                if (st.label == AppStrings.highRisk) {
+                  worstColor = AppColors.error;
+                  worstLabel = st.label;
+                  break;
+                }
+                if (st.label == AppStrings.warningStatus) {
+                  worstColor = AppColors.warning;
+                  worstLabel = st.label;
+                }
               }
             }
 
@@ -885,8 +989,14 @@ class _RecentReadingsCard extends StatelessWidget {
                     color: worstColor.withValues(alpha: 0.12),
                     borderRadius: AppBorderRadius.pill,
                   ),
-                  child: Text(worstLabel,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: worstColor, letterSpacing: 0.3)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (badgeIcon != null) ...[
+                      Icon(badgeIcon, size: 11, color: worstColor),
+                      const SizedBox(width: 3),
+                    ],
+                    Text(worstLabel,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: worstColor, letterSpacing: 0.3)),
+                  ]),
                 ),
               ]),
             );
@@ -910,6 +1020,7 @@ class _LogReadingSheet extends StatefulWidget {
 class _LogReadingSheetState extends State<_LogReadingSheet> {
   late final Map<String, TextEditingController> _ctrls;
   final _notesCtrl = TextEditingController();
+  DateTime _measuredAt = DateTime.now();
   bool _saving = false;
 
   @override
@@ -918,6 +1029,30 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
     _ctrls = {
       for (final inp in widget.config.inputs) inp.id: TextEditingController()
     };
+  }
+
+  Future<void> _pickMeasuredAt() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _measuredAt,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now,
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_measuredAt),
+    );
+    if (!mounted) return;
+    var picked = DateTime(
+      date.year, date.month, date.day,
+      time?.hour ?? _measuredAt.hour,
+      time?.minute ?? _measuredAt.minute,
+    );
+    // Never allow a future timestamp.
+    if (picked.isAfter(now)) picked = now;
+    setState(() => _measuredAt = picked);
   }
 
   @override
@@ -943,7 +1078,7 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
     final reading = _VitalReading(
       id: 'new-${DateTime.now().millisecondsSinceEpoch}',
       vitalConfigId: widget.config.id,
-      measuredAt: DateTime.now(),
+      measuredAt: _measuredAt,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       values: values,
     );
@@ -979,100 +1114,94 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
           const SizedBox(height: 20),
 
           Text('Log ${widget.config.name}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Input fields
-          ...widget.config.inputs.map((inp) {
-            final status = _ctrls[inp.id]!.text.isNotEmpty
-                ? _valueStatus(double.tryParse(_ctrls[inp.id]!.text) ?? inp.normalMin, inp)
-                : null;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: StatefulBuilder(
-                builder: (_, setLocal) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Text('${inp.label} ', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
-                    AppText.bodySm('(${inp.unit})'),
-                    const Spacer(),
-                    if (status != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: status.color.withValues(alpha: 0.12),
-                          borderRadius: AppBorderRadius.pill,
-                        ),
-                        child: Text(status.label,
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: status.color, letterSpacing: 0.3)),
-                      ),
-                  ]),
-                  const SizedBox(height: 6),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? context.inputBg : AppColors.light100,
-                      borderRadius: AppBorderRadius.mdAll,
-                      border: Border.all(
-                        color: status != null && status.label != AppStrings.normal
-                            ? status.color.withValues(alpha: 0.4)
-                            : border,
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _ctrls[inp.id],
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: TextStyle(fontSize: 14, color: context.primaryText),
-                      decoration: InputDecoration(
-                        hintText: '${inp.normalMin}–${inp.normalMax}',
-                        hintStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      ),
-                      onChanged: (_) => setLocal(() {}),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  AppText.bodyXs('${AppStrings.normalRange}: ${inp.normalMin}–${inp.normalMax} ${inp.unit}'),
-                ]),
-              ),
-            );
-          }),
-
-          // Notes
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppStrings.notes, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
-            const SizedBox(height: 6),
-            Container(
+          // Measured-at picker (schema: measuredAt)
+          Text(AppStrings.measuredAt,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: _saving ? null : _pickMeasuredAt,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: BoxDecoration(
                 color: isDark ? context.inputBg : AppColors.light100,
                 borderRadius: AppBorderRadius.mdAll,
                 border: Border.all(color: border),
               ),
-              child: TextField(
-                controller: _notesCtrl,
-                maxLines: 2,
-                style: TextStyle(fontSize: 14, color: context.primaryText),
-                decoration: InputDecoration(
-                  hintText: '${AppStrings.optional}…',
-                  hintStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(children: [
+                const Icon(Icons.event_rounded, size: 16, color: AppColors.teal),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(_fmtDateTime(_measuredAt),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.primaryText)),
                 ),
-              ),
+                const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textSecondary),
+              ]),
             ),
-          ]),
+          ),
+          const SizedBox(height: 16),
+
+          // Input fields — one per config input (schema-driven)
+          ...widget.config.inputs.map((inp) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: StatefulBuilder(
+                builder: (_, setLocal) {
+                  final raw = _ctrls[inp.id]!.text;
+                  final status = raw.isNotEmpty
+                      ? _valueStatus(double.tryParse(raw) ?? inp.normalMin, inp)
+                      : null;
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Text(inp.label,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
+                      const Spacer(),
+                      if (status != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: status.color.withValues(alpha: 0.12),
+                            borderRadius: AppBorderRadius.pill,
+                          ),
+                          child: Text(status.label,
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: status.color, letterSpacing: 0.3)),
+                        ),
+                    ]),
+                    const SizedBox(height: 6),
+                    AppTextField(
+                      controller: _ctrls[inp.id],
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      hint: '${inp.normalMin}–${inp.normalMax}',
+                      helperText: '${AppStrings.normalRange}: ${inp.normalMin}–${inp.normalMax} ${inp.unit}',
+                      suffix: Text(inp.unit,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                      onChanged: (_) => setLocal(() {}),
+                    ),
+                  ]);
+                },
+              ),
+            );
+          }),
+
+          // Notes
+          AppTextField(
+            controller: _notesCtrl,
+            label: AppStrings.notes,
+            hint: '${AppStrings.optional}…',
+            minLines: 2,
+            maxLines: 3,
+          ),
 
           const SizedBox(height: 24),
 
-          // Buttons
+          // Buttons (shared components)
           Row(children: [
             Expanded(
-              child: OutlinedButton(
+              child: AppButton.secondary(
+                label: AppStrings.cancel,
+                isFullWidth: true,
                 onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: border),
-                ),
-                child: const Text(AppStrings.cancel,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
               ),
             ),
             const SizedBox(width: 12),
@@ -1080,14 +1209,11 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
               flex: 2,
               child: ListenableBuilder(
                 listenable: Listenable.merge(_ctrls.values.toList()),
-                builder: (_, __) => FilledButton(
+                builder: (_, __) => AppButton.primary(
+                  label: _saving ? AppStrings.saving : AppStrings.save,
+                  isFullWidth: true,
+                  isLoading: _saving,
                   onPressed: (_canSave && !_saving) ? _save : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.teal,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: Text(_saving ? AppStrings.saving : AppStrings.save,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textInverse)),
                 ),
               ),
             ),

@@ -10,7 +10,10 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/connection_entity.dart';
 import '../../domain/entities/connection_request_entity.dart';
 import '../providers/connections_provider.dart';
+import '../services/razorpay_checkout.dart';
 import 'chat_screen.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/utils/logger.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 
 String _fmtTime(String? isoStr) {
@@ -78,6 +81,40 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
     AppSnackbar.info(context, AppStrings.requestDeclined);
   }
 
+  /// Pay for an accepted request → Razorpay checkout → confirm → activate.
+  Future<void> _pay(ConnectionRequestEntity req) async {
+    final checkout = RazorpayCheckout();
+    try {
+      final order = await ref.read(payForRequestProvider).call(req.id);
+      final user = ref.read(authProvider).user;
+      final result = await checkout.open(
+        keyId: order.razorpayKeyId,
+        orderId: order.razorpayOrderId,
+        amountPaise: order.amountPaise,
+        name: 'Hopes',
+        description: req.professional.displayName,
+        email: user?.email,
+        contact: user?.phone,
+      );
+      await ref.read(confirmPaymentProvider).call(
+            orderId: result.orderId,
+            paymentId: result.paymentId,
+            signature: result.signature,
+          );
+      AppLogger.i('Connection payment confirmed ✓', tag: 'Connections');
+      await ref.read(connectionsProvider.notifier).load();
+      if (!mounted) return;
+      AppSnackbar.success(context, 'Payment successful — connection is now active.');
+    } on RazorpayCheckoutException catch (e) {
+      if (!mounted) return;
+      AppSnackbar.error(context, e.message);
+    } catch (e) {
+      AppLogger.e('Payment failed', tag: 'Connections', error: e);
+      if (!mounted) return;
+      AppSnackbar.error(context, e.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!ref.watch(isOnlineProvider)) {
@@ -94,7 +131,13 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
     final filteredIncoming = _query.isEmpty
         ? st.incomingRequests
         : st.incomingRequests
-            .where((r) => r.sender.name.toLowerCase().contains(_query))
+            .where((r) => r.user.name.toLowerCase().contains(_query))
+            .toList();
+
+    final filteredSent = _query.isEmpty
+        ? st.myRequests
+        : st.myRequests
+            .where((r) => r.professional.displayName.toLowerCase().contains(_query))
             .toList();
 
     final incomingCount = st.incomingRequests.length;
@@ -170,12 +213,15 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
                 emptyIcon: Icons.people_outline_rounded,
                 itemBuilder: (conn) => _ActiveCard(conn: conn, onTap: () => _openChat(conn)),
               ),
-              _ListTab<Never>(
-                items: const [],
-                isLoading: false,
+              _ListTab<ConnectionRequestEntity>(
+                items: filteredSent,
+                isLoading: st.isLoading,
                 emptyMessage: AppStrings.noRequestsYet,
                 emptyIcon: Icons.send_outlined,
-                itemBuilder: (_) => const SizedBox.shrink(),
+                itemBuilder: (req) => _SentCard(
+                  req: req,
+                  onPay: req.status == 'AWAITING_PAYMENT' ? () => _pay(req) : null,
+                ),
               ),
               _ListTab<ConnectionRequestEntity>(
                 items: filteredIncoming,
@@ -329,7 +375,7 @@ class _IncomingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = req.sender.name;
+    final name = req.user.name;
 
     return AppCard(
       padding: const EdgeInsets.all(14),
@@ -370,6 +416,80 @@ class _IncomingCard extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Sent request card (patient view) ─────────────────────────────────────────
+
+class _SentCard extends StatelessWidget {
+  final ConnectionRequestEntity req;
+  final VoidCallback? onPay;
+  const _SentCard({required this.req, this.onPay});
+
+  ({Color color, String label}) _statusMeta() => switch (req.status) {
+        'PENDING' => (color: AppColors.warning, label: 'Pending'),
+        'AWAITING_PAYMENT' => (color: AppColors.teal, label: 'Accepted'),
+        'ACCEPTED' => (color: AppColors.teal, label: 'Active'),
+        'DECLINED' => (color: AppColors.error, label: 'Declined'),
+        'EXPIRED' => (color: AppColors.textHint, label: 'Expired'),
+        'CANCELLED' => (color: AppColors.textHint, label: 'Cancelled'),
+        _ => (color: AppColors.textHint, label: req.status),
+      };
+
+  String _planLabel() => switch (req.planType) {
+        'HOURLY' => 'Hourly',
+        'DAILY' => 'Daily',
+        'MONTHLY' => 'Monthly',
+        _ => req.planType,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final name = req.professional.displayName;
+    final st = _statusMeta();
+
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppAvatar(name: name, size: AppAvatarSize.md),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppText.labelMd(name, fontWeight: FontWeight.w600),
+                    const SizedBox(height: 2),
+                    AppText.bodySm('${_planLabel()} • ₹${req.amount}',
+                        color: AppColors.textHint),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              AppContainer.tinted(
+                color: st.color,
+                borderRadius: AppBorderRadius.pill,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: AppText.labelXs(st.label, color: st.color),
+              ),
+            ],
+          ),
+          if (onPay != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: AppButton.primary(
+                label: 'Pay ₹${req.amount} to start',
+                onPressed: onPay!,
+              ),
+            ),
+          ],
         ],
       ),
     );

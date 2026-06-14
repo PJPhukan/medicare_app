@@ -56,11 +56,27 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   final MarkDoseUseCase _markDose;
   final Ref _ref;
 
-  Future<void> load() async {
+  /// The calendar date currently being viewed. Kept so connectivity-triggered
+  /// refreshes re-fetch the same day rather than snapping back to today.
+  DateTime _currentDate = DateTime.now();
+
+  static String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static bool _isToday(DateTime d) {
+    final n = DateTime.now();
+    return d.year == n.year && d.month == n.month && d.day == n.day;
+  }
+
+  Future<void> load({DateTime? date}) async {
+    if (date != null) _currentDate = date;
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      // CacheInterceptor returns cached JSON automatically when offline
-      final entities = await _fetchDoses();
+      // CacheInterceptor returns cached JSON automatically when offline.
+      // Today is fetched without a date param so existing caches stay warm.
+      final entities = await _fetchDoses(
+        date: _isToday(_currentDate) ? null : _dateKey(_currentDate),
+      );
       state = state.copyWith(
         doses: entities.whereType<TodayDose>().toList(),
         isLoading: false,
@@ -90,9 +106,14 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
       }).toList(),
     );
 
-    // 2. Persist via repository (online → API, offline → SyncQueue)
+    // 2. Persist via repository (online → API, offline → SyncQueue).
+    // Stamp the log with the viewed date so back-dated marks land correctly.
     try {
-      await _markDose(doseTimeId: doseTimeId, status: status);
+      await _markDose(
+        doseTimeId: doseTimeId,
+        status: status,
+        scheduledDate: _isToday(_currentDate) ? null : _dateKey(_currentDate),
+      );
       AppLogger.i('Dose marked ✓', tag: 'Schedule');
       AppLogger.track('dose.marked', meta: {'status': status});
     } on Exception catch (e, s) {

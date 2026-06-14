@@ -45,6 +45,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     this._markRead,
     this._markAllRead,
     this._registerToken,
+    this._repository,
   ) : super(const NotificationsState()) {
     load();
   }
@@ -53,6 +54,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final MarkReadUseCase _markRead;
   final MarkAllReadUseCase _markAllRead;
   final RegisterPushTokenUseCase _registerToken;
+  final NotificationsRepository _repository;
 
   /// Call this after login with the FCM token once Firebase is set up.
   /// Platform should be 'android' or 'ios'.
@@ -122,6 +124,34 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       notifications: state.notifications.where((n) => n.id != id).toList(),
     );
   }
+
+  Future<void> deleteNotification(String id) async {
+    AppLogger.i('Notification delete → id:$id', tag: 'Notifications');
+    // Remove from UI immediately
+    dismiss(id);
+    try {
+      // Delete from backend
+      await _repository.deleteNotification(id);
+    } catch (e) {
+      AppLogger.e('Failed to delete notification', tag: 'Notifications', error: e);
+    }
+  }
+
+  Future<void> bulkDeleteNotifications(List<String> ids) async {
+    AppLogger.i('Bulk delete notifications → count:${ids.length}', tag: 'Notifications');
+    // Remove from UI immediately
+    state = state.copyWith(
+      notifications: state.notifications.where((n) => !ids.contains(n.id)).toList(),
+    );
+    try {
+      // Delete from backend in parallel
+      await Future.wait(ids.map((id) => _repository.deleteNotification(id)));
+    } catch (e) {
+      AppLogger.e('Failed to bulk delete notifications', tag: 'Notifications', error: e);
+      // Reload to restore UI state
+      await load();
+    }
+  }
 }
 
 // ── Providers ─────────────────────────────────────────────────────────────────
@@ -159,5 +189,6 @@ final notificationsProvider =
     ref.read(_markReadUseCaseProvider),
     ref.read(_markAllReadUseCaseProvider),
     ref.read(_registerTokenUseCaseProvider),
+    ref.read(notificationsRepositoryProvider),
   );
 });

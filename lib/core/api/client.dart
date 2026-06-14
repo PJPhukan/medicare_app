@@ -9,6 +9,8 @@ import 'interceptors/auth_interceptor.dart';
 import 'interceptors/cache_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/sanitize_interceptor.dart';
+import 'interceptors/refresh_interceptor.dart';
+import 'session_events.dart';
 
 final _secureStorageProvider = Provider<FlutterSecureStorage>(
   (_) => const FlutterSecureStorage(),
@@ -30,6 +32,7 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.addAll([
     AuthInterceptor(storage),
     CacheInterceptor(prefs),
+    RefreshInterceptor(storage, () => SessionEvents.instance.onUnauthorized?.call()),
     ErrorInterceptor(),
     if (kDebugMode) SanitizeInterceptor(),
     if (kDebugMode)

@@ -18,6 +18,22 @@ class VitalReadingValue extends VitalReadingValueEntity {
       );
 }
 
+class VitalAlert extends VitalAlertEntity {
+  const VitalAlert({
+    required super.id,
+    required super.inputId,
+    required super.severity,
+    required super.acknowledged,
+  });
+
+  factory VitalAlert.fromJson(Map<String, dynamic> json) => VitalAlert(
+        id: json['id'] as String,
+        inputId: json['inputId'] as String,
+        severity: json['severity'] as String? ?? 'NORMAL',
+        acknowledged: json['acknowledged'] as bool? ?? false,
+      );
+}
+
 class VitalReading extends VitalReadingEntity {
   const VitalReading({
     required super.id,
@@ -25,6 +41,7 @@ class VitalReading extends VitalReadingEntity {
     required super.measuredAt,
     required super.vitalConfig,
     required super.values,
+    super.alerts,
     super.notes,
   });
 
@@ -38,6 +55,9 @@ class VitalReading extends VitalReadingEntity {
         ),
         values: (json['values'] as List<dynamic>? ?? [])
             .map((e) => VitalReadingValue.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        alerts: (json['alerts'] as List<dynamic>? ?? [])
+            .map((e) => VitalAlert.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }

@@ -1,3 +1,4 @@
+import '../../data/models/location_models.dart';
 import '../../domain/entities/professional_category_entity.dart';
 import '../../domain/entities/professional_entity.dart';
 import '../../domain/repositories/professionals_repository.dart';
@@ -9,10 +10,10 @@ class ProfessionalsRepositoryImpl implements ProfessionalsRepository {
   final ProfessionalsRemoteDataSource _ds;
 
   @override
-  Future<List<ProfessionalCategoryEntity>> getCategories() async {
-    final List<ProfessionalCategoryEntity> list = await _ds.getCategories();
-    return list;
-  }
+  Future<List<ProfessionalCategoryEntity>> getCategories() => _ds.getCategories();
+
+  @override
+  Future<ProfessionalCategoryEntity> requestCategory(String name) => _ds.requestCategory(name);
 
   @override
   Future<List<ProfessionalEntity>> listProfessionals({
@@ -21,20 +22,29 @@ class ProfessionalsRepositoryImpl implements ProfessionalsRepository {
     bool? verified,
     int page = 1,
     int limit = 20,
-  }) async {
-    final List<ProfessionalEntity> list = await _ds.listProfessionals(
-      categoryId: categoryId,
-      search: search,
-      verified: verified,
-      page: page,
-      limit: limit,
-    );
-    return list;
-  }
+  }) => _ds.listProfessionals(
+        categoryId: categoryId,
+        search: search,
+        verified: verified,
+        page: page,
+        limit: limit,
+      );
 
   @override
-  Future<ProfessionalEntity> getProfessional(String id) async {
-    final ProfessionalEntity p = await _ds.getProfessional(id);
-    return p;
-  }
+  Future<ProfessionalsLocationPage> listByLocation({
+    String? pincode,
+    String? areaId,
+    String? categoryId,
+    int page = 1,
+    int limit = 10,
+  }) => _ds.listByLocation(
+        pincode: pincode,
+        areaId: areaId,
+        categoryId: categoryId,
+        page: page,
+        limit: limit,
+      );
+
+  @override
+  Future<ProfessionalEntity> getProfessional(String id) => _ds.getProfessional(id);
 }

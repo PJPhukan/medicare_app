@@ -22,6 +22,9 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   Future<void> markAllRead() => _ds.markAllRead();
 
   @override
+  Future<void> deleteNotification(String id) => _ds.deleteNotification(id);
+
+  @override
   Future<void> registerPushToken(String token, String platform) =>
       _ds.registerPushToken(token, platform);
 }

@@ -44,6 +44,60 @@ class _Med {
 }
 
 
+// ─── Dose timeline helpers ────────────────────────────────────────────────────
+
+class _DoseInfo {
+  final _Med med;
+  final String time; // HH:MM (24h)
+  final DateTime at;
+  final bool isUpcoming;
+  const _DoseInfo(this.med, this.time, this.at, this.isUpcoming);
+}
+
+/// Flattened, time-sorted list of every scheduled (non-PRN) dose for today.
+List<_DoseInfo> _todayDoses(List<_Med> meds) {
+  final now = DateTime.now();
+  final list = <_DoseInfo>[];
+  for (final m in meds) {
+    if (m.status == _MedStatus.prn) continue;
+    for (final t in m.times) {
+      final parts = t.split(':');
+      final h = int.tryParse(parts[0]) ?? 0;
+      final min = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      final at = DateTime(now.year, now.month, now.day, h, min);
+      list.add(_DoseInfo(m, t, at, at.isAfter(now)));
+    }
+  }
+  list.sort((a, b) => a.at.compareTo(b.at));
+  return list;
+}
+
+_DoseInfo? _nextDose(List<_DoseInfo> doses) {
+  for (final d in doses) {
+    if (d.isUpcoming) return d;
+  }
+  return null;
+}
+
+String _fmt12(String t) {
+  final parts = t.split(':');
+  var h = int.tryParse(parts[0]) ?? 0;
+  final m = parts.length > 1 ? parts[1].padLeft(2, '0') : '00';
+  final ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h == 0) h = 12;
+  return '$h:$m $ampm';
+}
+
+String _countdown(DateTime at) {
+  final diff = at.difference(DateTime.now());
+  if (diff.isNegative || diff.inMinutes == 0) return 'now';
+  final h = diff.inHours;
+  final m = diff.inMinutes % 60;
+  if (h >= 1) return 'in ${h}h ${m}m';
+  return 'in ${m}m';
+}
+
 // ─── Adapter ──────────────────────────────────────────────────────────────────
 
 _Med _toMed(med_model.UserMedicine um) {
@@ -110,9 +164,12 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
     ('assigned', AppStrings.scopeAssigned),
   ];
 
+  List<_Med> get _allMeds =>
+      ref.watch(medicinesProvider).medicines.map(_toMed).toList();
+
   List<_Med> get _visible {
     final q = _search.trim().toLowerCase();
-    final meds = ref.watch(medicinesProvider).medicines.map(_toMed).toList();
+    final meds = _allMeds;
     return meds.where((m) {
       if (_scopeFilter == 'mine' && m.scope != _MedScope.personal) return false;
       if (_scopeFilter == 'shared' && m.scope != _MedScope.sharedMaster) return false;
@@ -384,10 +441,17 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
 
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── Premium overview hero ────────────────────────────────
+                  _OverviewHero(
+                    meds: _allMeds,
+                    onTapNext: _openDetail,
+                  ),
+                  const SizedBox(height: 16),
+
                   // ── Search + Filters ─────────────────────────────────────
                   Row(
                     children: [
@@ -455,8 +519,17 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                     ],
                   ),
 
-                  const SizedBox(height: 12),
-                  _SummaryStrip(meds: ref.watch(medicinesProvider).medicines.map(_toMed).toList()),
+                  const SizedBox(height: 14),
+
+                  // ── Inline status segment ────────────────────────────────
+                  _StatusSegment(
+                    labels: _statusLabels,
+                    selected: _statusFilter,
+                    onSelect: (i) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _statusFilter = i);
+                    },
+                  ),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -530,75 +603,268 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
         ],
         ),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton.extended(
-          onPressed: _openAdd,
-          backgroundColor: AppColors.teal,
-          foregroundColor: AppColors.textInverse,
-          icon: const Icon(Icons.add_rounded),
-          label: AppText.labelMd(AppStrings.addMedicine, color: AppColors.textInverse),
-        ),
-      ),
     );
   }
 }
 
-// ─── Summary strip ────────────────────────────────────────────────────────────
+// ─── Premium overview hero ────────────────────────────────────────────────────
 
-class _SummaryStrip extends StatelessWidget {
+class _OverviewHero extends StatelessWidget {
   final List<_Med> meds;
-  const _SummaryStrip({required this.meds});
+  final void Function(_Med) onTapNext;
+  const _OverviewHero({required this.meds, required this.onTapNext});
 
   @override
   Widget build(BuildContext context) {
     final total = meds.length;
     final active = meds.where((m) => m.status == _MedStatus.active).length;
     final lowStock = meds.where((m) => m.status == _MedStatus.lowStock).length;
-    return Row(
-      children: [
-        _SummaryChip(icon: Icons.medication_rounded, label: 'Total', count: total, color: AppColors.teal),
-        const SizedBox(width: 10),
-        _SummaryChip(icon: Icons.check_circle_outline_rounded, label: 'Active', count: active, color: AppColors.green),
-        const SizedBox(width: 10),
-        _SummaryChip(icon: Icons.warning_amber_rounded, label: 'Low Stock', count: lowStock, color: AppColors.amber),
-      ],
+
+    final doses = _todayDoses(meds);
+    final next = _nextDose(doses);
+    final takenToday = doses.where((d) => !d.isUpcoming).length;
+    final totalToday = doses.length;
+    final dayProgress = totalToday == 0 ? 0.0 : (takenToday / totalToday).clamp(0.0, 1.0);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0EA5A4), Color(0xFF2563EB)],
+        ),
+        borderRadius: AppBorderRadius.xlAll,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.teal.withValues(alpha: 0.30),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // ── Next dose row ───────────────────────────────────────────────
+          GestureDetector(
+            onTap: next == null ? null : () => onTapNext(next.med),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              next == null ? Icons.check_circle_rounded : Icons.medication_liquid_rounded,
+                              size: 13,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              next == null ? 'ALL DONE TODAY' : 'NEXT DOSE',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                                color: Colors.white.withValues(alpha: 0.85),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          next?.med.name ?? (totalToday == 0 ? 'No scheduled doses' : 'You\'re all caught up'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          next == null
+                              ? '$takenToday of $totalToday doses taken'
+                              : '${_fmt12(next.time)}  ·  ${_countdown(next.at)}',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  // Day-progress ring
+                  SizedBox(
+                    width: 60,
+                    height: 60,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 60,
+                          height: 60,
+                          child: CircularProgressIndicator(
+                            value: totalToday == 0 ? 0 : dayProgress,
+                            strokeWidth: 5,
+                            backgroundColor: Colors.white.withValues(alpha: 0.25),
+                            valueColor: const AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              totalToday == 0 ? '—' : '$takenToday/$totalToday',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                height: 1,
+                              ),
+                            ),
+                            Text(
+                              'today',
+                              style: TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Divider
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 18),
+            color: Colors.white.withValues(alpha: 0.18),
+          ),
+
+          // ── Stats row ───────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
+            child: Row(
+              children: [
+                _HeroStat(icon: Icons.medication_rounded, label: 'Total', count: total),
+                _HeroDivider(),
+                _HeroStat(icon: Icons.check_circle_outline_rounded, label: 'Active', count: active),
+                _HeroDivider(),
+                _HeroStat(icon: Icons.warning_amber_rounded, label: 'Low Stock', count: lowStock),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _SummaryChip extends StatelessWidget {
+class _HeroStat extends StatelessWidget {
   final IconData icon;
   final String label;
   final int count;
-  final Color color;
-  const _SummaryChip({required this.icon, required this.label, required this.count, required this.color});
+  const _HeroStat({required this.icon, required this.label, required this.count});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            AppContainer.tinted(
-              color: color,
-              borderRadius: AppBorderRadius.smAll,
-              padding: const EdgeInsets.all(6),
-              child: Icon(icon, size: 13, color: color),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('$count', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color, height: 1)),
-                  AppText.bodyXs(label, color: AppColors.textSecondary),
-                ],
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.9)),
+              const SizedBox(width: 6),
+              Text('$count',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(label,
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.82))),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 1,
+        height: 30,
+        color: Colors.white.withValues(alpha: 0.18),
+      );
+}
+
+// ─── Inline status segment ────────────────────────────────────────────────────
+
+class _StatusSegment extends StatelessWidget {
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelect;
+  const _StatusSegment({required this.labels, required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final active = i == selected;
+          return GestureDetector(
+            onTap: () => onSelect(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: active ? AppColors.teal : context.cardBg,
+                borderRadius: AppBorderRadius.pill,
+                border: Border.all(
+                  color: active ? AppColors.teal : context.borderCol,
+                  width: active ? 1.5 : 1,
+                ),
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: AppColors.teal.withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                labels[i],
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  color: active ? Colors.white : AppColors.textSecondary,
+                ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -710,16 +976,27 @@ class _MedCard extends StatelessWidget {
       child: Container(
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: context.cardBg,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              context.cardBg,
+              _statusColor.withValues(alpha: isDark ? 0.06 : 0.04),
+            ],
+          ),
           borderRadius: AppBorderRadius.lgAll,
           border: Border.all(color: _statusColor.withValues(alpha: 0.22)),
+          boxShadow: [
+            BoxShadow(
+              color: _statusColor.withValues(alpha: isDark ? 0.10 : 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Colored top strip ────────────────────────────────────────
-            Container(height: 3, color: _statusColor),
-
             // ── Card body ────────────────────────────────────────────────
             Expanded(
               child: Padding(
@@ -731,10 +1008,20 @@ class _MedCard extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppContainer.tinted(
-                          color: _statusColor,
-                          borderRadius: AppBorderRadius.mdAll,
+                        Container(
                           padding: const EdgeInsets.all(11),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                _statusColor.withValues(alpha: 0.22),
+                                _statusColor.withValues(alpha: 0.10),
+                              ],
+                            ),
+                            borderRadius: AppBorderRadius.mdAll,
+                            border: Border.all(color: _statusColor.withValues(alpha: 0.18)),
+                          ),
                           child: Icon(Icons.medication_rounded,
                               color: _statusColor, size: 22),
                         ),
@@ -845,11 +1132,17 @@ class _MedCard extends StatelessWidget {
             ),
 
             // ── Stock progress bar flush to bottom ───────────────────────
-            LinearProgressIndicator(
-              value: stockFill,
-              minHeight: 6,
-              backgroundColor: _statusColor.withValues(alpha: 0.14),
-              valueColor: AlwaysStoppedAnimation(_statusColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              child: ClipRRect(
+                borderRadius: AppBorderRadius.pill,
+                child: LinearProgressIndicator(
+                  value: stockFill,
+                  minHeight: 6,
+                  backgroundColor: _statusColor.withValues(alpha: 0.14),
+                  valueColor: AlwaysStoppedAnimation(_statusColor),
+                ),
+              ),
             ),
           ],
         ),
@@ -867,40 +1160,71 @@ class _MedListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = switch (med.status) {
       _MedStatus.active   => AppColors.teal,
       _MedStatus.lowStock => AppColors.amber,
       _MedStatus.prn      => AppColors.purple,
     };
-    return AppCard(
+    return GestureDetector(
       onTap: onTap,
-      padding: EdgeInsets.zero,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 3,
-              decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
+      child: Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              statusColor.withValues(alpha: isDark ? 0.07 : 0.05),
+              context.cardBg,
+            ],
+          ),
+          borderRadius: AppBorderRadius.lgAll,
+          border: Border.all(color: statusColor.withValues(alpha: 0.20)),
+          boxShadow: [
+            BoxShadow(
+              color: statusColor.withValues(alpha: isDark ? 0.08 : 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [statusColor, statusColor.withValues(alpha: 0.55)],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Row(children: [
-                  AppContainer.tinted(
-                    color: statusColor,
-                    borderRadius: AppBorderRadius.mdAll,
-                    padding: const EdgeInsets.all(10),
-                    child: Icon(Icons.medication_rounded, color: statusColor, size: 22),
-                  ),
-                  const SizedBox(width: 12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            statusColor.withValues(alpha: 0.22),
+                            statusColor.withValues(alpha: 0.10),
+                          ],
+                        ),
+                        borderRadius: AppBorderRadius.mdAll,
+                        border: Border.all(color: statusColor.withValues(alpha: 0.18)),
+                      ),
+                      child: Icon(Icons.medication_rounded, color: statusColor, size: 22),
+                    ),
+                    const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
@@ -927,13 +1251,14 @@ class _MedListRow extends StatelessWidget {
                       ]),
                     ]),
                   ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
-                ]),
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
+                  ]),
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-          ],
+              const SizedBox(width: 14),
+            ],
+          ),
         ),
       ),
     );

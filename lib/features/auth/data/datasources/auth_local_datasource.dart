@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
 
-const _kToken   = 'auth_token';
-const _kUser    = 'auth_user';
+const _kToken        = 'auth_token';
+const _kRefreshToken = 'refresh_token';
+const _kUser         = 'auth_user';
 
 class AuthLocalDataSource {
   const AuthLocalDataSource(this._storage);
@@ -14,6 +15,11 @@ class AuthLocalDataSource {
 
   Future<void> saveToken(String token) =>
       _storage.write(key: _kToken, value: token);
+
+  Future<String?> readRefreshToken() => _storage.read(key: _kRefreshToken);
+
+  Future<void> saveRefreshToken(String token) =>
+      _storage.write(key: _kRefreshToken, value: token);
 
   Future<UserModel?> readUser() async {
     final raw = await _storage.read(key: _kUser);

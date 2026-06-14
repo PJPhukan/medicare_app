@@ -41,4 +41,8 @@ class NotificationsRemoteDataSource {
       data: {'token': token, 'platform': platform},
     );
   }
+
+  Future<void> deleteNotification(String id) async {
+    await _dio.delete<void>('${ApiConstants.notifications}/$id');
+  }
 }

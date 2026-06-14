@@ -1,24 +1,19 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
+import '../../../../core/theme/app_typography.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
-
-// ─── Mock categories ─────────────────────────────────────────────────────────
-
-const _kCategories = [
-  (id: 'doctor',       label: 'Doctor'),
-  (id: 'nurse',        label: 'Nurse'),
-  (id: 'physio',       label: 'Physiotherapist'),
-  (id: 'psychologist', label: 'Psychologist'),
-  (id: 'dietitian',    label: 'Dietitian'),
-  (id: 'pharmacist',   label: 'Pharmacist'),
-  (id: 'lab',          label: 'Lab Technician'),
-];
+import '../providers/pro_profile_provider.dart';
+import '../../../professionals/presentation/providers/professionals_provider.dart';
+import 'service_areas_screen.dart';
+import '../../domain/entities/pro_profile_entity.dart';
 
 // ─── Agreement bullets (matching web BecomeProfessionalPage.tsx exactly) ─────
 
@@ -29,16 +24,6 @@ const _kAgreementBullets = [
   'In case of any dispute between you and a patient, you agree to resolve it directly. The platform is not a party to such disputes.',
   'You will comply with all applicable laws and medical regulations in your region while providing services.',
   'You understand that payments are subject to platform service fees and payout schedules as described in our payment policy.',
-];
-
-// ─── Country codes ───────────────────────────────────────────────────────────
-
-const _kCountryCodes = [
-  (code: '+91',  name: 'India'),
-  (code: '+1',   name: 'USA'),
-  (code: '+44',  name: 'UK'),
-  (code: '+61',  name: 'Australia'),
-  (code: '+971', name: 'UAE'),
 ];
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -52,7 +37,8 @@ class BecomeProfessionalScreen extends ConsumerStatefulWidget {
       _BecomeProfessionalScreenState();
 }
 
-class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScreen> {
+class _BecomeProfessionalScreenState
+    extends ConsumerState<BecomeProfessionalScreen> {
   int _step = 0;
   bool _submitted = false;
 
@@ -60,32 +46,83 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
   int get _totalSteps => _isEditing ? 2 : 3;
 
   // ── Step 1 ───────────────────────────────────────────────────────────────────
-  bool _hasPhoto = false;
-  final Set<String> _selectedCats = {};
+  final List<String> _selectedCats = [];
   final _displayNameCtrl = TextEditingController();
-  final _experienceCtrl  = TextEditingController();
-  final _basePriceCtrl   = TextEditingController();
-  final _hourlyCtrl      = TextEditingController();
-  final _dailyCtrl       = TextEditingController();
-  final _monthlyCtrl     = TextEditingController();
-  final _bioCtrl         = TextEditingController();
-  final _addressCtrl     = TextEditingController();
+  final _experienceCtrl = TextEditingController();
+  final _basePriceCtrl = TextEditingController();
+  final _hourlyCtrl = TextEditingController();
+  final _dailyCtrl = TextEditingController();
+  final _monthlyCtrl = TextEditingController();
+  final _bioCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
   String _currency = 'INR';
 
+  final _PickedImage _photo = _PickedImage();
+
   // ── Step 2 ───────────────────────────────────────────────────────────────────
-  String _countryCode = '+91';
-  final _phoneCtrl   = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _aadhaarCtrl = TextEditingController();
-  final _panCtrl     = TextEditingController();
-  bool _hasPanFront     = false;
-  bool _hasPanBack      = false;
-  bool _hasAadhaarFront = false;
-  bool _hasAadhaarBack  = false;
+  final _panCtrl = TextEditingController();
+  final _PickedImage _panFront = _PickedImage();
+  final _PickedImage _panBack = _PickedImage();
+  final _PickedImage _aadhaarFront = _PickedImage();
+  final _PickedImage _aadhaarBack = _PickedImage();
   final List<String> _certs = [];
   final _certCtrl = TextEditingController();
 
   // ── Step 3 ───────────────────────────────────────────────────────────────────
   bool _agreed = false;
+  bool _submitting = false;
+  bool _prefilled = false;
+
+  // Pre-fill the editable details from the existing profile (edit mode).
+  void _prefill(ProProfileEntity p) {
+    _prefilled = true;
+    _displayNameCtrl.text = p.displayName ?? '';
+    _bioCtrl.text = p.bio ?? '';
+    _experienceCtrl.text = p.experienceYrs?.toString() ?? '';
+    _basePriceCtrl.text = p.basePrice?.toStringAsFixed(0) ?? '';
+    _hourlyCtrl.text = p.hourlyRate?.toStringAsFixed(0) ?? '';
+    _dailyCtrl.text = p.dailyRate?.toStringAsFixed(0) ?? '';
+    _monthlyCtrl.text = p.monthlyRate?.toStringAsFixed(0) ?? '';
+    _addressCtrl.text = p.address ?? '';
+    if (p.phone != null) {
+      final digits = p.phone!.replaceAll(RegExp(r'\D'), '');
+      _phoneCtrl.text =
+          digits.length > 10 ? digits.substring(digits.length - 10) : digits;
+    }
+    _currency = p.currency ?? 'INR';
+    _selectedCats.clear();
+    if (p.categoryId != null) _selectedCats.add(p.categoryId!);
+    _certs
+      ..clear()
+      ..addAll(p.certifications);
+    _photo.existingUrl = p.profileImageUrl;
+    _agreed = p.agreedToTerms;
+    setState(() {});
+  }
+
+  // Pick an image from the gallery, downscale, and keep its base64 data URL.
+  Future<void> _pickInto(_PickedImage target) async {
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1280,
+      imageQuality: 75,
+    );
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      target.bytes = bytes;
+      target.dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    });
+  }
+
+  void _clearImage(_PickedImage target) => setState(() {
+        target.bytes = null;
+        target.dataUrl = null;
+        target.existingUrl = null;
+      });
 
   @override
   void dispose() {
@@ -115,14 +152,24 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
         final phone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
         if (phone.length != 10) return AppStrings.invalidPhone;
         final aadhaar = _aadhaarCtrl.text.replaceAll(' ', '');
-        if (aadhaar.length != 12 || int.tryParse(aadhaar) == null) {
-          return AppStrings.invalidAadhaar;
-        }
         final pan = _panCtrl.text.toUpperCase();
-        if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$').hasMatch(pan)) {
-          return AppStrings.invalidPan;
+        // In edit mode KYC was already submitted (and isn't returned to the
+        // client), so only validate fields the user actually re-entered.
+        if (!_isEditing || aadhaar.isNotEmpty) {
+          if (aadhaar.length != 12 || int.tryParse(aadhaar) == null) {
+            return AppStrings.invalidAadhaar;
+          }
         }
-        if (!_hasPanFront || !_hasPanBack || !_hasAadhaarFront || !_hasAadhaarBack) {
+        if (!_isEditing || pan.isNotEmpty) {
+          if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$').hasMatch(pan)) {
+            return AppStrings.invalidPan;
+          }
+        }
+        if (!_isEditing &&
+            (!_panFront.isSet ||
+                !_panBack.isSet ||
+                !_aadhaarFront.isSet ||
+                !_aadhaarBack.isSet)) {
           return AppStrings.allImagesRequired;
         }
         return null;
@@ -142,7 +189,61 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
     if (_step < _totalSteps - 1) {
       setState(() => _step++);
     } else {
+      _submit();
+    }
+  }
+
+  int? _intOf(TextEditingController c) {
+    final t = c.text.trim();
+    return t.isEmpty ? null : int.tryParse(t);
+  }
+
+  Map<String, dynamic> _buildPayload() {
+    final phone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+    return {
+      'categoryIds': _selectedCats,
+      if (_displayNameCtrl.text.trim().isNotEmpty)
+        'displayName': _displayNameCtrl.text.trim(),
+      if (_bioCtrl.text.trim().isNotEmpty) 'bio': _bioCtrl.text.trim(),
+      if (_intOf(_experienceCtrl) != null) 'experienceYrs': _intOf(_experienceCtrl),
+      if (_intOf(_basePriceCtrl) != null) 'basePrice': _intOf(_basePriceCtrl),
+      if (_intOf(_hourlyCtrl) != null) 'hourlyRate': _intOf(_hourlyCtrl),
+      if (_intOf(_dailyCtrl) != null) 'dailyRate': _intOf(_dailyCtrl),
+      if (_intOf(_monthlyCtrl) != null) 'monthlyRate': _intOf(_monthlyCtrl),
+      'currency': _currency,
+      if (phone.length == 10) 'phone': '+91$phone',
+      if (_addressCtrl.text.trim().isNotEmpty) 'address': _addressCtrl.text.trim(),
+      // KYC numbers: only send when entered (blank in edit mode = leave as-is).
+      if (_aadhaarCtrl.text.replaceAll(' ', '').isNotEmpty)
+        'aadhaarNumber': _aadhaarCtrl.text.replaceAll(' ', ''),
+      if (_panCtrl.text.trim().isNotEmpty) 'panNumber': _panCtrl.text.toUpperCase().trim(),
+      // Images: only send a newly picked one (dataUrl); never overwrite with null.
+      if (_photo.dataUrl != null) 'profileImageUrl': _photo.dataUrl,
+      if (_panFront.dataUrl != null) 'panFrontUrl': _panFront.dataUrl,
+      if (_panBack.dataUrl != null) 'panBackUrl': _panBack.dataUrl,
+      if (_aadhaarFront.dataUrl != null) 'aadhaarFrontUrl': _aadhaarFront.dataUrl,
+      if (_aadhaarBack.dataUrl != null) 'aadhaarBackUrl': _aadhaarBack.dataUrl,
+      if (_certs.isNotEmpty) 'certifications': _certs,
+      // Only sent on create. Re-sending true on edit would re-trigger the
+      // backend's KYC-required gate even though we aren't resubmitting docs.
+      if (!_isEditing) 'agreedToTerms': _agreed,
+    };
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+    try {
+      await ref
+          .read(proProfileProvider.notifier)
+          .submit(_buildPayload(), isEditing: _isEditing);
+      if (!mounted) return;
       setState(() => _submitted = true);
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbar.error(context, 'Could not submit profile. Please try again.');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -154,8 +255,57 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
     }
   }
 
-  void _jumpToStep(int i) {
-    if (i < _step) setState(() => _step = i);
+  // Submit a speciality that isn't in the list; it goes to admin for approval
+  // but can be selected immediately.
+  Future<void> _addCustomCategory() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardBg,
+        title: AppText.h3('Add a speciality'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppText.bodyXs(
+              "We'll send it for verification — you can use it right away.",
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              controller: ctrl,
+              hint: 'e.g. Lactation Consultant',
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: AppText.labelMd('Cancel', color: AppColors.textSecondary),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: AppText.labelMd('Submit', color: AppColors.teal),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.length < 2) return;
+
+    final id = await ref
+        .read(professionalsProvider.notifier)
+        .requestCustomCategory(name);
+    if (!mounted) return;
+    if (id != null) {
+      setState(() {
+        if (!_selectedCats.contains(id)) _selectedCats.add(id);
+      });
+      AppSnackbar.success(context, 'Speciality submitted — you can use it now');
+    } else {
+      AppSnackbar.error(context, 'Could not submit. Please try again.');
+    }
   }
 
   void _addCert() {
@@ -169,11 +319,47 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
     _certCtrl.clear();
   }
 
+  void _openServiceAreas() => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ServiceAreasScreen()),
+      );
+
   @override
   Widget build(BuildContext context) {
     if (!ref.watch(isOnlineProvider)) {
       return const OfflinePage(featureName: 'Professional Profile');
     }
+    final proState = ref.watch(proProfileProvider);
+
+    // Edit mode: pre-fill once the existing profile is available.
+    if (_isEditing && !_prefilled) {
+      final existing = proState.profile;
+      if (existing != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_prefilled) _prefill(existing);
+        });
+      }
+    }
+
+    // Apply mode but a profile already exists → show its status, not the form.
+    final existingProfile = proState.profile;
+    final showStatus = !_isEditing && !_submitted && existingProfile != null;
+    final loadingProfile =
+        !_isEditing && !_submitted && proState.isLoading && existingProfile == null;
+
+    final Widget body;
+    if (_submitted) {
+      body = _buildSubmitted();
+    } else if (loadingProfile) {
+      body = const Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
+      );
+    } else if (showStatus) {
+      body = _buildStatus(existingProfile.isVerified);
+    } else {
+      body = _buildWizard();
+    }
+    final hideBack = _submitted;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -181,18 +367,49 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
         appBar: AppBar(
           backgroundColor: context.bg,
           elevation: 0,
-          leading: _submitted
+          automaticallyImplyLeading: false,
+          toolbarHeight: 76,
+          leading: hideBack
               ? const SizedBox.shrink()
               : IconButton(
                   icon: Icon(Icons.arrow_back_ios_new_rounded,
                       color: context.primaryText, size: 20),
                   onPressed: _goBack,
                 ),
-          title: Text(_isEditing ? AppStrings.editProfessionalProfile : AppStrings.becomeProfessional,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          centerTitle: true,
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _isEditing
+                    ? AppStrings.editProfessionalProfile
+                    : showStatus
+                        ? 'Professional Profile'
+                        : AppStrings.becomeProfessional,
+                textAlign: TextAlign.center,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _isEditing
+                    ? 'Update your professional details and save the changes below.'
+                    : showStatus
+                        ? 'Your application status and setup.'
+                        : 'Complete your professional details below to create your profile.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.2,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+          centerTitle: false,
         ),
-        body: _submitted ? _buildSubmitted() : _buildWizard(),
+        body: body,
       ),
     );
   }
@@ -224,29 +441,88 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
             ),
             const SizedBox(height: 24),
             AppText.h2(
-              isEdit ? AppStrings.profileUpdated : AppStrings.applicationSubmitted,
+              isEdit
+                  ? AppStrings.profileUpdated
+                  : AppStrings.applicationSubmitted,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             AppText.bodySm(
-              isEdit ? AppStrings.profileUpdatedDesc : AppStrings.applicationPendingDesc,
+              isEdit
+                  ? AppStrings.profileUpdatedDesc
+                  : AppStrings.applicationPendingDesc,
               color: AppColors.textSecondary,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  foregroundColor: AppColors.textInverse,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: AppBorderRadius.lgAll),
-                ),
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text(AppStrings.back, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+            AppButton.primary(
+              label: 'Set up Service Areas',
+              onPressed: _openServiceAreas,
+              size: AppButtonSize.lg,
+              isFullWidth: true,
+            ),
+            const SizedBox(height: 12),
+            AppButton.secondary(
+              label: AppStrings.back,
+              onPressed: () => Navigator.of(context).pop(),
+              size: AppButtonSize.lg,
+              isFullWidth: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Already-applied status (shown if user re-opens "Become a Professional") ───
+
+  Widget _buildStatus(bool verified) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: (verified ? AppColors.teal : AppColors.amber)
+                    .withValues(alpha: 0.12),
+                shape: BoxShape.circle,
               ),
+              child: Icon(
+                verified ? Icons.verified_rounded : Icons.hourglass_top_rounded,
+                color: verified ? AppColors.teal : AppColors.amber,
+                size: 44,
+              ),
+            ),
+            const SizedBox(height: 24),
+            AppText.h2(
+              verified ? "You're verified" : 'Under review',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            AppText.bodySm(
+              verified
+                  ? 'Your professional profile is live. Patients can now find and connect with you.'
+                  : "Your application has been submitted and is awaiting verification. We'll notify you once it's approved.",
+              color: AppColors.textSecondary,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            AppButton.primary(
+              label: 'Manage Service Areas',
+              onPressed: _openServiceAreas,
+              size: AppButtonSize.lg,
+              isFullWidth: true,
+            ),
+            const SizedBox(height: 12),
+            AppButton.secondary(
+              label: AppStrings.back,
+              onPressed: () => Navigator.of(context).pop(),
+              size: AppButtonSize.lg,
+              isFullWidth: true,
             ),
           ],
         ),
@@ -259,11 +535,9 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
   Widget _buildWizard() {
     return Column(
       children: [
-        _StepIndicator(currentStep: _step, totalSteps: _totalSteps),
-        _StepTabPills(currentStep: _step, totalSteps: _totalSteps, onTap: _jumpToStep),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 260),
               transitionBuilder: (child, anim) => FadeTransition(
@@ -289,6 +563,7 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
           submitLabel: _isEditing ? AppStrings.saveChanges : AppStrings.submit,
           onBack: _goBack,
           onAdvance: _advance,
+          isBusy: _submitting,
         ),
       ],
     );
@@ -296,9 +571,12 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
 
   Widget _currentStepWidget() {
     switch (_step) {
-      case 0:  return _buildStep1();
-      case 1:  return _buildStep2();
-      default: return _buildStep3();
+      case 0:
+        return _buildStep1();
+      case 1:
+        return _buildStep2();
+      default:
+        return _buildStep3();
     }
   }
 
@@ -308,117 +586,241 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _PhotoPicker(
-          hasPhoto: _hasPhoto,
-          onTap: () => setState(() => _hasPhoto = !_hasPhoto),
+        AppCard(
+          hasShadow: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.teal.withValues(alpha: 0.12),
+                      borderRadius: AppBorderRadius.mdAll,
+                    ),
+                    child: const Icon(Icons.workspace_premium_rounded,
+                        color: AppColors.teal, size: 19),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText.labelMd(AppStrings.becomeProfessional,
+                            color: context.primaryText),
+                        AppText.bodyXs('Your basic professional details',
+                            color: AppColors.textSecondary),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              AppTextField(
+                controller: _displayNameCtrl,
+                label: AppStrings.displayName,
+                hint: AppStrings.displayNameHint,
+                prefix: const Icon(Icons.badge_rounded),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: AppTextField(
+                      controller: _experienceCtrl,
+                      label: AppStrings.proExperience,
+                      hint: AppStrings.experienceHint,
+                      prefix: const Icon(Icons.military_tech_rounded),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  _ProfilePhotoField(
+                    bytes: _photo.bytes,
+                    imageUrl: _photo.existingUrl,
+                    onTap: () => _pickInto(_photo),
+                    onClear: _photo.isSet ? () => _clearImage(_photo) : null,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Builder(builder: (_) {
+                final cats = ref.watch(professionalsProvider).categories;
+                return AppMultiSelectDropdownInput<String>(
+                  options: cats.map((c) => c.id).toList(),
+                  labels: cats.map((c) => c.name).toList(),
+                  selected: _selectedCats,
+                  label: AppStrings.selectCategories,
+                  hint: cats.isEmpty
+                      ? 'Loading specialities…'
+                      : 'Select your specialities',
+                  onChanged: (values) => setState(() => _selectedCats
+                    ..clear()
+                    ..addAll(values)),
+                );
+              }),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: _addCustomCategory,
+                child: Row(children: [
+                  const Icon(Icons.add_circle_outline_rounded,
+                      size: 16, color: AppColors.teal),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: AppText.bodySm(
+                      "Can't find your speciality? Add a custom one",
+                      color: AppColors.teal,
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 28),
-        _WizLabel(AppStrings.selectCategories),
-        const SizedBox(height: 10),
-        _CategoryChips(
-          categories: _kCategories,
-          selected: _selectedCats,
-          onToggle: (id) => setState(() {
-            if (_selectedCats.contains(id)) {
-              _selectedCats.remove(id);
-            } else {
-              _selectedCats.add(id);
-            }
-          }),
-        ),
-        const SizedBox(height: 24),
-        _WizLabel(AppStrings.displayName),
-        const SizedBox(height: 8),
-        _WizField(
-          controller: _displayNameCtrl,
-          hint: AppStrings.displayNameHint,
-          icon: Icons.badge_rounded,
-        ),
-        const SizedBox(height: 20),
-        _WizLabel(AppStrings.proExperience),
-        const SizedBox(height: 8),
-        _WizField(
-          controller: _experienceCtrl,
-          hint: AppStrings.experienceHint,
-          icon: Icons.military_tech_rounded,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        ),
-        const SizedBox(height: 20),
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _WizLabel(AppStrings.basePrice),
-              const SizedBox(height: 8),
-              _WizField(
-                controller: _basePriceCtrl,
+        const SizedBox(height: 16),
+        AppCard(
+          hasShadow: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.green.withValues(alpha: 0.12),
+                      borderRadius: AppBorderRadius.mdAll,
+                    ),
+                    child: const Icon(Icons.payments_rounded,
+                        color: AppColors.green, size: 19),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText.labelMd(AppStrings.connectionRates,
+                            color: context.primaryText),
+                        AppText.bodyXs(AppStrings.connectionRatesSubtitle,
+                            color: AppColors.textSecondary),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: AppTextField(
+                    controller: _basePriceCtrl,
+                    label: AppStrings.basePrice,
+                    hint: AppStrings.basePriceHint,
+                    prefix: const Icon(Icons.payments_rounded),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppDropdownInput<String>(
+                    label: AppStrings.currency,
+                    hint: 'Select currency',
+                    value: _currency,
+                    options: const ['INR', 'USD', 'EUR', 'GBP'],
+                    labels: const ['INR', 'USD', 'EUR', 'GBP'],
+                    onChanged: (v) {
+                      setState(() => _currency = v);
+                    },
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _hourlyCtrl,
+                label: AppStrings.hourlyRate,
                 hint: AppStrings.basePriceHint,
-                icon: Icons.payments_rounded,
+                prefix: const Icon(Icons.access_time_rounded),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
               ),
-            ]),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _dailyCtrl,
+                label: AppStrings.dailyRate,
+                hint: AppStrings.basePriceHint,
+                prefix: const Icon(Icons.today_rounded),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _monthlyCtrl,
+                label: AppStrings.monthlyRate,
+                hint: AppStrings.basePriceHint,
+                prefix: const Icon(Icons.calendar_month_rounded),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _WizLabel(AppStrings.currency),
-            const SizedBox(height: 8),
-            _CurrencyPicker(
-              value: _currency,
-              onChanged: (v) => setState(() => _currency = v),
-            ),
-          ]),
-        ]),
-        const SizedBox(height: 28),
-        AppText.labelMd(AppStrings.connectionRates, color: context.primaryText),
-        const SizedBox(height: 4),
-        AppText.bodyXs(AppStrings.connectionRatesSubtitle, color: AppColors.textSecondary),
+        ),
         const SizedBox(height: 16),
-        _WizLabel(AppStrings.hourlyRate),
-        const SizedBox(height: 8),
-        _WizField(
-          controller: _hourlyCtrl,
-          hint: AppStrings.basePriceHint,
-          icon: Icons.access_time_rounded,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        const SizedBox(height: 20),
-        _WizLabel(AppStrings.dailyRate),
-        const SizedBox(height: 8),
-        _WizField(
-          controller: _dailyCtrl,
-          hint: AppStrings.basePriceHint,
-          icon: Icons.today_rounded,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        const SizedBox(height: 20),
-        _WizLabel(AppStrings.monthlyRate),
-        const SizedBox(height: 8),
-        _WizField(
-          controller: _monthlyCtrl,
-          hint: AppStrings.basePriceHint,
-          icon: Icons.calendar_month_rounded,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        const SizedBox(height: 20),
-        _WizLabel(AppStrings.bio),
-        const SizedBox(height: 8),
-        _WizField(
-          controller: _bioCtrl,
-          hint: AppStrings.bioHint,
-          icon: Icons.notes_rounded,
-          maxLines: 4,
-          maxLength: 1000,
-        ),
-        const SizedBox(height: 20),
-        _WizLabel(AppStrings.address),
-        const SizedBox(height: 8),
-        _WizField(
-          controller: _addressCtrl,
-          hint: AppStrings.addressHint,
-          icon: Icons.location_on_rounded,
-          maxLines: 2,
-          maxLength: 300,
+        AppCard(
+          hasShadow: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.blue.withValues(alpha: 0.12),
+                      borderRadius: AppBorderRadius.mdAll,
+                    ),
+                    child: const Icon(Icons.person_rounded,
+                        color: AppColors.blue, size: 19),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText.labelMd(AppStrings.bio,
+                            color: context.primaryText),
+                        AppText.bodyXs('Tell patients about yourself',
+                            color: AppColors.textSecondary),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              AppTextField(
+                controller: _bioCtrl,
+                label: AppStrings.bio,
+                hint: AppStrings.bioHint,
+                prefix: const Icon(Icons.notes_rounded),
+                maxLines: 4,
+                maxLength: 1000,
+              ),
+              const SizedBox(height: 16),
+              AppTextArea(
+                controller: _addressCtrl,
+                label: AppStrings.address,
+                hint: AppStrings.addressHint,
+                minLines: 2,
+                maxLines: 2,
+                maxLength: 300,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -432,40 +834,35 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
       children: [
         const _SecurityBanner(),
         const SizedBox(height: 24),
-        _WizLabel(AppStrings.phone),
-        const SizedBox(height: 8),
-        _PhoneField(
-          countryCode: _countryCode,
+        AppPhoneField(
           controller: _phoneCtrl,
-          onPickCode: _showCountryCodePicker,
+          label: AppStrings.phone,
+          hint: AppStrings.enterPhoneNumber,
         ),
         const SizedBox(height: 20),
-        _WizLabel(AppStrings.aadhaarNumber),
-        const SizedBox(height: 8),
-        _WizField(
+        AppTextField(
           controller: _aadhaarCtrl,
+          label: AppStrings.aadhaarNumber,
           hint: AppStrings.aadhaarHint,
-          icon: Icons.credit_card_rounded,
+          prefix: const Icon(Icons.credit_card_rounded),
           keyboardType: TextInputType.number,
           inputFormatters: [_AadhaarFormatter()],
           maxLength: 14,
         ),
         const SizedBox(height: 20),
-        _WizLabel(AppStrings.panNumber),
-        const SizedBox(height: 8),
-        _WizField(
+        AppTextField(
           controller: _panCtrl,
+          label: AppStrings.panNumber,
           hint: AppStrings.panHint,
-          icon: Icons.badge_rounded,
+          prefix: const Icon(Icons.badge_rounded),
           maxLength: 10,
-          textCapitalization: TextCapitalization.characters,
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
             _UpperCaseFormatter(),
           ],
         ),
         const SizedBox(height: 24),
-        _WizLabel('Identity Documents'),
+        AppText.labelMd('Identity Documents', color: AppColors.textSecondary),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(
@@ -473,8 +870,9 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
               label: AppStrings.panFront,
               icon: Icons.credit_card_rounded,
               color: AppColors.blue,
-              selected: _hasPanFront,
-              onTap: () => setState(() => _hasPanFront = !_hasPanFront),
+              imageBytes: _panFront.bytes,
+              onTap: () => _pickInto(_panFront),
+              onClear: _panFront.isSet ? () => _clearImage(_panFront) : null,
             ),
           ),
           const SizedBox(width: 12),
@@ -483,8 +881,9 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
               label: AppStrings.panBack,
               icon: Icons.flip_rounded,
               color: AppColors.blue,
-              selected: _hasPanBack,
-              onTap: () => setState(() => _hasPanBack = !_hasPanBack),
+              imageBytes: _panBack.bytes,
+              onTap: () => _pickInto(_panBack),
+              onClear: _panBack.isSet ? () => _clearImage(_panBack) : null,
             ),
           ),
         ]),
@@ -495,9 +894,9 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
               label: AppStrings.aadhaarFront,
               icon: Icons.person_pin_rounded,
               color: AppColors.purple,
-              selected: _hasAadhaarFront,
-              onTap: () =>
-                  setState(() => _hasAadhaarFront = !_hasAadhaarFront),
+              imageBytes: _aadhaarFront.bytes,
+              onTap: () => _pickInto(_aadhaarFront),
+              onClear: _aadhaarFront.isSet ? () => _clearImage(_aadhaarFront) : null,
             ),
           ),
           const SizedBox(width: 12),
@@ -506,9 +905,9 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
               label: AppStrings.aadhaarBack,
               icon: Icons.flip_rounded,
               color: AppColors.purple,
-              selected: _hasAadhaarBack,
-              onTap: () =>
-                  setState(() => _hasAadhaarBack = !_hasAadhaarBack),
+              imageBytes: _aadhaarBack.bytes,
+              onTap: () => _pickInto(_aadhaarBack),
+              onClear: _aadhaarBack.isSet ? () => _clearImage(_aadhaarBack) : null,
             ),
           ),
         ]),
@@ -523,67 +922,21 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
     );
   }
 
-  void _showCountryCodePicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.topXxl,
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                  color: context.dividerCol,
-                  borderRadius: AppBorderRadius.pill,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            AppText.h3(AppStrings.selectCountry),
-            const SizedBox(height: 12),
-            ..._kCountryCodes.map((c) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: AppText.bodyMd(c.name, color: context.primaryText),
-              trailing: AppText.bodyMd(c.code, color: AppColors.teal),
-              onTap: () {
-                setState(() => _countryCode = c.code);
-                Navigator.pop(context);
-              },
-            )),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── Step 3: Agreement ──────────────────────────────────────────────────────────
 
   Widget _buildStep3() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppStrings.agreementTitle,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+        AppText.h2(AppStrings.agreementTitle),
         const SizedBox(height: 8),
-        Text(AppStrings.agreementPreamble,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
+        AppText.bodySm(
+          AppStrings.agreementPreamble,
+          color: AppColors.textSecondary,
+        ),
         const SizedBox(height: 16),
-        Container(
-          width: double.infinity,
+        AppCard(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: AppBorderRadius.lgAll,
-            border: Border.all(color: context.borderCol),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: _kAgreementBullets.map((bullet) {
@@ -603,8 +956,10 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(bullet,
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6)),
+                      child: AppText.bodySm(
+                        bullet,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -613,8 +968,10 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
           ),
         ),
         const SizedBox(height: 16),
-        Text(AppStrings.agreementFooter,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6, fontStyle: FontStyle.italic)),
+        AppText.bodySm(
+          AppStrings.agreementFooter,
+          color: AppColors.textSecondary,
+        ),
         const SizedBox(height: 24),
         GestureDetector(
           onTap: () => setState(() => _agreed = !_agreed),
@@ -641,7 +998,8 @@ class _BecomeProfessionalScreenState extends ConsumerState<BecomeProfessionalScr
               const SizedBox(width: 12),
               Expanded(
                 child: Text(AppStrings.agreementCheckbox,
-                    style: TextStyle(fontSize: 14, color: context.primaryText, height: 1.5)),
+                    style: TextStyle(
+                        fontSize: 14, color: context.primaryText, height: 1.5)),
               ),
             ],
           ),
@@ -660,364 +1018,54 @@ class _NavBar extends StatelessWidget {
     required this.submitLabel,
     required this.onBack,
     required this.onAdvance,
+    this.isBusy = false,
   });
   final int step;
   final int totalSteps;
   final String submitLabel;
   final VoidCallback onBack;
   final VoidCallback onAdvance;
+  final bool isBusy;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          20, 12, 20, 12 + MediaQuery.paddingOf(context).bottom),
+          20, 14, 20, 14 + MediaQuery.paddingOf(context).bottom),
       decoration: BoxDecoration(
         color: context.cardBg,
         border: Border(top: BorderSide(color: context.borderCol)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: Row(children: [
         if (step > 0) ...[
           Expanded(
-            child: SizedBox(
-              height: 50,
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: context.primaryText,
-                  side: BorderSide(color: context.borderCol),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: AppBorderRadius.lgAll),
-                ),
-                onPressed: onBack,
-                child:
-                    const Text(AppStrings.back, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
-              ),
+            child: AppButton.secondary(
+              label: AppStrings.back,
+              onPressed: onBack,
+              size: AppButtonSize.lg,
+              isFullWidth: true,
             ),
           ),
           const SizedBox(width: 12),
         ],
         Expanded(
           flex: step > 0 ? 2 : 1,
-          child: SizedBox(
-            height: 50,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.teal,
-                foregroundColor: AppColors.textInverse,
-                shape: RoundedRectangleBorder(
-                    borderRadius: AppBorderRadius.lgAll),
-              ),
-              onPressed: onAdvance,
-              child: Text(
-                step < totalSteps - 1 ? AppStrings.next : submitLabel,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2),
-              ),
-            ),
+          child: AppButton.primary(
+            label: step < totalSteps - 1 ? AppStrings.next : submitLabel,
+            onPressed: isBusy ? null : onAdvance,
+            size: AppButtonSize.lg,
+            isFullWidth: true,
+            isLoading: isBusy,
           ),
         ),
       ]),
-    );
-  }
-}
-
-// ─── Step Tab Pills ───────────────────────────────────────────────────────────
-
-class _StepTabPills extends StatelessWidget {
-  const _StepTabPills({
-    required this.currentStep,
-    required this.totalSteps,
-    required this.onTap,
-  });
-  final int currentStep;
-  final int totalSteps;
-  final ValueChanged<int> onTap;
-
-  static const _labels = [
-    AppStrings.stepProfile,
-    AppStrings.stepDocuments,
-    AppStrings.stepAgreement,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      color: context.bg,
-      child: Row(
-        children: List.generate(totalSteps, (i) {
-          final active = i == currentStep;
-          final done = i < currentStep;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onTap(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: active
-                      ? AppColors.teal
-                      : done
-                          ? AppColors.teal.withValues(alpha: 0.15)
-                          : context.inputBg,
-                  borderRadius: AppBorderRadius.pill,
-                  border: Border.all(
-                    color: active || done
-                        ? AppColors.teal
-                        : context.borderCol,
-                  ),
-                ),
-                child: Text(
-                  _labels[i],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 0.5,
-                    color: active
-                        ? AppColors.textInverse
-                        : done
-                            ? AppColors.teal
-                            : AppColors.textSecondary,
-                    fontWeight:
-                        active ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-// ─── Step Indicator ──────────────────────────────────────────────────────────
-
-class _StepIndicator extends StatelessWidget {
-  const _StepIndicator({required this.currentStep, required this.totalSteps});
-  final int currentStep;
-  final int totalSteps;
-
-  static const _labels = [
-    AppStrings.stepProfile,
-    AppStrings.stepDocuments,
-    AppStrings.stepAgreement,
-  ];
-  static const _icons = [
-    Icons.person_rounded,
-    Icons.folder_rounded,
-    Icons.shield_rounded,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      color: context.bg,
-      child: Column(
-        children: [
-          Row(
-            children: List.generate(totalSteps, (i) {
-              final done   = i < currentStep;
-              final active = i == currentStep;
-              return Expanded(
-                child: Center(
-                  child: _StepCircle(
-                      index: i, done: done, active: active, icon: _icons[i]),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: List.generate(totalSteps, (i) {
-              final active = i == currentStep;
-              final done   = i < currentStep;
-              final lastIdx = totalSteps - 1;
-              return Expanded(
-                child: Text(
-                  _labels[i],
-                  textAlign: i == 0
-                      ? TextAlign.start
-                      : i == lastIdx
-                          ? TextAlign.end
-                          : TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 0.5,
-                    color: done
-                        ? AppColors.teal
-                        : active
-                            ? context.primaryText
-                            : AppColors.textSecondary,
-                    fontWeight:
-                        active ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepCircle extends StatelessWidget {
-  const _StepCircle(
-      {required this.index,
-      required this.done,
-      required this.active,
-      required this.icon});
-  final int index;
-  final bool done;
-  final bool active;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color bg = done
-        ? AppColors.teal
-        : active
-            ? AppColors.teal.withValues(alpha: 0.15)
-            : context.inputBg;
-    final Color border = done || active ? AppColors.teal : context.dividerCol;
-    final Color fg = done
-        ? AppColors.textInverse
-        : active
-            ? AppColors.teal
-            : AppColors.textSecondary;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 280),
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: bg,
-        shape: BoxShape.circle,
-        border: Border.all(color: border, width: 2),
-      ),
-      child: done
-          ? const Icon(Icons.check_rounded, color: AppColors.textInverse, size: 18)
-          : Icon(icon, color: fg, size: 18),
-    );
-  }
-}
-
-// ─── Photo Picker ─────────────────────────────────────────────────────────────
-
-class _PhotoPicker extends StatelessWidget {
-  const _PhotoPicker({required this.hasPhoto, required this.onTap});
-  final bool hasPhoto;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Stack(
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: context.inputBg,
-                border: Border.all(
-                  color: hasPhoto ? AppColors.teal : context.borderCol,
-                  width: 2,
-                ),
-              ),
-              child: hasPhoto
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: const Icon(Icons.person_rounded,
-                          color: AppColors.teal, size: 48),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.camera_alt_rounded,
-                            color: AppColors.textHint, size: 30),
-                        const SizedBox(height: 4),
-                        AppText.bodyXs('Upload Photo', color: AppColors.textHint),
-                      ],
-                    ),
-            ),
-            if (hasPhoto)
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: AppColors.teal,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: context.bg, width: 2),
-                  ),
-                  child: const Icon(Icons.camera_alt_rounded,
-                      color: AppColors.textInverse, size: 14),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Category Chips ───────────────────────────────────────────────────────────
-
-class _CategoryChips extends StatelessWidget {
-  const _CategoryChips(
-      {required this.categories,
-      required this.selected,
-      required this.onToggle});
-  final List<({String id, String label})> categories;
-  final Set<String> selected;
-  final ValueChanged<String> onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 112),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: context.inputBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: SingleChildScrollView(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: categories.map((cat) {
-              final on = selected.contains(cat.id);
-              return GestureDetector(
-                onTap: () => onToggle(cat.id),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: on
-                        ? AppColors.teal.withValues(alpha: 0.15)
-                        : context.cardBg,
-                    border: Border.all(
-                        color: on ? AppColors.teal : context.borderCol),
-                    borderRadius: AppBorderRadius.pill,
-                  ),
-                  child: AppText.labelMd(cat.label,
-                      color: on ? AppColors.teal : AppColors.textSecondary),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1034,73 +1082,14 @@ class _SecurityBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.amber.withValues(alpha: 0.1),
         borderRadius: AppBorderRadius.lgAll,
-        border:
-            Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
       ),
       child: Row(children: [
         const Icon(Icons.lock_rounded, color: AppColors.amber, size: 18),
         const SizedBox(width: 10),
         Expanded(
-          child: AppText.bodySm(AppStrings.secureDataBanner, color: AppColors.amber),
-        ),
-      ]),
-    );
-  }
-}
-
-// ─── Phone Field ─────────────────────────────────────────────────────────────
-
-class _PhoneField extends StatelessWidget {
-  const _PhoneField(
-      {required this.countryCode,
-      required this.controller,
-      required this.onPickCode});
-  final String countryCode;
-  final TextEditingController controller;
-  final VoidCallback onPickCode;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.inputBg,
-        borderRadius: AppBorderRadius.lgAll,
-        border: Border.all(color: context.borderCol),
-      ),
-      child: Row(children: [
-        GestureDetector(
-          onTap: onPickCode,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-            decoration: BoxDecoration(
-              border: Border(right: BorderSide(color: context.borderCol)),
-            ),
-            child: Row(children: [
-              AppText.bodyMd(countryCode, color: context.primaryText),
-              const SizedBox(width: 4),
-              const Icon(Icons.expand_more_rounded,
-                  color: AppColors.textSecondary, size: 16),
-            ]),
-          ),
-        ),
-        Expanded(
-          child: TextField(
-            controller: controller,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(10),
-            ],
-            style: TextStyle(fontSize: 14, color: context.primaryText),
-            decoration: InputDecoration(
-              hintText: AppStrings.enterPhoneNumber,
-              hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
-              border: InputBorder.none,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14),
-            ),
-          ),
+          child: AppText.bodySm(AppStrings.secureDataBanner,
+              color: AppColors.amber),
         ),
       ]),
     );
@@ -1114,13 +1103,17 @@ class _ImagePickerBox extends StatelessWidget {
       {required this.label,
       required this.icon,
       required this.color,
-      required this.selected,
-      required this.onTap});
+      required this.imageBytes,
+      required this.onTap,
+      this.onClear});
   final String label;
   final IconData icon;
   final Color color;
-  final bool selected;
+  final Uint8List? imageBytes;
   final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  bool get _selected => imageBytes != null;
 
   @override
   Widget build(BuildContext context) {
@@ -1129,39 +1122,72 @@ class _ImagePickerBox extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         height: 104,
+        clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: selected
-              ? color.withValues(alpha: 0.12)
-              : context.cardBg,
+          color: _selected ? color.withValues(alpha: 0.12) : context.cardBg,
           borderRadius: AppBorderRadius.lgAll,
           border: Border.all(
-            color: selected ? color : context.borderCol,
-            width: selected ? 1.5 : 1,
+            color: _selected ? color : context.borderCol,
+            width: _selected ? 1.5 : 1,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              selected ? Icons.check_circle_rounded : icon,
-              color: selected ? color : AppColors.textHint,
-              size: 28,
-            ),
-            const SizedBox(height: 8),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                  color: selected ? color : AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center),
-            if (!selected) ...[
-              const SizedBox(height: 2),
-              AppText.bodyXs(AppStrings.tapToSelect, color: AppColors.textHint),
-            ],
-          ],
-        ),
+        child: _selected
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.memory(imageBytes!, fit: BoxFit.cover),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      color: Colors.black.withValues(alpha: 0.45),
+                      child: Text(label,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          )),
+                    ),
+                  ),
+                  if (onClear != null)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: onClear,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close_rounded,
+                              size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                ],
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: AppColors.textHint, size: 28),
+                  const SizedBox(height: 8),
+                  Text(label,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                        color: AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 2),
+                  AppText.bodyXs(AppStrings.tapToSelect, color: AppColors.textHint),
+                ],
+              ),
       ),
     );
   }
@@ -1186,14 +1212,15 @@ class _CertificationsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _WizLabel('${AppStrings.certifications} (${certs.length}/10)'),
+        AppText.labelMd('${AppStrings.certifications} (${certs.length}/10)',
+            color: AppColors.textSecondary),
         const SizedBox(height: 8),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
-            child: _WizField(
+            child: AppTextField(
               controller: certCtrl,
               hint: AppStrings.certificationHint,
-              icon: Icons.workspace_premium_rounded,
+              prefix: const Icon(Icons.workspace_premium_rounded),
             ),
           ),
           const SizedBox(width: 8),
@@ -1213,35 +1240,27 @@ class _CertificationsSection extends StatelessWidget {
         ]),
         const SizedBox(height: 8),
         if (certs.isEmpty)
-          Container(
-            width: double.infinity,
+          AppCard(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: AppBorderRadius.lgAll,
-              border: Border.all(color: context.borderCol),
+            child: AppText.bodySm(
+              AppStrings.noCertificationsYet,
+              color: AppColors.textHint,
+              textAlign: TextAlign.center,
             ),
-            child: AppText.bodySm(AppStrings.noCertificationsYet,
-                color: AppColors.textHint,
-                textAlign: TextAlign.center),
           )
         else
           ...certs.asMap().entries.map(
-                (e) => Container(
+                (e) => AppCard(
                   margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: context.cardBg,
-                    borderRadius: AppBorderRadius.lgAll,
-                    border: Border.all(color: context.borderCol),
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(children: [
                     const Icon(Icons.workspace_premium_rounded,
                         color: AppColors.amber, size: 18),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: AppText.bodyMd(e.value, color: context.primaryText),
+                      child:
+                          AppText.bodyMd(e.value, color: context.primaryText),
                     ),
                     GestureDetector(
                       onTap: () => onRemove(e.key),
@@ -1252,140 +1271,6 @@ class _CertificationsSection extends StatelessWidget {
                 ),
               ),
       ],
-    );
-  }
-}
-
-// ─── Currency Picker ─────────────────────────────────────────────────────────
-
-class _CurrencyPicker extends StatelessWidget {
-  const _CurrencyPicker({required this.value, required this.onChanged});
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  static const _currencies = ['INR', 'USD', 'EUR', 'GBP'];
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (_) => Container(
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: AppBorderRadius.topXxl,
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                  color: context.dividerCol,
-                  borderRadius: AppBorderRadius.pill,
-                ),
-              ),
-              const SizedBox(height: 16),
-              AppText.h3(AppStrings.currency),
-              const SizedBox(height: 12),
-              ..._currencies.map((c) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: AppText.bodyMd(c, color: context.primaryText),
-                trailing: c == value
-                    ? const Icon(Icons.check_rounded,
-                        color: AppColors.teal)
-                    : null,
-                onTap: () {
-                  onChanged(c);
-                  Navigator.pop(context);
-                },
-              )),
-            ],
-          ),
-        ),
-      ),
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        decoration: BoxDecoration(
-          color: context.inputBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          AppText.bodyMd(value, color: context.primaryText),
-          const SizedBox(width: 4),
-          const Icon(Icons.expand_more_rounded,
-              color: AppColors.textSecondary, size: 16),
-        ]),
-      ),
-    );
-  }
-}
-
-// ─── Shared form helpers ──────────────────────────────────────────────────────
-
-class _WizLabel extends StatelessWidget {
-  const _WizLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppText.labelMd(text, color: AppColors.textSecondary);
-  }
-}
-
-class _WizField extends StatelessWidget {
-  const _WizField({
-    required this.controller,
-    required this.hint,
-    required this.icon,
-    this.keyboardType,
-    this.inputFormatters,
-    this.maxLines = 1,
-    this.maxLength,
-    this.textCapitalization = TextCapitalization.none,
-  });
-
-  final TextEditingController controller;
-  final String hint;
-  final IconData icon;
-  final TextInputType? keyboardType;
-  final List<TextInputFormatter>? inputFormatters;
-  final int maxLines;
-  final int? maxLength;
-  final TextCapitalization textCapitalization;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      maxLines: maxLines,
-      maxLength: maxLength,
-      textCapitalization: textCapitalization,
-      style: TextStyle(fontSize: 14, color: context.primaryText),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
-        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
-        filled: true,
-        fillColor: context.inputBg,
-        counterStyle: const TextStyle(fontSize: 11, color: AppColors.textHint),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppBorderRadius.lgAll,
-          borderSide: BorderSide(color: context.borderCol),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppBorderRadius.lgAll,
-          borderSide: const BorderSide(color: AppColors.teal),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      ),
     );
   }
 }
@@ -1417,4 +1302,91 @@ class _UpperCaseFormatter extends TextInputFormatter {
       TextEditingValue oldValue, TextEditingValue newValue) {
     return newValue.copyWith(text: newValue.text.toUpperCase());
   }
+}
+
+// ─── Profile photo field (labeled, bordered, with camera/clear badge) ─────────
+
+class _ProfilePhotoField extends StatelessWidget {
+  final Uint8List? bytes;
+  final String? imageUrl;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+  const _ProfilePhotoField({
+    required this.bytes,
+    this.imageUrl,
+    required this.onTap,
+    this.onClear,
+  });
+
+  bool get _has => bytes != null || (imageUrl != null && imageUrl!.isNotEmpty);
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 64.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Profile Photo', style: AppTypography.labelMd),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: onTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: size,
+                height: size,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: context.inputBg,
+                  borderRadius: AppBorderRadius.lgAll,
+                  border: Border.all(
+                    color: _has ? AppColors.teal : context.borderCol,
+                    width: _has ? 1.5 : 1,
+                  ),
+                ),
+                child: _has
+                    ? (bytes != null
+                        ? Image.memory(bytes!, fit: BoxFit.cover, width: size, height: size)
+                        : Image.network(imageUrl!, fit: BoxFit.cover, width: size, height: size))
+                    : const Icon(Icons.camera_alt_rounded,
+                        color: AppColors.textHint, size: 26),
+              ),
+              Positioned(
+                bottom: -4,
+                right: -4,
+                child: GestureDetector(
+                  onTap: _has ? (onClear ?? onTap) : onTap,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: _has ? AppColors.error : AppColors.teal,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: context.cardBg, width: 2),
+                    ),
+                    child: Icon(
+                      _has ? Icons.close_rounded : Icons.camera_alt_rounded,
+                      color: AppColors.textInverse,
+                      size: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Picked image holder (raw bytes + base64 data URL for upload) ─────────────
+
+class _PickedImage {
+  Uint8List? bytes; // freshly picked image bytes (for preview)
+  String? dataUrl; // base64 data URL to upload (only when newly picked)
+  String? existingUrl; // already-uploaded remote URL (edit mode)
+
+  bool get isSet => dataUrl != null || existingUrl != null;
 }

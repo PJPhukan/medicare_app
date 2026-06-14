@@ -45,4 +45,18 @@ class ProProfileRepositoryImpl implements ProProfileRepository {
   @override
   Future<void> removeServiceArea(String serviceAreaId) =>
       _ds.removeServiceArea(serviceAreaId);
+
+  @override
+  Future<void> requestNewArea({
+    required String name,
+    required String pincodes,
+    required String state,
+    required String district,
+  }) =>
+      _ds.requestNewArea(
+        name: name,
+        pincodes: pincodes,
+        state: state,
+        district: district,
+      );
 }

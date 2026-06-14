@@ -5,6 +5,16 @@ class SendConnectionRequestUseCase {
 
   final ConnectionsRepository _repo;
 
-  Future<void> call(String targetUserId) =>
-      _repo.sendConnectionRequest(targetUserId);
+  Future<void> call({
+    required String professionalId,
+    required String planType,
+    String? areaId,
+    String? note,
+  }) =>
+      _repo.sendConnectionRequest(
+        professionalId: professionalId,
+        planType: planType,
+        areaId: areaId,
+        note: note,
+      );
 }
