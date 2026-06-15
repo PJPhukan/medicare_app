@@ -12,4 +12,11 @@ abstract interface class VitalsRepository {
     String? measuredAt,
     String? notes,
   });
+
+  Future<VitalReadingEntity> updateReading({
+    required String id,
+    required List<Map<String, dynamic>> values,
+    String? measuredAt,
+    String? notes,
+  });
 }

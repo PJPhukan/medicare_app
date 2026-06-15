@@ -4,7 +4,7 @@ abstract class ApiConstants {
   // or for a LAN device: `--dart-define=API_BASE_URL=http://192.168.x.x:4000`
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.29.210:4000',
+    defaultValue: 'http://192.168.29.232:4000',
   );
 
   // ── Auth ──────────────────────────────────────────────────────────────────

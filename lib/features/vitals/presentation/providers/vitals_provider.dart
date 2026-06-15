@@ -10,6 +10,7 @@ import '../../domain/repositories/vitals_repository.dart';
 import '../../domain/usecases/fetch_vital_configs_usecase.dart';
 import '../../domain/usecases/fetch_vitals_usecase.dart';
 import '../../domain/usecases/add_vital_reading_usecase.dart';
+import '../../domain/usecases/update_vital_reading_usecase.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/utils/logger.dart';
 
@@ -50,6 +51,7 @@ class VitalsNotifier extends StateNotifier<VitalsState> {
     this._fetchConfigs,
     this._fetchVitals,
     this._addReading,
+    this._updateReadingUseCase,
     this._ref,
   ) : super(const VitalsState()) {
     load();
@@ -61,6 +63,7 @@ class VitalsNotifier extends StateNotifier<VitalsState> {
   final FetchVitalConfigsUseCase _fetchConfigs;
   final FetchVitalsUseCase _fetchVitals;
   final AddVitalReadingUseCase _addReading;
+  final UpdateVitalReadingUseCase _updateReadingUseCase;
   final Ref _ref;
 
   Future<void> load() async {
@@ -107,6 +110,34 @@ class VitalsNotifier extends StateNotifier<VitalsState> {
       rethrow;
     }
   }
+
+  Future<void> updateReading({
+    required String id,
+    required List<Map<String, dynamic>> values,
+    String? measuredAt,
+    String? notes,
+  }) async {
+    AppLogger.i('Vital reading update → id:$id', tag: 'Vitals');
+    try {
+      final updated = await _updateReadingUseCase(
+        id: id,
+        values: values,
+        measuredAt: measuredAt,
+        notes: notes,
+      ) as VitalReading;
+      // Replace the edited reading in place.
+      state = state.copyWith(
+        readings: [
+          for (final r in state.readings) if (r.id == id) updated else r,
+        ],
+      );
+      AppLogger.i('Vital reading updated ✓', tag: 'Vitals');
+    } on Exception catch (e, s) {
+      AppLogger.e('Vital reading update failed', tag: 'Vitals', error: e, stack: s);
+      state = state.copyWith(error: e.toString());
+      rethrow;
+    }
+  }
 }
 
 // ── Providers ─────────────────────────────────────────────────────────────────
@@ -134,6 +165,10 @@ final _addVitalReadingUseCaseProvider = Provider<AddVitalReadingUseCase>(
   (ref) => AddVitalReadingUseCase(ref.read(vitalsRepositoryProvider)),
 );
 
+final _updateVitalReadingUseCaseProvider = Provider<UpdateVitalReadingUseCase>(
+  (ref) => UpdateVitalReadingUseCase(ref.read(vitalsRepositoryProvider)),
+);
+
 final vitalsProvider =
     StateNotifierProvider<VitalsNotifier, VitalsState>((ref) {
   ref.watch(authTokenProvider);
@@ -141,6 +176,7 @@ final vitalsProvider =
     ref.read(_fetchVitalConfigsUseCaseProvider),
     ref.read(_fetchVitalsUseCaseProvider),
     ref.read(_addVitalReadingUseCaseProvider),
+    ref.read(_updateVitalReadingUseCaseProvider),
     ref,
   );
 });

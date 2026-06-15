@@ -370,6 +370,10 @@ abstract class AppStrings {
   // ─── Vitals ─────────────────────────────────────────────────────────────────
   static const vitals = 'Vitals';
   static const myVitals = 'My Vitals';
+  static const vitalsSubtitle = 'Track your health readings over time';
+  static const rangeToday = 'Today';
+  static const range7Days = '7 days';
+  static const range30Days = '30 days';
   static const addVital = 'Add Vital';
   static const logReading        = 'Log Reading';
   static const recentReadings    = 'Recent Readings';

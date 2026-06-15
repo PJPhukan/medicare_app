@@ -53,4 +53,24 @@ class VitalsRepositoryImpl implements VitalsRepository {
       );
     }
   }
+
+  @override
+  Future<VitalReadingEntity> updateReading({
+    required String id,
+    required List<Map<String, dynamic>> values,
+    String? measuredAt,
+    String? notes,
+  }) async {
+    // Editing needs a live connection — there's no offline replay handler for
+    // updates (unlike create), so we don't silently queue an unhandled op.
+    if (!_isOnline()) {
+      throw UnsupportedError('Editing a reading requires an internet connection.');
+    }
+    return _ds.updateReading(
+      id: id,
+      values: values,
+      measuredAt: measuredAt,
+      notes: notes,
+    );
+  }
 }

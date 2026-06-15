@@ -42,4 +42,21 @@ class VitalsRemoteDataSource {
     );
     return VitalReading.fromJson(res.data!['data'] as Map<String, dynamic>);
   }
+
+  Future<VitalReading> updateReading({
+    required String id,
+    required List<Map<String, dynamic>> values,
+    String? measuredAt,
+    String? notes,
+  }) async {
+    final res = await _dio.patch<Map<String, dynamic>>(
+      '${ApiConstants.myVitals}/$id',
+      data: {
+        'values': values,
+        if (measuredAt != null) 'measuredAt': measuredAt,
+        if (notes != null) 'notes': notes,
+      },
+    );
+    return VitalReading.fromJson(res.data!['data'] as Map<String, dynamic>);
+  }
 }
