@@ -4,9 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/widgets.dart';
 
 const _kSeenKey = 'onboarding_seen';
 const _kAutoAdvanceMs = 4000;
+
+abstract class _OnboardingDimens {
+  static const illustrationSize   = 280.0;
+  static const illustrationTopPad = 80.0;
+}
 
 Future<bool> hasSeenOnboarding() async {
   final prefs = await SharedPreferences.getInstance();
@@ -48,13 +54,12 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
-  final _pageController = PageController();
+    with SingleTickerProviderStateMixin {
+  late final PageController _pageController;
   int _page = 0;
   Timer? _autoTimer;
 
   late final AnimationController _floatCtrl;
-  late final AnimationController _contentCtrl;
   late final Animation<double> _floatAnim;
 
   static const _pages = [
@@ -65,6 +70,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       accentColor: AppColors.teal,
       darkGradientEnd: Color(0xFF0A1F1C),
       lightGradientEnd: Color(0xFFE6FAF8),
+    ),
+    _PageData(
+      title: AppStrings.onboarding4Title,
+      body: AppStrings.onboarding4Body,
+      makePainter: _ProfessionalPainter.new,
+      accentColor: AppColors.amber,
+      darkGradientEnd: Color(0xFF1F1500),
+      lightGradientEnd: Color(0xFFFFF8E1),
     ),
     _PageData(
       title: AppStrings.onboarding2Title,
@@ -82,29 +95,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       darkGradientEnd: Color(0xFF1A0D1F),
       lightGradientEnd: Color(0xFFF0E8FF),
     ),
-    _PageData(
-      title: AppStrings.onboarding4Title,
-      body: AppStrings.onboarding4Body,
-      makePainter: _ProfessionalPainter.new,
-      accentColor: AppColors.amber,
-      darkGradientEnd: Color(0xFF1F1500),
-      lightGradientEnd: Color(0xFFFFF8E1),
-    ),
   ];
 
   @override
   void initState() {
     super.initState();
 
+    _pageController = PageController();
+
     _floatCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
     )..repeat(reverse: true);
-
-    _contentCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    )..forward();
 
     _floatAnim = Tween<double>(begin: -10, end: 10).animate(
       CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
@@ -130,7 +132,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _onPageChanged(int i) {
     setState(() => _page = i);
-    _contentCtrl.forward(from: 0);
     // Reset timer on manual swipe so the current page gets full 4s
     _startAutoTimer();
   }
@@ -158,6 +159,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _done() async {
     _autoTimer?.cancel();
     await markOnboardingSeen();
+    if (!mounted) return;
     widget.onDone();
   }
 
@@ -166,7 +168,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _autoTimer?.cancel();
     _pageController.dispose();
     _floatCtrl.dispose();
-    _contentCtrl.dispose();
     super.dispose();
   }
 
@@ -198,7 +199,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
           // Subtle grid overlay
           Positioned.fill(
-            child: CustomPaint(painter: _GridPainter(isDark: isDark)),
+            child: RepaintBoundary(
+              child: CustomPaint(painter: _GridPainter(isDark: isDark)),
+            ),
           ),
 
           // Accent glow behind illustration
@@ -217,16 +220,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
 
           // Pages
-          PageView.builder(
-            controller: _pageController,
-            itemCount: _pages.length,
-            onPageChanged: _onPageChanged,
-            itemBuilder: (_, index) => _PageContent(
-              page: _pages[index],
-              floatAnim: _floatAnim,
-              contentCtrl: _contentCtrl,
-              isCurrent: index == _page,
-              isDark: isDark,
+          NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n is ScrollStartNotification) { _autoTimer?.cancel(); }
+              else if (n is ScrollEndNotification) { _startAutoTimer(); }
+              return false;
+            },
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _pages.length,
+              onPageChanged: _onPageChanged,
+              itemBuilder: (_, index) => _PageContent(
+                page: _pages[index],
+                floatAnim: _floatAnim,
+                isActive: index == _page,
+                isDark: isDark,
+              ),
             ),
           ),
 
@@ -239,47 +248,47 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Back button — fades in from page 2
-                    AnimatedOpacity(
-                      opacity: _page > 0 ? 1.0 : 0.0,
+                    // Back button — appears from page 2 onward
+                    AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
-                      child: TextButton.icon(
-                        onPressed: _page > 0 ? _goBack : null,
-                        icon: Icon(
-                          Icons.arrow_back_rounded,
-                          size: 16,
-                          color: isDark
-                              ? AppColors.textHint
-                              : const Color(0xFF94A3B8),
-                        ),
-                        label: Text(
-                          AppStrings.back,
-                          style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w500,
-                            color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                        ),
-                      ),
+                      child: _page > 0
+                          ? Semantics(
+                              button: true,
+                              label: 'Go to previous page',
+                              child: AppButton(
+                                key: const ValueKey('back'),
+                                label: AppStrings.back,
+                                variant: AppButtonVariant.text,
+                                size: AppButtonSize.sm,
+                                color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
+                                leading: Icon(
+                                  Icons.arrow_back_rounded,
+                                  size: 16,
+                                  color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
+                                ),
+                                onPressed: _goBack,
+                              ),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('back-hidden')),
                     ),
 
                     // Skip button — hidden on last page
-                    AnimatedOpacity(
-                      opacity: isLast ? 0.0 : 1.0,
+                    AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
-                      child: TextButton(
-                        onPressed: isLast ? null : _done,
-                        child: Text(
-                          AppStrings.onboardingSkip,
-                          style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w500,
-                            color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ),
+                      child: isLast
+                          ? const SizedBox.shrink(key: ValueKey('skip-hidden'))
+                          : Semantics(
+                              button: true,
+                              label: 'Skip onboarding',
+                              child: AppButton(
+                                key: const ValueKey('skip'),
+                                label: AppStrings.onboardingSkip,
+                                variant: AppButtonVariant.text,
+                                size: AppButtonSize.sm,
+                                color: isDark ? AppColors.textHint : const Color(0xFF94A3B8),
+                                onPressed: _done,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -306,55 +315,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     const SizedBox(height: 32),
 
                     // CTA button
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            page.accentColor,
-                            Color.lerp(page.accentColor, Colors.white, 0.12)!,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: page.accentColor.withValues(
-                                alpha: isDark ? 0.35 : 0.25),
-                            blurRadius: 20,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _goNext,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  isLast
-                                      ? AppStrings.onboardingGetStarted
-                                      : AppStrings.onboardingNext,
-                                  style: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w700,
-                                    color: Colors.white, letterSpacing: 0.2,
-                                  ),
-                                ),
-                                if (!isLast) ...[
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.arrow_forward_rounded,
-                                      color: Colors.white, size: 18),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                    AppButton(
+                      label: isLast
+                          ? AppStrings.onboardingGetStarted
+                          : AppStrings.onboardingNext,
+                      variant: AppButtonVariant.primary,
+                      size: AppButtonSize.lg,
+                      color: page.accentColor,
+                      isFullWidth: true,
+                      trailing: isLast
+                          ? null
+                          : const Icon(Icons.arrow_forward_rounded,
+                              color: Colors.white, size: 18),
+                      onPressed: _goNext,
                     ),
                   ],
                 ),
@@ -369,26 +342,55 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
 // ─── Single page content ──────────────────────────────────────────────────────
 
-class _PageContent extends StatelessWidget {
+class _PageContent extends StatefulWidget {
   const _PageContent({
     required this.page,
     required this.floatAnim,
-    required this.contentCtrl,
-    required this.isCurrent,
+    required this.isActive,
     required this.isDark,
   });
 
   final _PageData page;
   final Animation<double> floatAnim;
-  final AnimationController contentCtrl;
-  final bool isCurrent;
+  final bool isActive;
   final bool isDark;
 
   @override
+  State<_PageContent> createState() => _PageContentState();
+}
+
+class _PageContentState extends State<_PageContent>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _contentCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+  }
+
+  @override
+  void didUpdateWidget(_PageContent old) {
+    super.didUpdateWidget(old);
+    if (widget.isActive && !old.isActive) {
+      _contentCtrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final fadeSlide = CurvedAnimation(parent: contentCtrl, curve: Curves.easeOut);
-    final titleColor = isDark ? Colors.white : const Color(0xFF1A202C);
-    final bodyColor = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
+    final fadeSlide = CurvedAnimation(parent: _contentCtrl, curve: Curves.easeOut);
+    final titleColor = widget.isDark ? Colors.white : const Color(0xFF1A202C);
+    final bodyColor = widget.isDark ? AppColors.textSecondary : const Color(0xFF64748B);
 
     return Column(
       children: [
@@ -396,16 +398,21 @@ class _PageContent extends StatelessWidget {
         Expanded(
           flex: 5,
           child: Padding(
-            padding: const EdgeInsets.only(top: 80),
+            padding: const EdgeInsets.only(top: _OnboardingDimens.illustrationTopPad),
             child: AnimatedBuilder(
-              animation: floatAnim,
+              animation: widget.floatAnim,
               builder: (_, child) => Transform.translate(
-                offset: Offset(0, floatAnim.value),
+                offset: Offset(0, widget.floatAnim.value),
                 child: child,
               ),
-              child: CustomPaint(
-                painter: page.makePainter(isDark),
-                child: const SizedBox(width: 280, height: 280),
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: widget.page.makePainter(widget.isDark),
+                  child: const SizedBox(
+                    width: _OnboardingDimens.illustrationSize,
+                    height: _OnboardingDimens.illustrationSize,
+                  ),
+                ),
               ),
             ),
           ),
@@ -427,22 +434,16 @@ class _PageContent extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
                 children: [
-                  Text(
-                    page.title,
+                  AppText.display2(
+                    widget.page.title,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 30, fontWeight: FontWeight.w800,
-                      color: titleColor, height: 1.15, letterSpacing: -0.3,
-                    ),
+                    color: titleColor,
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    page.body,
+                  AppText.bodyLg(
+                    widget.page.body,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w400,
-                      color: bodyColor, height: 1.6,
-                    ),
+                    color: bodyColor,
                   ),
                 ],
               ),
@@ -450,7 +451,9 @@ class _PageContent extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(height: 148),
+        SizedBox(
+          height: (MediaQuery.sizeOf(context).height * 0.15).clamp(80.0, 148.0),
+        ),
       ],
     );
   }
