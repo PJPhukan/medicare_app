@@ -3,8 +3,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/router/route_args.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -370,58 +372,40 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
         child: CustomScrollView(
           slivers: [
             // ── App bar ──────────────────────────────────────────────────────
-            SliverAppBar(
+            AppSliverAppBar(
               floating: true,
               snap: true,
-              backgroundColor: bg,
-              surfaceTintColor: Colors.transparent,
-              toolbarHeight: 68,
-              leading: IconButton(
-                icon: const Icon(Icons.menu_rounded, size: 22),
-                onPressed: openAppSidebar,
-                tooltip: 'Menu',
-                style:
-                    IconButton.styleFrom(backgroundColor: Colors.transparent),
-              ),
-              // Two-line title with a small description (matches the other screens).
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppText.h3(AppStrings.myVitals, color: context.primaryText),
-                  AppText.bodySm(AppStrings.vitalsSubtitle,
-                      color: context.secondaryText),
-                ],
-              ),
-              actions: [
-                // Add-log action lives in the toolbar; gated on the vitals tab's
-                // allowAdd permission (see canLog).
-                if (canLog)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        _openLog();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.teal, AppColors.blue],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: AppBorderRadius.pill,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.teal.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+              config: AppBarConfig(
+                title: AppStrings.myVitals,
+                subtitle: AppStrings.vitalsSubtitle,
+                actions: [
+                  if (canLog)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          _openLog();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.teal, AppColors.blue],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                          ],
-                        ),
-                        child: const Row(
+                            borderRadius: AppBorderRadius.pill,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.teal.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.add_rounded,
@@ -433,11 +417,13 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
                                       fontWeight: FontWeight.w700,
                                       color: Colors.white,
                                       letterSpacing: 0.2)),
-                            ]),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
 
             // ── Loading skeleton ──────────────────────────────────────────────
@@ -591,6 +577,15 @@ class _VitalsScreenState extends ConsumerState<VitalsScreen> {
                     config: _activeConfig,
                     readings: _activeReadings,
                     onEdit: canEdit ? _openEdit : null,
+                    onViewAll: _activeConfig.id.isNotEmpty
+                        ? () => context.push(
+                              AppRoutes.vitalHistory,
+                              extra: VitalHistoryArgs(
+                                configId: _activeConfig.id,
+                                configName: _activeConfig.name,
+                              ),
+                            )
+                        : null,
                   ),
                 ),
               ),
@@ -943,7 +938,8 @@ class _LineGraph extends StatelessWidget {
   final _VitalConfig config;
   final List<_VitalReading> readings;
   final _Range range;
-  const _LineGraph({required this.config, required this.readings, required this.range});
+  const _LineGraph(
+      {required this.config, required this.readings, required this.range});
 
   @override
   Widget build(BuildContext context) {
@@ -1079,7 +1075,8 @@ class _BarGraph extends StatelessWidget {
   final _VitalConfig config;
   final List<_VitalReading> readings;
   final _Range range;
-  const _BarGraph({required this.config, required this.readings, required this.range});
+  const _BarGraph(
+      {required this.config, required this.readings, required this.range});
 
   @override
   Widget build(BuildContext context) {
@@ -1265,10 +1262,12 @@ class _RecentReadingsCard extends StatelessWidget {
   final List<_VitalReading> readings;
   // When non-null, each row shows an edit button (gated on the tab's allowEdit).
   final void Function(_VitalReading)? onEdit;
+  final VoidCallback? onViewAll;
   const _RecentReadingsCard({
     required this.config,
     required this.readings,
     this.onEdit,
+    this.onViewAll,
   });
 
   @override
@@ -1287,7 +1286,22 @@ class _RecentReadingsCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SectionHeader(
-            title: AppStrings.recentReadings, accentColor: AppColors.teal),
+          title: AppStrings.recentReadings,
+          accentColor: AppColors.teal,
+          action: onViewAll != null
+              ? GestureDetector(
+                  onTap: onViewAll,
+                  child: const Text(
+                    'View All →',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.teal,
+                    ),
+                  ),
+                )
+              : null,
+        ),
         const SizedBox(height: 8),
         if (readings.isEmpty)
           Padding(
@@ -1489,8 +1503,9 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
     try {
       await widget.onSaved(reading);
       if (!mounted) return;
-      Navigator.pop(context);
-      AppSnackbar.success(context, _isEdit ? 'Reading updated' : 'Reading logged');
+      context.pop();
+      AppSnackbar.success(
+          context, _isEdit ? 'Reading updated' : 'Reading logged');
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -1641,10 +1656,11 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
               // Buttons (shared components)
               Row(children: [
                 Expanded(
-                  child: AppButton.secondary(
+                  child: AppButton(
+                    variant: AppButtonVariant.secondary,
                     label: AppStrings.cancel,
                     isFullWidth: true,
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => context.pop(),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1652,7 +1668,8 @@ class _LogReadingSheetState extends State<_LogReadingSheet> {
                   flex: 2,
                   child: ListenableBuilder(
                     listenable: Listenable.merge(_ctrls.values.toList()),
-                    builder: (_, __) => AppButton.primary(
+                    builder: (_, __) => AppButton(
+                      variant: AppButtonVariant.primary,
                       label: _saving ? AppStrings.saving : AppStrings.save,
                       isFullWidth: true,
                       isLoading: _saving,

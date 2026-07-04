@@ -57,6 +57,7 @@ class _EmergencyNotifier extends StateNotifier<_EmergencyState> {
       final list = await _fetch();
       state = state.copyWith(contacts: list, isLoading: false);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -92,6 +93,7 @@ class _EmergencyNotifier extends StateNotifier<_EmergencyState> {
       AppLogger.i('Emergency contact deleted ✓', tag: 'Emergency');
     } catch (e, s) {
       AppLogger.e('Emergency contact delete failed', tag: 'Emergency', error: e, stack: s as StackTrace?);
+            if (!mounted) return;
       state = state.copyWith(contacts: prev, error: e.toString());
     }
   }

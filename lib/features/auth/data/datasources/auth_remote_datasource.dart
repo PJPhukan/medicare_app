@@ -3,23 +3,27 @@ import '../../../../core/constants/api_constants.dart';
 import '../models/auth_token_model.dart';
 import '../models/user_model.dart';
 
+typedef AuthResult = ({AuthTokenModel token, UserModel user});
+
 class AuthRemoteDataSource {
   const AuthRemoteDataSource(this._dio);
 
   final Dio _dio;
 
-  Future<({AuthTokenModel token, UserModel user})> login({
+  static final _emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+
+  Future<AuthResult> login({
     required String identifier,
     required String password,
   }) async {
-    final isEmail = identifier.contains('@');
+    final isEmail = _emailRegex.hasMatch(identifier);
     final res = await _dio.post<Map<String, dynamic>>(
       ApiConstants.login,
       data: isEmail
           ? {'email': identifier, 'password': password}
           : {'phone': identifier, 'password': password},
     );
-    return _parseAuthResponse(res.data!);
+    return _parseAuthResponse(res.data, ApiConstants.login);
   }
 
   Future<void> sendOtp({
@@ -32,7 +36,7 @@ class AuthRemoteDataSource {
     );
   }
 
-  Future<({AuthTokenModel token, UserModel user})> verifyOtp({
+  Future<AuthResult> verifyOtp({
     required String identifier,
     required String otp,
   }) async {
@@ -40,10 +44,10 @@ class AuthRemoteDataSource {
       ApiConstants.otpVerify,
       data: {'identifier': identifier, 'otp': otp},
     );
-    return _parseAuthResponse(res.data!);
+    return _parseAuthResponse(res.data, ApiConstants.otpVerify);
   }
 
-  Future<({AuthTokenModel token, UserModel user})> register({
+  Future<AuthResult> register({
     required String name,
     required String email,
     required String phone,
@@ -58,16 +62,15 @@ class AuthRemoteDataSource {
         'password': password,
       },
     );
-    return _parseAuthResponse(res.data!);
+    return _parseAuthResponse(res.data, ApiConstants.register);
   }
 
   Future<UserModel> getMe() async {
     final res = await _dio.get<Map<String, dynamic>>(ApiConstants.me);
-    final data = res.data!['data'] as Map<String, dynamic>;
-    return UserModel.fromJson(data);
+    return UserModel.fromJson(_requireData(res.data, ApiConstants.me));
   }
 
-  Future<void> forgotPassword(String identifier) async {
+  Future<void> forgotPassword({required String identifier}) async {
     await _dio.post<void>(
       ApiConstants.forgotPassword,
       data: {'identifier': identifier},
@@ -89,16 +92,33 @@ class AuthRemoteDataSource {
     await _dio.post<void>(ApiConstants.logout);
   }
 
-  ({AuthTokenModel token, UserModel user}) _parseAuthResponse(
-      Map<String, dynamic> body) {
-    final data = body['data'] as Map<String, dynamic>;
+  static Map<String, dynamic> _requireData(
+    Map<String, dynamic>? body,
+    String endpoint,
+  ) {
+    if (body == null) {
+      throw FormatException('Empty response from $endpoint');
+    }
+    final data = body['data'];
+    if (data is! Map<String, dynamic>) {
+      throw FormatException('Invalid response shape from $endpoint');
+    }
+    return data;
+  }
+
+  AuthResult _parseAuthResponse(Map<String, dynamic>? body, String endpoint) {
+    final data = _requireData(body, endpoint);
+    final token = data['token'];
+    final user = data['user'];
+    if (token is! String) throw const FormatException('Missing token');
+    if (user is! Map<String, dynamic>) throw const FormatException('Missing user');
     return (
       token: AuthTokenModel(
-        token: data['token'] as String,
-        refreshToken: data['refreshToken'] as String?,
+        token: token,
+        refreshToken: data['refreshToken'] is String ? data['refreshToken'] as String : null,
         isNewUser: data['isNewUser'] as bool? ?? false,
       ),
-      user: UserModel.fromJson(data['user'] as Map<String, dynamic>),
+      user: UserModel.fromJson(user),
     );
   }
 }

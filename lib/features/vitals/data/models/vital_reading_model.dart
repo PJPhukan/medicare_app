@@ -13,7 +13,7 @@ class VitalReadingValue extends VitalReadingValueEntity {
       VitalReadingValue(
         id: json['id'] as String,
         inputId: json['inputId'] as String,
-        value: (json['value'] as num).toDouble(),
+        value: (json['value'] as num?)?.toDouble() ?? 0.0,
         input: VitalInput.fromJson(json['input'] as Map<String, dynamic>),
       );
 }

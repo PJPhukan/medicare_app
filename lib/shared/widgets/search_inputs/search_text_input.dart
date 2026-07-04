@@ -104,9 +104,10 @@ class _AppSearchTextInputState extends State<AppSearchTextInput> {
             color: AppColors.textSecondary,
           ),
           suffixIcon: _hasText
-              ? GestureDetector(
-                  onTap: _clear,
-                  child: const Icon(
+              ? IconButton(
+                  tooltip: 'Clear',
+                  onPressed: _clear,
+                  icon: const Icon(
                     Icons.close_rounded,
                     size: 18,
                     color: AppColors.textSecondary,

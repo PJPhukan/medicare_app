@@ -26,141 +26,164 @@ class AppText extends StatelessWidget {
     this.semanticsLabel,
   });
 
-  // ── Display ─────────────────────────────────────────────────────────────────
+  // ── Private helper ───────────────────────────────────────────────────────────
 
-  factory AppText.display1(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.display1,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  static AppText _make(
+    TextStyle style,
+    String text, {
+    Key? key,
+    Color? color,
+    FontWeight? fontWeight,
+    TextAlign? textAlign,
+    int? maxLines,
+    TextOverflow? overflow,
+    bool? softWrap,
+  }) =>
+      AppText(
+        text,
+        key: key,
+        style: style,
+        color: color,
+        fontWeight: fontWeight,
+        textAlign: textAlign,
+        maxLines: maxLines,
+        overflow: overflow,
+        softWrap: softWrap,
+      );
 
-  factory AppText.display2(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.display2,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  // ── Display ──────────────────────────────────────────────────────────────────
+
+  factory AppText.display1(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.display1, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
+
+  factory AppText.display2(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.display2, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
   // ── Headings ─────────────────────────────────────────────────────────────────
 
-  factory AppText.h1(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.h1,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.h1(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.h1, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.h2(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.h2,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.h2(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.h2, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.h3(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.h3,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.h3(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.h3, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
   // ── Body ─────────────────────────────────────────────────────────────────────
 
-  factory AppText.bodyLg(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.bodyLg,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.bodyLg(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.bodyLg, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.bodyMd(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.bodyMd,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.bodyMd(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.bodyMd, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.bodySm(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.bodySm,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.bodySm(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.bodySm, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.bodyXs(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.bodyXs,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.bodyXs(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.bodyXs, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
   // ── Labels ───────────────────────────────────────────────────────────────────
 
-  factory AppText.labelLg(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.labelLg,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.labelLg(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.labelLg, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.labelMd(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.labelMd,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.labelMd(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.labelMd, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.labelSm(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.labelSm,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.labelSm(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.labelSm, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.labelXs(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.labelXs,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.labelXs(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.labelXs, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
   // ── Caption / Overline ───────────────────────────────────────────────────────
 
-  factory AppText.caption(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.caption,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.caption(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.caption, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.overline(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.overline,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.overline(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.overline, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
   // ── Stats ────────────────────────────────────────────────────────────────────
 
-  factory AppText.statXl(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.statXl,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.statXl(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.statXl, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.statLg(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.statLg,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.statLg(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.statLg, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
-  factory AppText.statMd(String text, {Color? color, FontWeight? fontWeight, TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key, style: AppTypography.statMd,
-          color: color, fontWeight: fontWeight, textAlign: textAlign,
-          maxLines: maxLines, overflow: overflow);
+  factory AppText.statMd(String text, {Color? color, FontWeight? fontWeight,
+      TextAlign? textAlign, int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.statMd, text, key: key, color: color,
+          fontWeight: fontWeight, textAlign: textAlign, maxLines: maxLines,
+          overflow: overflow, softWrap: softWrap);
 
   // ── Error / hint helpers ─────────────────────────────────────────────────────
 
   factory AppText.error(String text, {TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key,
-          style: AppTypography.bodyXs,
-          color: AppColors.error,
-          textAlign: textAlign, maxLines: maxLines, overflow: overflow);
+      int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.bodyXs, text, key: key,
+          color: AppColors.error, textAlign: textAlign,
+          maxLines: maxLines, overflow: overflow, softWrap: softWrap);
 
   factory AppText.hint(String text, {TextAlign? textAlign,
-      int? maxLines, TextOverflow? overflow, Key? key}) =>
-      AppText(text, key: key,
-          style: AppTypography.bodyXs,
-          color: AppColors.textHint,
-          textAlign: textAlign, maxLines: maxLines, overflow: overflow);
+      int? maxLines, TextOverflow? overflow, bool? softWrap, Key? key}) =>
+      AppText._make(AppTypography.bodyXs, text, key: key,
+          color: AppColors.textHint, textAlign: textAlign,
+          maxLines: maxLines, overflow: overflow, softWrap: softWrap);
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -191,7 +214,6 @@ class AppText extends StatelessWidget {
     );
   }
 
-  // Maps static AppColors typography defaults to theme-adaptive equivalents.
   static Color _adaptColor(BuildContext context, Color? styleColor) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (styleColor == AppColors.textPrimary) {

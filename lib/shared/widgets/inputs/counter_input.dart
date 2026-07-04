@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
-import '../../../core/theme/app_typography.dart';
+import '../texts/app_text.dart';
 
 /// Compact +/- counter with a large value display in the centre.
 class AppCounterInput extends StatefulWidget {
@@ -57,8 +57,7 @@ class _AppCounterInputState extends State<AppCounterInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 8),
         ],
         Row(
@@ -79,11 +78,11 @@ class _AppCounterInputState extends State<AppCounterInput> {
                     color: color.withValues(alpha: 0.3)),
                 borderRadius: AppBorderRadius.smAll,
               ),
-              child: Text(
+              child: AppText.h3(
                 '$_value',
+                color: color,
+                fontWeight: FontWeight.w700,
                 textAlign: TextAlign.center,
-                style: AppTypography.h3.copyWith(
-                    color: color, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(width: 4),
@@ -115,17 +114,19 @@ class _Btn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: enabled ? color : color.withValues(alpha: 0.1),
+    final bgColor = enabled ? color : color.withValues(alpha: 0.1);
+    final iconColor = enabled ? Colors.white : color.withValues(alpha: 0.4);
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Material(
+        color: bgColor,
+        borderRadius: AppBorderRadius.smAll,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
           borderRadius: AppBorderRadius.smAll,
+          child: Icon(icon, size: 20, color: iconColor),
         ),
-        child: Icon(icon, size: 20,
-            color: enabled ? Colors.white : color.withValues(alpha: 0.4)),
       ),
     );
   }

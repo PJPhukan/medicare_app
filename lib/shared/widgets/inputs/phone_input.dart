@@ -1,3 +1,5 @@
+import 'package:app_medicare/core/constants/app_strings.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/data/country_codes.dart';
@@ -5,29 +7,19 @@ import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
+import '../search_inputs/search_text_input.dart';
 
-/// Phone number input with an integrated country code selector.
-///
-/// Uses the full [kCountryCodes] list (195 countries) sourced from
-/// `core/data/country_codes.dart`.
-///
-/// [onChanged] fires with the combined value: e.g. "+91 9876543210".
-/// [onCountryChanged] fires with the ISO region code: e.g. "IN".
-///
-/// ```dart
-/// AppPhoneInput(
-///   label: 'Phone number',
-///   initialCountryCode: 'IN',
-///   onChanged: (full) => _phone = full,
-/// )
-/// ```
+const double _kFieldHeight = 52.0;
+const double _kCountryBtnMinWidth = 90.0;
+
 class AppPhoneInput extends StatefulWidget {
   const AppPhoneInput({
     super.key,
     this.controller,
     this.focusNode,
-    this.label,
-    this.hint,
+    this.label = AppStrings.mobileNumber,
+    this.hint = AppStrings.mobileHint,
     this.error,
     this.helper,
     this.onChanged,
@@ -67,24 +59,62 @@ class _AppPhoneInputState extends State<AppPhoneInput> {
   late CountryCode _selected;
   String _number = '';
 
+  // Major 2 — extracted helper used in both initState and didUpdateWidget
+  CountryCode _countryFromRegion(String region) => kCountryCodes.firstWhere(
+        (c) => c.region.toUpperCase() == region.toUpperCase(),
+        orElse: () => kDefaultCountry,
+      );
+
   @override
   void initState() {
     super.initState();
-    _selected = kCountryCodes.firstWhere(
-      (c) => c.region == widget.initialCountryCode,
-      orElse: () => kDefaultCountry,
-    );
+    _selected = _countryFromRegion(widget.initialCountryCode);
+    _number = widget.controller?.text ?? '';
+    widget.controller?.addListener(_onControllerChanged);
   }
 
-  void _notify() =>
-      widget.onChanged?.call('${_selected.code} $_number');
+  @override
+  void didUpdateWidget(AppPhoneInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCountryCode != widget.initialCountryCode) {
+      setState(() => _selected = _countryFromRegion(widget.initialCountryCode));
+      _notify();
+    }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_onControllerChanged);
+      widget.controller?.addListener(_onControllerChanged);
+      setState(() => _number = widget.controller?.text ?? '');
+      _notify();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    _number = widget.controller?.text ?? '';
+    _notify();
+  }
+
+  void _notify() => widget.onChanged?.call(
+        _number.isEmpty ? _selected.code : '${_selected.code} $_number',
+      );
+
+  OutlineInputBorder _border(BuildContext context, {Color? color, double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: color ?? context.borderCol, width: width),
+      );
 
   void _openPicker() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CountryPickerSheet(
+      builder: (context) => _CountryPickerSheet(
         selected: _selected,
         onSelect: (c) {
           setState(() => _selected = c);
@@ -97,7 +127,7 @@ class _AppPhoneInputState extends State<AppPhoneInput> {
 
   @override
   Widget build(BuildContext context) {
-    final hasError  = widget.error != null && widget.error!.isNotEmpty;
+    final hasError = widget.error != null && widget.error!.isNotEmpty;
     final borderCol = hasError ? AppColors.error : context.borderCol;
 
     return Column(
@@ -106,61 +136,50 @@ class _AppPhoneInputState extends State<AppPhoneInput> {
       children: [
         // ── Label ────────────────────────────────────────────────────────────
         if (widget.label != null) ...[
-          Text(
-            widget.label!,
-            style: AppTypography.labelSm.copyWith(letterSpacing: 0.2),
-          ),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
 
         // ── Field ─────────────────────────────────────────────────────────────
-        Container(
-          decoration: BoxDecoration(
-            color: context.inputBg,
-            borderRadius: AppBorderRadius.mdAll,
-            border: Border.all(color: borderCol),
-          ),
-          child: Row(
-            children: [
-              // ── Country selector ───────────────────────────────────────────
-              GestureDetector(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Country selector button ────────────────────────────────────
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
                 onTap: widget.enabled ? _openPicker : null,
+                borderRadius: AppBorderRadius.mdAll,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 13),
+                  constraints: const BoxConstraints(minHeight: _kFieldHeight, minWidth: _kCountryBtnMinWidth),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    border: Border(
-                      right: BorderSide(color: borderCol),
-                    ),
+                    color: context.inputBg,
+                    borderRadius: AppBorderRadius.mdAll,
+                    border: Border.all(color: borderCol),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _selected.flag,
-                        style: const TextStyle(fontSize: 18),
-                      ),
+                      Text(_selected.flag, style: const TextStyle(fontSize: 18)),
                       const SizedBox(width: 6),
-                      Text(
-                        _selected.code,
-                        style: AppTypography.labelSm.copyWith(
-                          color: context.primaryText,
-                          letterSpacing: 0,
-                        ),
-                      ),
+                      AppText.labelSm(_selected.code),
                       const SizedBox(width: 4),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
+                      Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 16, color: AppColors.textSecondary),
                     ],
                   ),
                 ),
               ),
+            ),
 
-              // ── Number field ───────────────────────────────────────────────
-              Expanded(
+            const SizedBox(width: 8),
+
+            // ── Number field ───────────────────────────────────────────────
+            Expanded(
+              child: SizedBox(
+                height: _kFieldHeight,
                 child: TextField(
                   controller: widget.controller,
                   focusNode: widget.focusNode,
@@ -168,31 +187,35 @@ class _AppPhoneInputState extends State<AppPhoneInput> {
                   autofocus: widget.autofocus,
                   keyboardType: TextInputType.phone,
                   textInputAction: widget.textInputAction,
+                  autofillHints: const [AutofillHints.telephoneNumber],
                   inputFormatters: [
+                    // Bug 2 fix — no hardcoded length; countries vary (9–13 digits)
                     FilteringTextInputFormatter.digitsOnly,
                   ],
-                  onChanged: (v) {
-                    _number = v;
-                    _notify();
-                  },
-                  style: AppTypography.bodyMd
-                      .copyWith(color: context.primaryText),
+                  style:
+                      AppTypography.bodyMd.copyWith(color: context.primaryText),
                   decoration: InputDecoration(
-                    hintText: widget.hint ?? '9876543210',
+                    hintText: widget.hint,
                     hintStyle: AppTypography.bodyMd
                         .copyWith(color: AppColors.textHint),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
                     filled: true,
-                    fillColor: Colors.transparent,
+                    fillColor: context.inputBg,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 13),
+                        horizontal: 16, vertical: 16),
+                    enabledBorder:      _border(context, color: borderCol),
+                    focusedBorder:      _border(context,
+                        color: hasError ? AppColors.error : AppColors.teal,
+                        width: 1.5),
+                    errorBorder:        _border(context, color: AppColors.error),
+                    focusedErrorBorder: _border(context,
+                        color: AppColors.error, width: 1.5),
+                    disabledBorder:     _border(context,
+                        color: context.borderCol.withValues(alpha: 0.5)),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
 
         // ── Error / helper ────────────────────────────────────────────────────
@@ -202,21 +225,11 @@ class _AppPhoneInputState extends State<AppPhoneInput> {
             const Icon(Icons.error_outline_rounded,
                 size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                widget.error!,
-                style:
-                    AppTypography.bodyXs.copyWith(color: AppColors.error),
-              ),
-            ),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(
-            widget.helper!,
-            style: AppTypography.bodyXs
-                .copyWith(color: AppColors.textHint),
-          ),
+          AppText.hint(widget.helper!),
         ],
       ],
     );
@@ -257,26 +270,33 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
   List<CountryCode> get _filtered {
     if (_query.isEmpty) return kCountryCodes;
     final q = _query.toLowerCase();
-    return kCountryCodes.where((c) =>
-        c.label.toLowerCase().contains(q) ||
-        c.code.contains(q) ||
-        c.region.toLowerCase().contains(q)).toList();
+    return kCountryCodes
+        .where((c) =>
+            c.label.toLowerCase().contains(q) ||
+            c.code.contains(q) ||
+            c.region.toLowerCase().contains(q))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final bg         = context.cardBg;
-    final border     = context.borderCol;
-    final bottomPad  = MediaQuery.paddingOf(context).bottom;
+    final bg            = context.cardBg;
+    final border        = context.borderCol;
+    final bottomPad     = MediaQuery.paddingOf(context).bottom;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final screenHeight  = MediaQuery.sizeOf(context).height;
+    final statusBar     = MediaQuery.paddingOf(context).top;
+    final spaceAboveKeyboard = screenHeight - keyboardInset - statusBar;
+    final maxSheetHeight = spaceAboveKeyboard * 0.65;
 
-    return Container(
-      height: MediaQuery.sizeOf(context).height * 0.78,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(24),
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-      ),
       child: Column(
         children: [
           // Drag handle
@@ -295,15 +315,12 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Row(
               children: [
-                Expanded(
-                  child: Text(
-                    'Select Country',
-                    style: AppTypography.h3.copyWith(fontSize: 17),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close_rounded, size: 20),
+                Expanded(child: AppText.h3(AppStrings.selectCountry)),
+                IconButton(
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
@@ -312,37 +329,15 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
           // Search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: context.inputBg,
-                borderRadius: AppBorderRadius.mdAll,
-                border: Border.all(color: border),
-              ),
-              child: Row(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(left: 12),
-                    child: Icon(Icons.search_rounded,
-                        size: 18, color: AppColors.textSecondary),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (v) =>
-                          setState(() => _query = v),
-                      style: AppTypography.bodyMd,
-                      decoration: InputDecoration(
-                        hintText: 'Search country or code…',
-                        hintStyle: AppTypography.bodyMd
-                            .copyWith(color: AppColors.textHint),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            child: AppSearchTextInput(
+              controller: _searchCtrl,
+              hint: AppStrings.searchCountryHint,
+              autofocus: false,
+              onChanged: (v) => setState(() => _query = v),
+              onClear: () {
+                _searchCtrl.clear();
+                setState(() => _query = '');
+              },
             ),
           ),
 
@@ -350,58 +345,44 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
           Expanded(
             child: _filtered.isEmpty
                 ? Center(
-                    child: Text(
-                      'No countries found',
-                      style: AppTypography.bodyMd.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    child: AppText.bodyMd(
+                      AppStrings.noCountriesFound,
+                      color: AppColors.textSecondary,
                     ),
                   )
                 : ListView.separated(
-                    padding:
-                        EdgeInsets.only(bottom: bottomPad + 16),
+                    padding: EdgeInsets.only(bottom: bottomPad + 16),
                     itemCount: _filtered.length,
                     separatorBuilder: (_, __) =>
                         Divider(height: 1, color: border),
                     itemBuilder: (_, i) {
                       final c = _filtered[i];
-                      final isSelected =
-                          c.region == widget.selected.region;
+                      final isSelected = c.region == widget.selected.region;
                       return ListTile(
                         onTap: () {
                           widget.onSelect(c);
-                          Navigator.pop(context);
+                          context.pop();
                         },
                         leading: Text(
                           c.flag,
                           style: const TextStyle(fontSize: 22),
                         ),
-                        title: Text(
+                        title: AppText.bodyMd(
                           c.label,
-                          style: AppTypography.bodyMd.copyWith(
-                            color: isSelected
-                                ? AppColors.teal
-                                : context.primaryText,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w400,
-                          ),
+                          color: isSelected ? AppColors.teal : null,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w400,
                         ),
-                        subtitle: Text(
+                        subtitle: AppText.bodyXs(
                           c.region,
-                          style: AppTypography.bodyXs.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                          color: AppColors.textSecondary,
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
+                            AppText.labelSm(
                               c.code,
-                              style: AppTypography.labelSm.copyWith(
-                                color: AppColors.textSecondary,
-                                letterSpacing: 0,
-                              ),
+                              color: AppColors.textSecondary,
                             ),
                             if (isSelected) ...[
                               const SizedBox(width: 8),
@@ -419,6 +400,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
           ),
         ],
       ),
+    ),
     );
   }
 }

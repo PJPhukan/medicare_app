@@ -5,6 +5,7 @@ import '../entities/connection_request_entity.dart';
 
 abstract interface class ConnectionsRepository {
   Future<List<ConnectionEntity>> getConnections();
+  Future<List<ConnectionEntity>> getConnectionsAsProfessional();
   Future<List<ConnectionRequestEntity>> getMyRequests();
   Future<List<ConnectionRequestEntity>> getIncomingRequests();
   Future<void> sendConnectionRequest({

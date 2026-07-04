@@ -69,7 +69,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     final isLoading = authState.isLoading;
 
     return AuthShell(
-      showBack: true,
+      leading: AppBarLeading.back,
       onBack: widget.onBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

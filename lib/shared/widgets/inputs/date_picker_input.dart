@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
-import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// Tappable date input that opens the system date picker.
 class AppDatePickerInput extends StatefulWidget {
@@ -46,11 +46,19 @@ class _AppDatePickerInputState extends State<AppDatePickerInput> {
     _selected = widget.initialDate;
   }
 
+  @override
+  void didUpdateWidget(AppDatePickerInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialDate != widget.initialDate) {
+      setState(() => _selected = widget.initialDate);
+    }
+  }
+
   String _format(DateTime d) {
     if (widget.displayFormat != null) return widget.displayFormat!(d);
     const months = [
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${d.day.toString().padLeft(2, '0')} ${months[d.month - 1]} ${d.year}';
   }
@@ -78,53 +86,59 @@ class _AppDatePickerInputState extends State<AppDatePickerInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
-        GestureDetector(
-          onTap: widget.enabled ? _pick : null,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              color: context.inputBg,
-              borderRadius: AppBorderRadius.mdAll,
-              border: Border.all(color: borderCol),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.calendar_today_rounded,
-                    size: 18, color: AppColors.textSecondary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _selected != null
-                        ? _format(_selected!)
-                        : (widget.hint ?? 'Select date'),
-                    style: AppTypography.bodyMd.copyWith(
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.enabled ? _pick : null,
+            borderRadius: AppBorderRadius.mdAll,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: context.inputBg,
+                borderRadius: AppBorderRadius.mdAll,
+                border: Border.all(color: borderCol),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 18,
+                    color: widget.enabled
+                        ? AppColors.textSecondary
+                        : AppColors.textSecondary.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: AppText.bodyMd(
+                      _selected != null
+                          ? _format(_selected!)
+                          : (widget.hint ?? 'Select date'),
                       color: _selected != null
-                          ? context.primaryText
+                          ? (widget.enabled ? null : AppColors.textSecondary)
                           : AppColors.textHint,
                     ),
                   ),
-                ),
-                const Icon(Icons.keyboard_arrow_down_rounded,
-                    size: 18, color: AppColors.textSecondary),
-              ],
+                  const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 18, color: AppColors.textSecondary),
+                ],
+              ),
             ),
           ),
         ),
         if (hasError) ...[
           const SizedBox(height: 5),
           Row(children: [
-            const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.error),
+            const Icon(Icons.error_outline_rounded,
+                size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(child: Text(widget.error!,
-                style: AppTypography.bodyXs.copyWith(color: AppColors.error))),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(widget.helper!,
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(widget.helper!),
         ],
       ],
     );

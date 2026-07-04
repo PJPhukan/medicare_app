@@ -18,6 +18,24 @@ class FirebaseMessagingService {
   static bool _initialized = false;
   static VoidCallback? _onNotificationReceived;
 
+  /// Request notification permission from the user.
+  /// Call this from a contextually appropriate screen (e.g. dashboard) rather
+  /// than at app startup. Safe to call multiple times — OS only prompts once.
+  static Future<void> requestPermission() async {
+    try {
+      final settings = await _fcm.requestPermission(
+        alert: true,
+        announcement: true,
+        badge: true,
+        provisional: false,
+        sound: true,
+      );
+      AppLogger.i('FCM permissions: $settings', tag: 'FCM');
+    } catch (e) {
+      AppLogger.e('FCM permission request failed: $e', tag: 'FCM');
+    }
+  }
+
   /// Initialize FCM and set up listeners
   static Future<void> initialize({
     VoidCallback? onNotificationReceived,
@@ -28,16 +46,6 @@ class FirebaseMessagingService {
 
     try {
       AppLogger.i('Starting FCM initialization', tag: 'FCM');
-
-      // Request permissions
-      final settings = await _fcm.requestPermission(
-        alert: true,
-        announcement: true,
-        badge: true,
-        provisional: false,
-        sound: true,
-      );
-      AppLogger.i('FCM permissions requested: $settings', tag: 'FCM');
 
       // Get FCM token
       final token = await _fcm.getToken();

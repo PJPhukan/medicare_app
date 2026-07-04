@@ -48,10 +48,10 @@ abstract class AppColors {
 
   // ─── Light theme backgrounds ───────────────────────────────────────────────
 
-  static const light100 = Color(0xFFF8FAF7); // scaffold bg
+  static const light100 = Color(0xFFF8FAFC); // scaffold bg
   static const light200 = Color(0xFFFFFFFF); // card bg
-  static const light300 = Color(0xFFECF4D6); // soft bg
-  static const light400 = Color(0xFFE2E8F0); // borders
+  static const light300 = Color(0xFFE2E8F0); // borders / dividers
+  static const light400 = Color(0xFFCBD5E1); // secondary borders
 
   // ─── Text ──────────────────────────────────────────────────────────────────
 

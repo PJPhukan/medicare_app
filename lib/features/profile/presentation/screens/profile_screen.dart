@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -402,7 +403,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet>
       emergencyRelation: _emRelCtrl.text.trim(),
       emergencyPhone: _emPhoneCtrl.text.trim(),
     );
-    Navigator.pop(context);
+    context.pop();
     widget.onSave(updated);
   }
 

@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +28,7 @@ class MyRequestsScreen extends ConsumerWidget {
               expandedHeight: 100,
               leading: AppIconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),

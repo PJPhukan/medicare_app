@@ -12,7 +12,7 @@ class ProfessionalsRemoteDataSource {
   Future<List<ProfessionalCategory>> getCategories() async {
     final res = await _dio
         .get<Map<String, dynamic>>(ApiConstants.professionalCategories);
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => ProfessionalCategory.fromJson(e as Map<String, dynamic>))
         .toList();

@@ -14,6 +14,10 @@ class ConnectionsRepositoryImpl implements ConnectionsRepository {
   Future<List<ConnectionEntity>> getConnections() => _ds.getConnections();
 
   @override
+  Future<List<ConnectionEntity>> getConnectionsAsProfessional() =>
+      _ds.getConnectionsAsProfessional();
+
+  @override
   Future<List<ConnectionRequestEntity>> getMyRequests() => _ds.getMyRequests();
 
   @override

@@ -19,7 +19,7 @@ class TabsRemoteDataSource {
         ApiConstants.myTabs,
         queryParameters: {'platform': 'APP'},
       );
-      final list = res.data!['data'] as List<dynamic>;
+      final list = (res.data?['data'] as List<dynamic>?) ?? [];
 
       // Cache the last-known tab config so it still renders offline, the same
       // way banners are cached — instead of dropping to the hardcoded defaults.

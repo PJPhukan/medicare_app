@@ -11,12 +11,11 @@ import '../../../../shared/widgets/skeleton/skeleton.dart';
 import '../../presentation/providers/professionals_provider.dart';
 import '../../presentation/providers/location_provider.dart';
 import '../../data/models/professional_model.dart' as pro_model;
-import 'professional_detail_screen.dart';
-import 'map_picker_screen.dart';
-import '../../../professional_profile/presentation/screens/become_professional_screen.dart';
 import '../../../connections/presentation/providers/connections_provider.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../core/network/connectivity_monitor.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +69,8 @@ Color _categoryColor(String name) {
   final n = name.toLowerCase();
   if (n.contains('doctor') || n.contains('physician')) return AppColors.teal;
   if (n.contains('nurse')) return AppColors.blue;
-  if (n.contains('therapist') || n.contains('psycholog')) return AppColors.purple;
+  if (n.contains('therapist') || n.contains('psycholog'))
+    return AppColors.purple;
   if (n.contains('diet') || n.contains('nutrition')) return AppColors.amber;
   if (n.contains('caregiver') || n.contains('care')) return AppColors.red;
   if (n.contains('physio')) return AppColors.green;
@@ -106,7 +106,8 @@ class _ProFilter {
 
   const _ProFilter({this.maxHourlyRate, this.location, this.minRating});
 
-  bool get isActive => maxHourlyRate != null || location != null || minRating != null;
+  bool get isActive =>
+      maxHourlyRate != null || location != null || minRating != null;
 
   int get activeCount =>
       (maxHourlyRate != null ? 1 : 0) +
@@ -119,9 +120,12 @@ class _ProFilter {
     Object? minRating = _sentinel,
   }) =>
       _ProFilter(
-        maxHourlyRate: maxHourlyRate == _sentinel ? this.maxHourlyRate : maxHourlyRate as int?,
+        maxHourlyRate: maxHourlyRate == _sentinel
+            ? this.maxHourlyRate
+            : maxHourlyRate as int?,
         location: location == _sentinel ? this.location : location as String?,
-        minRating: minRating == _sentinel ? this.minRating : minRating as double?,
+        minRating:
+            minRating == _sentinel ? this.minRating : minRating as double?,
       );
 }
 
@@ -133,7 +137,8 @@ class ProfessionalsScreen extends ConsumerStatefulWidget {
   const ProfessionalsScreen({super.key});
 
   @override
-  ConsumerState<ProfessionalsScreen> createState() => _ProfessionalsScreenState();
+  ConsumerState<ProfessionalsScreen> createState() =>
+      _ProfessionalsScreenState();
 }
 
 class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
@@ -184,7 +189,6 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
     super.dispose();
   }
 
-
   void _loadForCurrentLocation() {
     final loc = ref.read(locationProvider);
     ref.read(professionalsProvider.notifier).loadForLocation(
@@ -213,7 +217,9 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
     List<ProData> list =
         ref.watch(professionalsProvider).professionals.map(_toPro).toList();
     if (_filter.maxHourlyRate != null) {
-      list = list.where((p) => (p.hourlyRate ?? 0) <= _filter.maxHourlyRate!).toList();
+      list = list
+          .where((p) => (p.hourlyRate ?? 0) <= _filter.maxHourlyRate!)
+          .toList();
     }
     if (_filter.minRating != null) {
       list = list.where((p) => p.averageRating >= _filter.minRating!).toList();
@@ -279,7 +285,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
       return const OfflinePage(featureName: 'Professionals', showAppBar: false);
     }
 
-    final state    = ref.watch(professionalsProvider);
+    final state = ref.watch(professionalsProvider);
     final locState = ref.watch(locationProvider);
     final filtered = _filtered;
 
@@ -300,7 +306,8 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
                 toolbarHeight: 68,
                 automaticallyImplyLeading: false,
                 leading: AppIconButton(
-                  icon: Icon(Icons.menu_rounded, size: 22, color: context.primaryText),
+                  icon: Icon(Icons.menu_rounded,
+                      size: 22, color: context.primaryText),
                   tooltip: 'Menu',
                   onPressed: openAppSidebar,
                   backgroundColor: Colors.transparent,
@@ -308,29 +315,34 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText.h3(AppStrings.browseProfessionals, color: context.primaryText),
-                    AppText.bodySm('Find and connect with professionals', color: context.secondaryText),
+                    AppText.h3(AppStrings.browseProfessionals,
+                        color: context.primaryText),
+                    AppText.bodySm('Find and connect with professionals',
+                        color: context.secondaryText),
                   ],
                 ),
                 actions: [
                   GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
-                    ),
+                    onTap: () => context.push(AppRoutes.settingsPro),
                     child: Container(
                       margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
                         color: AppColors.teal.withValues(alpha: 0.12),
                         borderRadius: AppBorderRadius.pill,
-                        border: Border.all(color: AppColors.teal.withValues(alpha: 0.35)),
+                        border: Border.all(
+                            color: AppColors.teal.withValues(alpha: 0.35)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.workspace_premium_rounded, size: 14, color: AppColors.teal),
+                          const Icon(Icons.workspace_premium_rounded,
+                              size: 14, color: AppColors.teal),
                           const SizedBox(width: 5),
-                          AppText.labelSm('Become Pro', color: AppColors.teal, fontWeight: FontWeight.w700),
+                          AppText.labelSm('Become Pro',
+                              color: AppColors.teal,
+                              fontWeight: FontWeight.w700),
                         ],
                       ),
                     ),
@@ -356,7 +368,8 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
                           onTap: _showFilterSheet,
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               color: AppColors.teal.withValues(alpha: 0.12),
                               borderRadius: AppBorderRadius.lgAll,
@@ -406,7 +419,8 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
               SliverToBoxAdapter(
                 child: _CategoryChips(
                   categories: state.categories
-                      .map((c) => (id: c.id, name: c.name, color: AppColors.teal))
+                      .map((c) =>
+                          (id: c.id, name: c.name, color: AppColors.teal))
                       .toList(),
                   selectedId: _selectedCategoryId,
                   onSelect: (id) {
@@ -463,7 +477,8 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
                     child: AppEmptyState(
                       icon: Icons.search_off_rounded,
                       title: AppStrings.noProfessionalsFound,
-                      subtitle: 'No professionals serve ${locState.area?.name ?? 'this area'} yet',
+                      subtitle:
+                          'No professionals serve ${locState.area?.name ?? 'this area'} yet',
                     ),
                   ),
                 )
@@ -493,17 +508,13 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _ProCard(
                             pro: filtered[i],
-                            onViewProfile: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ProfessionalDetailScreen(pro: filtered[i]),
-                              ),
-                            ),
+                            onViewProfile: () => context.push(AppRoutes.professionalDetail, extra: filtered[i]),
                             onConnect: () => _showConnect(filtered[i]),
                           ),
                         );
                       },
-                      childCount: filtered.length + (state.isLoadingMore ? 1 : 0),
+                      childCount:
+                          filtered.length + (state.isLoadingMore ? 1 : 0),
                     ),
                   ),
                 ),
@@ -517,7 +528,15 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen> {
 
 // ─── Filter bottom sheet ──────────────────────────────────────────────────────
 
-const _kLocations = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Pune', 'Kolkata'];
+const _kLocations = [
+  'Mumbai',
+  'Delhi',
+  'Bangalore',
+  'Hyderabad',
+  'Chennai',
+  'Pune',
+  'Kolkata'
+];
 
 class _FilterSheet extends StatefulWidget {
   final _ProFilter current;
@@ -542,9 +561,9 @@ class _FilterSheetState extends State<_FilterSheet> {
   @override
   void initState() {
     super.initState();
-    _maxRate    = widget.current.maxHourlyRate;
-    _location   = widget.current.location;
-    _minRating  = widget.current.minRating;
+    _maxRate = widget.current.maxHourlyRate;
+    _location = widget.current.location;
+    _minRating = widget.current.minRating;
     _categoryId = widget.selectedCategoryId;
   }
 
@@ -564,129 +583,178 @@ class _FilterSheetState extends State<_FilterSheet> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(
+          20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
       child: SingleChildScrollView(
         child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.dividerCol,
-                borderRadius: BorderRadius.circular(2),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.dividerCol,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // Header
-          Row(
-            children: [
-              const Icon(Icons.tune_rounded, size: 18, color: AppColors.teal),
-              const SizedBox(width: 8),
-              AppText.h3('Filter Professionals'),
-              const Spacer(),
-              if (_isActive)
-                GestureDetector(
-                  onTap: () => setState(() {
-                    _maxRate = null; _location = null; _minRating = null; _categoryId = null;
-                  }),
-                  child: AppText.labelSm('Clear all', color: AppColors.red),
-                ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // ── Category ───────────────────────────────────────────────────────
-          if (widget.categories.isNotEmpty) ...[
-            _FilterSectionLabel('Category'),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8, runSpacing: 8,
+            // Header
+            Row(
               children: [
-                _FilterChip(
-                  label: 'All',
-                  active: _categoryId == null,
-                  onTap: () => setState(() => _categoryId = null),
-                ),
-                ...widget.categories.map((c) => _FilterChip(
-                  label: c.name,
-                  active: _categoryId == c.id,
-                  onTap: () => setState(
-                    () => _categoryId = _categoryId == c.id ? null : c.id,
+                const Icon(Icons.tune_rounded, size: 18, color: AppColors.teal),
+                const SizedBox(width: 8),
+                AppText.h3('Filter Professionals'),
+                const Spacer(),
+                if (_isActive)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _maxRate = null;
+                      _location = null;
+                      _minRating = null;
+                      _categoryId = null;
+                    }),
+                    child: AppText.labelSm('Clear all', color: AppColors.red),
                   ),
-                )),
               ],
             ),
             const SizedBox(height: 20),
-          ],
 
-          // ── Pricing ────────────────────────────────────────────────────────
-          _FilterSectionLabel('Pricing (Hourly Rate)'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8, runSpacing: 8,
-            children: [
-              _FilterChip(label: 'Any',        active: _maxRate == null,  onTap: () => setState(() => _maxRate = null)),
-              _FilterChip(label: 'Under ₹300', active: _maxRate == 300,   onTap: () => setState(() => _maxRate = _maxRate == 300   ? null : 300)),
-              _FilterChip(label: '₹300–600',   active: _maxRate == 600,   onTap: () => setState(() => _maxRate = _maxRate == 600   ? null : 600)),
-              _FilterChip(label: '₹600–1000',  active: _maxRate == 1000,  onTap: () => setState(() => _maxRate = _maxRate == 1000  ? null : 1000)),
-              _FilterChip(label: '₹1000+',     active: _maxRate == 99999, onTap: () => setState(() => _maxRate = _maxRate == 99999 ? null : 99999)),
+            // ── Category ───────────────────────────────────────────────────────
+            if (widget.categories.isNotEmpty) ...[
+              _FilterSectionLabel('Category'),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _FilterChip(
+                    label: 'All',
+                    active: _categoryId == null,
+                    onTap: () => setState(() => _categoryId = null),
+                  ),
+                  ...widget.categories.map((c) => _FilterChip(
+                        label: c.name,
+                        active: _categoryId == c.id,
+                        onTap: () => setState(
+                          () => _categoryId = _categoryId == c.id ? null : c.id,
+                        ),
+                      )),
+                ],
+              ),
+              const SizedBox(height: 20),
             ],
-          ),
-          const SizedBox(height: 20),
 
-          // ── Location ───────────────────────────────────────────────────────
-          _FilterSectionLabel('Location'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8, runSpacing: 8,
-            children: [
-              _FilterChip(label: 'Any', active: _location == null, onTap: () => setState(() => _location = null)),
-              ..._kLocations.map((loc) => _FilterChip(
-                label: loc,
-                active: _location == loc,
-                onTap: () => setState(() => _location = _location == loc ? null : loc),
-              )),
-            ],
-          ),
-          const SizedBox(height: 20),
+            // ── Pricing ────────────────────────────────────────────────────────
+            _FilterSectionLabel('Pricing (Hourly Rate)'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _FilterChip(
+                    label: 'Any',
+                    active: _maxRate == null,
+                    onTap: () => setState(() => _maxRate = null)),
+                _FilterChip(
+                    label: 'Under ₹300',
+                    active: _maxRate == 300,
+                    onTap: () => setState(
+                        () => _maxRate = _maxRate == 300 ? null : 300)),
+                _FilterChip(
+                    label: '₹300–600',
+                    active: _maxRate == 600,
+                    onTap: () => setState(
+                        () => _maxRate = _maxRate == 600 ? null : 600)),
+                _FilterChip(
+                    label: '₹600–1000',
+                    active: _maxRate == 1000,
+                    onTap: () => setState(
+                        () => _maxRate = _maxRate == 1000 ? null : 1000)),
+                _FilterChip(
+                    label: '₹1000+',
+                    active: _maxRate == 99999,
+                    onTap: () => setState(
+                        () => _maxRate = _maxRate == 99999 ? null : 99999)),
+              ],
+            ),
+            const SizedBox(height: 20),
 
-          // ── Rating ─────────────────────────────────────────────────────────
-          _FilterSectionLabel('Minimum Rating'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8, runSpacing: 8,
-            children: [
-              _FilterChip(label: 'Any',  active: _minRating == null, onTap: () => setState(() => _minRating = null)),
-              _FilterChip(label: '4.0+', active: _minRating == 4.0,  onTap: () => setState(() => _minRating = _minRating == 4.0 ? null : 4.0), icon: Icons.star_rounded),
-              _FilterChip(label: '4.5+', active: _minRating == 4.5,  onTap: () => setState(() => _minRating = _minRating == 4.5 ? null : 4.5), icon: Icons.star_rounded),
-              _FilterChip(label: '4.8+', active: _minRating == 4.8,  onTap: () => setState(() => _minRating = _minRating == 4.8 ? null : 4.8), icon: Icons.star_rounded),
-            ],
-          ),
-          const SizedBox(height: 24),
+            // ── Location ───────────────────────────────────────────────────────
+            _FilterSectionLabel('Location'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _FilterChip(
+                    label: 'Any',
+                    active: _location == null,
+                    onTap: () => setState(() => _location = null)),
+                ..._kLocations.map((loc) => _FilterChip(
+                      label: loc,
+                      active: _location == loc,
+                      onTap: () => setState(
+                          () => _location = _location == loc ? null : loc),
+                    )),
+              ],
+            ),
+            const SizedBox(height: 20),
 
-          // ── Apply button ───────────────────────────────────────────────────
-          AppButton.primary(
-            label: _isActive ? 'Apply Filters' : 'Done',
-            isFullWidth: true,
-            onPressed: () => Navigator.pop(
-              context,
-              (
-                filter: _ProFilter(
-                  maxHourlyRate: _maxRate,
-                  location: _location,
-                  minRating: _minRating,
+            // ── Rating ─────────────────────────────────────────────────────────
+            _FilterSectionLabel('Minimum Rating'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _FilterChip(
+                    label: 'Any',
+                    active: _minRating == null,
+                    onTap: () => setState(() => _minRating = null)),
+                _FilterChip(
+                    label: '4.0+',
+                    active: _minRating == 4.0,
+                    onTap: () => setState(
+                        () => _minRating = _minRating == 4.0 ? null : 4.0),
+                    icon: Icons.star_rounded),
+                _FilterChip(
+                    label: '4.5+',
+                    active: _minRating == 4.5,
+                    onTap: () => setState(
+                        () => _minRating = _minRating == 4.5 ? null : 4.5),
+                    icon: Icons.star_rounded),
+                _FilterChip(
+                    label: '4.8+',
+                    active: _minRating == 4.8,
+                    onTap: () => setState(
+                        () => _minRating = _minRating == 4.8 ? null : 4.8),
+                    icon: Icons.star_rounded),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ── Apply button ───────────────────────────────────────────────────
+            AppButton(
+              variant: AppButtonVariant.primary,
+              label: _isActive ? 'Apply Filters' : 'Done',
+              isFullWidth: true,
+              onPressed: () => context.pop(
+                (
+                  filter: _ProFilter(
+                    maxHourlyRate: _maxRate,
+                    location: _location,
+                    minRating: _minRating,
+                  ),
+                  categoryId: _categoryId,
                 ),
-                categoryId: _categoryId,
               ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -714,7 +782,11 @@ class _FilterChip extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
   final IconData? icon;
-  const _FilterChip({required this.label, required this.active, required this.onTap, this.icon});
+  const _FilterChip(
+      {required this.label,
+      required this.active,
+      required this.onTap,
+      this.icon});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -725,17 +797,22 @@ class _FilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             // Reversed: selected is a solid teal fill (white text); unselected
             // keeps the light teal tint with teal text.
-            color: active ? AppColors.teal : AppColors.teal.withValues(alpha: 0.12),
+            color: active
+                ? AppColors.teal
+                : AppColors.teal.withValues(alpha: 0.12),
             borderRadius: AppBorderRadius.pill,
             border: Border.all(
-              color: active ? AppColors.teal : AppColors.teal.withValues(alpha: 0.45),
+              color: active
+                  ? AppColors.teal
+                  : AppColors.teal.withValues(alpha: 0.45),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 11, color: active ? Colors.white : AppColors.teal),
+                Icon(icon,
+                    size: 11, color: active ? Colors.white : AppColors.teal),
                 const SizedBox(width: 4),
               ],
               AppText.labelSm(
@@ -834,9 +911,11 @@ class _LocationChip extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: detecting
-                  ? AppText.bodySm('Detecting location…', color: context.secondaryText)
+                  ? AppText.bodySm('Detecting location…',
+                      color: context.secondaryText)
                   : area == null
-                      ? AppText.bodySm('Select your location', color: context.secondaryText)
+                      ? AppText.bodySm('Select your location',
+                          color: context.secondaryText)
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -861,8 +940,10 @@ class _LocationChip extends StatelessWidget {
             ),
             if (!detecting) ...[
               const SizedBox(width: 6),
-              AppText.labelXs('Change', color: AppColors.teal, fontWeight: FontWeight.w700),
-              const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.teal),
+              AppText.labelXs('Change',
+                  color: AppColors.teal, fontWeight: FontWeight.w700),
+              const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 16, color: AppColors.teal),
             ],
           ],
         ),
@@ -889,7 +970,8 @@ class _FallbackBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.amber),
+          const Icon(Icons.info_outline_rounded,
+              size: 16, color: AppColors.amber),
           const SizedBox(width: 10),
           Expanded(
             child: AppText.bodySm(
@@ -921,7 +1003,8 @@ class _NoLocationState extends StatelessWidget {
               color: AppColors.teal,
               borderRadius: AppBorderRadius.xlAll,
               padding: const EdgeInsets.all(18),
-              child: const Icon(Icons.location_off_rounded, size: 32, color: AppColors.teal),
+              child: const Icon(Icons.location_off_rounded,
+                  size: 32, color: AppColors.teal),
             ),
             const SizedBox(height: 18),
             AppText.h3('Set your location', color: context.primaryText),
@@ -932,7 +1015,10 @@ class _NoLocationState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 22),
-            AppButton.primary(label: 'Choose location', onPressed: onPick),
+            AppButton(
+                variant: AppButtonVariant.primary,
+                label: 'Choose location',
+                onPressed: onPick),
           ],
         ),
       ),
@@ -946,7 +1032,8 @@ class _LocationPickerSheet extends ConsumerStatefulWidget {
   const _LocationPickerSheet();
 
   @override
-  ConsumerState<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+  ConsumerState<_LocationPickerSheet> createState() =>
+      _LocationPickerSheetState();
 }
 
 class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
@@ -980,7 +1067,10 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
   }
 
   Future<void> _useGps() async {
-    setState(() { _busy = true; _error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     // detectFromGps() triggers the OS permission dialog when permission is
     // not yet granted (and re-requestable).
     await ref.read(locationProvider.notifier).detectFromGps();
@@ -989,7 +1079,7 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
     setState(() => _busy = false);
 
     if (state.hasLocation) {
-      Navigator.pop(context, true);
+      context.pop(true);
     } else if (state.status == LocationStatus.permissionDenied) {
       // If the OS won't show the dialog anymore, guide the user to settings.
       final permanentlyDenied =
@@ -1021,12 +1111,10 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
   }
 
   Future<void> _selectOnMap() async {
-    final picked = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const MapPickerScreen()),
-    );
+    final picked = await context.push<bool>(AppRoutes.professionalsMapPicker);
     if (!mounted) return;
     if (picked == true && ref.read(locationProvider).hasLocation) {
-      Navigator.pop(context, true);
+      context.pop(true);
     }
   }
 
@@ -1036,16 +1124,20 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
       setState(() => _error = 'Enter a valid 6-digit pincode');
       return;
     }
-    setState(() { _busy = true; _error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     await ref.read(locationProvider.notifier).resolveFromPincode(pincode);
     if (!mounted) return;
     final state = ref.read(locationProvider);
     setState(() => _busy = false);
 
     if (state.hasLocation && state.pincode == pincode) {
-      Navigator.pop(context, true);
+      context.pop(true);
     } else {
-      setState(() => _error = state.error ?? 'No service area found for this pincode');
+      setState(() =>
+          _error = state.error ?? 'No service area found for this pincode');
     }
   }
 
@@ -1058,15 +1150,19 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
         color: context.cardBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(
+          20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: context.dividerCol, borderRadius: BorderRadius.circular(2)),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: context.dividerCol,
+                  borderRadius: BorderRadius.circular(2)),
             ),
           ),
           const SizedBox(height: 16),
@@ -1087,7 +1183,8 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
               decoration: BoxDecoration(
                 color: AppColors.teal.withValues(alpha: 0.08),
                 borderRadius: AppBorderRadius.lgAll,
-                border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+                border:
+                    Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -1095,14 +1192,16 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
                     color: AppColors.teal,
                     borderRadius: AppBorderRadius.mdAll,
                     padding: const EdgeInsets.all(10),
-                    child: const Icon(Icons.my_location_rounded, size: 18, color: AppColors.teal),
+                    child: const Icon(Icons.my_location_rounded,
+                        size: 18, color: AppColors.teal),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppText.labelMd('Use my current location', color: context.primaryText),
+                        AppText.labelMd('Use my current location',
+                            color: context.primaryText),
                         AppText.bodySm(
                           _currentLocationLabel ?? 'Detect via GPS',
                           color: context.secondaryText,
@@ -1112,7 +1211,8 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: AppColors.teal),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.teal),
                 ],
               ),
             ),
@@ -1128,7 +1228,8 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
               decoration: BoxDecoration(
                 color: AppColors.blue.withValues(alpha: 0.08),
                 borderRadius: AppBorderRadius.lgAll,
-                border: Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
+                border:
+                    Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -1136,19 +1237,23 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
                     color: AppColors.blue,
                     borderRadius: AppBorderRadius.mdAll,
                     padding: const EdgeInsets.all(10),
-                    child: const Icon(Icons.map_rounded, size: 18, color: AppColors.blue),
+                    child: const Icon(Icons.map_rounded,
+                        size: 18, color: AppColors.blue),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppText.labelMd('Select on map', color: context.primaryText),
-                        AppText.bodySm('Drop a pin on your location', color: context.secondaryText),
+                        AppText.labelMd('Select on map',
+                            color: context.primaryText),
+                        AppText.bodySm('Drop a pin on your location',
+                            color: context.secondaryText),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: AppColors.blue),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.blue),
                 ],
               ),
             ),
@@ -1160,7 +1265,8 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
               Expanded(child: Divider(color: context.dividerCol)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: AppText.bodySm('or enter pincode', color: AppColors.textHint),
+                child: AppText.bodySm('or enter pincode',
+                    color: AppColors.textHint),
               ),
               Expanded(child: Divider(color: context.dividerCol)),
             ],
@@ -1179,24 +1285,31 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
                   decoration: InputDecoration(
                     counterText: '',
                     hintText: '6-digit pincode',
-                    prefixIcon: const Icon(Icons.pin_drop_rounded, size: 18, color: AppColors.teal),
+                    prefixIcon: const Icon(Icons.pin_drop_rounded,
+                        size: 18, color: AppColors.teal),
                     filled: true,
                     fillColor: AppColors.teal.withValues(alpha: 0.08),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
                     border: OutlineInputBorder(
                       borderRadius: AppBorderRadius.lgAll,
-                      borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.3)),
+                      borderSide: BorderSide(
+                          color: AppColors.teal.withValues(alpha: 0.3)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: AppBorderRadius.lgAll,
-                      borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.3)),
+                      borderSide: BorderSide(
+                          color: AppColors.teal.withValues(alpha: 0.3)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: AppBorderRadius.lgAll,
-                      borderSide: BorderSide(color: AppColors.teal.withValues(alpha: 0.5)),
+                      borderSide: BorderSide(
+                          color: AppColors.teal.withValues(alpha: 0.5)),
                     ),
                   ),
-                  onChanged: (_) { if (_error != null) setState(() => _error = null); },
+                  onChanged: (_) {
+                    if (_error != null) setState(() => _error = null);
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -1212,9 +1325,11 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
                   child: _busy
                       ? const Padding(
                           padding: EdgeInsets.all(16),
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
-                      : const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                      : const Icon(Icons.arrow_forward_rounded,
+                          color: Colors.white),
                 ),
               ),
             ],
@@ -1224,7 +1339,8 @@ class _LocationPickerSheetState extends ConsumerState<_LocationPickerSheet> {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.error_outline_rounded, size: 14, color: AppColors.red),
+                const Icon(Icons.error_outline_rounded,
+                    size: 14, color: AppColors.red),
                 const SizedBox(width: 6),
                 Expanded(child: AppText.bodySm(_error!, color: AppColors.red)),
               ],
@@ -1242,7 +1358,10 @@ class _ProCard extends StatelessWidget {
   final ProData pro;
   final VoidCallback onViewProfile;
   final VoidCallback onConnect;
-  const _ProCard({required this.pro, required this.onViewProfile, required this.onConnect});
+  const _ProCard(
+      {required this.pro,
+      required this.onViewProfile,
+      required this.onConnect});
 
   @override
   Widget build(BuildContext context) {
@@ -1261,7 +1380,10 @@ class _ProCard extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [pro.categoryColor, pro.categoryColor.withValues(alpha: 0.4)],
+                colors: [
+                  pro.categoryColor,
+                  pro.categoryColor.withValues(alpha: 0.4)
+                ],
               ),
             ),
           ),
@@ -1295,7 +1417,8 @@ class _ProCard extends StatelessWidget {
                               ),
                               if (pro.isVerified) ...[
                                 const SizedBox(width: 6),
-                                const Icon(Icons.verified_rounded, size: 15, color: AppColors.teal),
+                                const Icon(Icons.verified_rounded,
+                                    size: 15, color: AppColors.teal),
                               ],
                             ],
                           ),
@@ -1303,7 +1426,8 @@ class _ProCard extends StatelessWidget {
                           AppContainer.tinted(
                             color: pro.categoryColor,
                             borderRadius: AppBorderRadius.pill,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             child: AppText.labelXs(
                               pro.categoryName,
                               color: pro.categoryColor,
@@ -1313,7 +1437,8 @@ class _ProCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(Icons.star_rounded, size: 13, color: AppColors.amber),
+                              const Icon(Icons.star_rounded,
+                                  size: 13, color: AppColors.amber),
                               const SizedBox(width: 3),
                               AppText.labelXs(
                                 '${pro.averageRating.toStringAsFixed(1)} (${pro.ratingCount})',
@@ -1330,7 +1455,8 @@ class _ProCard extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          AppText.bodyXs(AppStrings.from, color: AppColors.textHint),
+                          AppText.bodyXs(AppStrings.from,
+                              color: AppColors.textHint),
                           Text(
                             '₹${pro.hourlyRate}',
                             style: TextStyle(
@@ -1341,7 +1467,8 @@ class _ProCard extends StatelessWidget {
                           ),
                           Text(
                             AppStrings.perHour,
-                            style: const TextStyle(fontSize: 9, color: AppColors.textHint),
+                            style: const TextStyle(
+                                fontSize: 9, color: AppColors.textHint),
                           ),
                         ],
                       ),
@@ -1363,7 +1490,9 @@ class _ProCard extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    _MetaChip(icon: Icons.work_outline_rounded, label: '${pro.experienceYrs} yrs'),
+                    _MetaChip(
+                        icon: Icons.work_outline_rounded,
+                        label: '${pro.experienceYrs} yrs'),
                     _MetaChip(icon: Icons.place_outlined, label: pro.address),
                   ],
                 ),
@@ -1373,14 +1502,18 @@ class _ProCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: AppButton.secondary(
+                      child: AppButton(
+                        variant: AppButtonVariant.secondary,
                         label: AppStrings.viewProfile,
                         isFullWidth: true,
                         onPressed: onViewProfile,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _ConnStateButton(state: pro.connectionState, color: pro.categoryColor, onTap: onConnect),
+                    _ConnStateButton(
+                        state: pro.connectionState,
+                        color: pro.categoryColor,
+                        onTap: onConnect),
                   ],
                 ),
               ],
@@ -1422,7 +1555,8 @@ class _ConnStateButton extends StatelessWidget {
   final ProConnState state;
   final Color color;
   final VoidCallback onTap;
-  const _ConnStateButton({required this.state, required this.color, required this.onTap});
+  const _ConnStateButton(
+      {required this.state, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1434,9 +1568,11 @@ class _ConnStateButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.teal),
+              const Icon(Icons.chat_bubble_outline_rounded,
+                  size: 14, color: AppColors.teal),
               const SizedBox(width: 6),
-              AppText.labelSm(AppStrings.message, color: AppColors.teal, fontWeight: FontWeight.w600),
+              AppText.labelSm(AppStrings.message,
+                  color: AppColors.teal, fontWeight: FontWeight.w600),
             ],
           ),
         ),
@@ -1447,9 +1583,11 @@ class _ConnStateButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.hourglass_top_rounded, size: 13, color: AppColors.amber),
+              const Icon(Icons.hourglass_top_rounded,
+                  size: 13, color: AppColors.amber),
               const SizedBox(width: 6),
-              AppText.labelSm(AppStrings.pending, color: AppColors.amber, fontWeight: FontWeight.w600),
+              AppText.labelSm(AppStrings.pending,
+                  color: AppColors.amber, fontWeight: FontWeight.w600),
             ],
           ),
         ),
@@ -1457,13 +1595,15 @@ class _ConnStateButton extends StatelessWidget {
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(color: color, borderRadius: AppBorderRadius.lgAll),
+            decoration: BoxDecoration(
+                color: color, borderRadius: AppBorderRadius.lgAll),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.add_rounded, size: 14, color: Colors.white),
                 const SizedBox(width: 4),
-                AppText.labelSm(AppStrings.connect, color: Colors.white, fontWeight: FontWeight.w600),
+                AppText.labelSm(AppStrings.connect,
+                    color: Colors.white, fontWeight: FontWeight.w600),
               ],
             ),
           ),
@@ -1493,7 +1633,8 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
     _selected = widget.initialPlan ?? ProPlanType.hourly;
   }
 
-  ({String label, int? rate, Color color, IconData icon}) _planMeta(ProPlanType t) {
+  ({String label, int? rate, Color color, IconData icon}) _planMeta(
+      ProPlanType t) {
     return switch (t) {
       ProPlanType.hourly => (
           label: AppStrings.hourlyPlan,
@@ -1519,7 +1660,8 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
   Future<void> _submit() async {
     final meta = _planMeta(_selected);
     if (meta.rate == null) {
-      AppSnackbar.error(context, '${meta.label} is not offered by ${widget.pro.name}.');
+      AppSnackbar.error(
+          context, '${meta.label} is not offered by ${widget.pro.name}.');
       return;
     }
     final planType = switch (_selected) {
@@ -1529,7 +1671,8 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
     };
     final areaId = ref.read(locationProvider).area?.id;
 
-    AppLogger.i('Connection request send → pro:${widget.pro.id} plan:$planType', tag: 'Professionals');
+    AppLogger.i('Connection request send → pro:${widget.pro.id} plan:$planType',
+        tag: 'Professionals');
     setState(() => _sending = true);
     try {
       // Free request — no money moves until the pro accepts and the patient
@@ -1544,7 +1687,7 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
       AppLogger.track('connection.request_sent');
       ref.read(connectionsProvider.notifier).load();
       if (!mounted) return;
-      Navigator.pop(context);
+      context.pop();
       AppSnackbar.success(context, AppStrings.connectionRequestSent);
     } on Exception catch (e) {
       AppLogger.e('Connection request failed', tag: 'Professionals', error: e);
@@ -1573,7 +1716,9 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 36,
               height: 4,
-              decoration: BoxDecoration(color: context.dividerCol, borderRadius: AppBorderRadius.pill),
+              decoration: BoxDecoration(
+                  color: context.dividerCol,
+                  borderRadius: AppBorderRadius.pill),
             ),
           ),
 
@@ -1591,13 +1736,15 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
                         children: [
                           AppText.h3(AppStrings.selectPlanTitle),
                           const SizedBox(height: 2),
-                          AppText.bodySm(widget.pro.name, color: context.secondaryText),
+                          AppText.bodySm(widget.pro.name,
+                              color: context.secondaryText),
                         ],
                       ),
                     ),
                     AppIconButton(
-                      icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
-                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded,
+                          size: 16, color: AppColors.textSecondary),
+                      onPressed: () => context.pop(),
                     ),
                   ],
                 ),
@@ -1616,7 +1763,9 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isSelected ? meta.color.withValues(alpha: 0.08) : context.inputBg,
+                          color: isSelected
+                              ? meta.color.withValues(alpha: 0.08)
+                              : context.inputBg,
                           borderRadius: AppBorderRadius.lgAll,
                           border: Border.all(
                             color: isSelected ? meta.color : context.borderCol,
@@ -1629,18 +1778,24 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
                               color: meta.color,
                               borderRadius: AppBorderRadius.mdAll,
                               padding: const EdgeInsets.all(11),
-                              child: Icon(meta.icon, size: 18, color: meta.color),
+                              child:
+                                  Icon(meta.icon, size: 18, color: meta.color),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  AppText.labelMd(meta.label, color: context.primaryText),
+                                  AppText.labelMd(meta.label,
+                                      color: context.primaryText),
                                   const SizedBox(height: 2),
                                   AppText.bodySm(
-                                    meta.rate != null ? '₹${meta.rate} ${_rateLabel(t)}' : 'Not available',
-                                    color: meta.rate != null ? meta.color : AppColors.textHint,
+                                    meta.rate != null
+                                        ? '₹${meta.rate} ${_rateLabel(t)}'
+                                        : 'Not available',
+                                    color: meta.rate != null
+                                        ? meta.color
+                                        : AppColors.textHint,
                                   ),
                                 ],
                               ),
@@ -1650,15 +1805,20 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
                               width: 20,
                               height: 20,
                               decoration: BoxDecoration(
-                                color: isSelected ? meta.color : Colors.transparent,
+                                color: isSelected
+                                    ? meta.color
+                                    : Colors.transparent,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: isSelected ? meta.color : context.borderCol,
+                                  color: isSelected
+                                      ? meta.color
+                                      : context.borderCol,
                                   width: 2,
                                 ),
                               ),
                               child: isSelected
-                                  ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
+                                  ? const Icon(Icons.check_rounded,
+                                      size: 12, color: Colors.white)
                                   : null,
                             ),
                           ],
@@ -1687,9 +1847,11 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
                           ? SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(color: context.bg, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                  color: context.bg, strokeWidth: 2),
                             )
-                          : AppText.labelMd(AppStrings.connectNow, color: context.bg, fontWeight: FontWeight.w700),
+                          : AppText.labelMd(AppStrings.connectNow,
+                              color: context.bg, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),

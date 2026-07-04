@@ -1,7 +1,9 @@
+import '../../../../core/utils/logger.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_local_datasource.dart';
 import '../datasources/auth_remote_datasource.dart';
+import '../models/auth_token_model.dart';
 import '../models/user_model.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -11,22 +13,13 @@ class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource _remote;
 
   @override
-  Future<({String token, UserEntity user, bool isNewUser})> login({
+  Future<AuthSession> login({
     required String identifier,
     required String password,
   }) async {
-    final result = await _remote.login(
-      identifier: identifier,
-      password: password,
-    );
-    await Future.wait([
-      _local.saveToken(result.token.token),
-      if (result.token.refreshToken != null)
-        _local.saveRefreshToken(result.token.refreshToken!),
-      _local.saveUser(result.user),
-    ]);
-    final UserEntity user = result.user;
-    return (token: result.token.token, user: user, isNewUser: result.token.isNewUser);
+    final result = await _remote.login(identifier: identifier, password: password);
+    await _persistSession(result);
+    return (token: result.token.token, user: result.user, isNewUser: result.token.isNewUser);
   }
 
   @override
@@ -37,50 +30,37 @@ class AuthRepositoryImpl implements AuthRepository {
       _remote.sendOtp(identifier: identifier, purpose: purpose);
 
   @override
-  Future<({String token, UserEntity user, bool isNewUser})> verifyOtp({
+  Future<AuthSession> verifyOtp({
     required String identifier,
     required String otp,
   }) async {
-    final result = await _remote.verifyOtp(
-      identifier: identifier,
-      otp: otp,
-    );
-    await Future.wait([
-      _local.saveToken(result.token.token),
-      if (result.token.refreshToken != null)
-        _local.saveRefreshToken(result.token.refreshToken!),
-      _local.saveUser(result.user),
-    ]);
-    final UserEntity user = result.user;
-    return (token: result.token.token, user: user, isNewUser: result.token.isNewUser);
+    final result = await _remote.verifyOtp(identifier: identifier, otp: otp);
+    await _persistSession(result);
+    return (token: result.token.token, user: result.user, isNewUser: result.token.isNewUser);
   }
 
   @override
-  Future<({String token, UserEntity user, bool isNewUser})> register({
+  Future<AuthSession> register({
     required String name,
     required String email,
     required String phone,
     required String password,
   }) async {
-    final result = await _remote.register(
-      name: name,
-      email: email,
-      phone: phone,
-      password: password,
-    );
-    await Future.wait([
-      _local.saveToken(result.token.token),
-      if (result.token.refreshToken != null)
-        _local.saveRefreshToken(result.token.refreshToken!),
-      _local.saveUser(result.user),
-    ]);
-    final UserEntity user = result.user;
-    return (token: result.token.token, user: user, isNewUser: result.token.isNewUser);
+    final result = await _remote.register(name: name, email: email, phone: phone, password: password);
+    await _persistSession(result);
+    return (token: result.token.token, user: result.user, isNewUser: result.token.isNewUser);
   }
 
+  Future<void> _persistSession(({AuthTokenModel token, UserModel user}) result) =>
+      _local.saveSession(
+        token: result.token.token,
+        refreshToken: result.token.refreshToken,
+        user: result.user,
+      );
+
   @override
-  Future<void> forgotPassword(String identifier) =>
-      _remote.forgotPassword(identifier);
+  Future<void> forgotPassword({required String identifier}) =>
+      _remote.forgotPassword(identifier: identifier);
 
   @override
   Future<void> resetPassword({
@@ -103,7 +83,18 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> logout() async {
     try {
       await _remote.logout();
-    } catch (_) {}
-    await _local.clear();
+    } catch (e, s) {
+      AppLogger.w('Remote logout failed', error: e, stack: s);
+    }
+    await _local.clearAuth();
   }
+
+  @override
+  Future<String?> getOnboardingStep() => _local.readOnboardingStep();
+
+  @override
+  Future<void> saveOnboardingStep(String step) => _local.saveOnboardingStep(step);
+
+  @override
+  Future<void> clearOnboardingStep() => _local.clearOnboardingStep();
 }

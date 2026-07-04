@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,9 +87,9 @@ class _OfflinePageState extends ConsumerState<OfflinePage>
                 backgroundColor: context.bg,
                 surfaceTintColor: Colors.transparent,
                 elevation: 0,
-                leading: Navigator.canPop(context)
+                leading: context.canPop()
                     ? GestureDetector(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () => context.pop(),
                         child: Padding(
                           padding: const EdgeInsets.only(left: 8),
                           child: Icon(Icons.arrow_back_ios_new_rounded,

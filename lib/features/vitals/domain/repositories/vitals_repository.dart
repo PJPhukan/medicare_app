@@ -19,4 +19,11 @@ abstract interface class VitalsRepository {
     String? measuredAt,
     String? notes,
   });
+
+  Future<({List<VitalReadingEntity> readings, String? nextCursor})> getVitalHistory({
+    required String configId,
+    required String filter,
+    String? cursor,
+    int limit = 20,
+  });
 }

@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// Multi-line text area with optional character counter.
 class AppMultilineInput extends StatelessWidget {
@@ -52,7 +53,7 @@ class AppMultilineInput extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
-          Text(label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(label!),
           const SizedBox(height: 6),
         ],
         Container(
@@ -96,12 +97,11 @@ class AppMultilineInput extends StatelessWidget {
           Row(children: [
             const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(child: Text(error!,
-                style: AppTypography.bodyXs.copyWith(color: AppColors.error))),
+            Expanded(child: AppText.error(error!)),
           ]),
         ] else if (helper != null) ...[
           const SizedBox(height: 5),
-          Text(helper!, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(helper!),
         ],
       ],
     );

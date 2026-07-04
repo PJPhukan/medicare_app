@@ -63,15 +63,19 @@ class MedicinesNotifier extends StateNotifier<MedicinesState> {
   final Ref _ref;
 
   Future<void> load() async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final entities = await _fetchMedicines();
+      if (!mounted) return;
       state = state.copyWith(
         medicines: entities.whereType<UserMedicine>().toList(),
         isLoading: false,
         isOffline: !_ref.read(isOnlineProvider),
       );
-    } on Exception catch (e) {
+    } catch (e, s) {
+      AppLogger.e('Medicines load failed', tag: 'Medicines', error: e, stack: s);
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

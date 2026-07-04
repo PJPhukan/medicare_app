@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -80,7 +81,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       AppLogger.i('Profile updated ✓', tag: 'Profile');
       if (!mounted) return;
       AppSnackbar.success(context, AppStrings.profileUpdated);
-      Navigator.pop(context);
+      context.pop();
     } on Exception catch (e) {
       AppLogger.e('Profile update failed', tag: 'Profile', error: e);
       if (!mounted) return;
@@ -106,7 +107,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 expandedHeight: 100,
                 leading: IconButton(
                   icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => context.pop(),
                 ),
                 actions: [
                   Padding(

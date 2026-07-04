@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +12,8 @@ class PayoutDetailsScreen extends ConsumerStatefulWidget {
   const PayoutDetailsScreen({super.key});
 
   @override
-  ConsumerState<PayoutDetailsScreen> createState() => _PayoutDetailsScreenState();
+  ConsumerState<PayoutDetailsScreen> createState() =>
+      _PayoutDetailsScreenState();
 }
 
 class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
@@ -62,9 +64,11 @@ class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
           );
       if (!mounted) return;
       AppSnackbar.success(context, 'Payout details saved');
-      Navigator.of(context).pop();
+      context.pop();
     } catch (_) {
-      if (mounted) AppSnackbar.error(context, 'Could not save. Check the details and try again.');
+      if (mounted)
+        AppSnackbar.error(
+            context, 'Could not save. Check the details and try again.');
     }
   }
 
@@ -87,12 +91,14 @@ class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
           elevation: 0,
           leading: IconButton(
             icon: Icon(Icons.arrow_back_rounded, color: context.primaryText),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
           ),
           title: AppText.h3('Payout Details'),
         ),
         body: state.isLoading
-            ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal))
+            ? const Center(
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.teal))
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
@@ -101,10 +107,12 @@ class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.teal.withValues(alpha: 0.08),
                       borderRadius: AppBorderRadius.mdAll,
-                      border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
+                      border: Border.all(
+                          color: AppColors.teal.withValues(alpha: 0.2)),
                     ),
                     child: Row(children: [
-                      const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.teal),
+                      const Icon(Icons.info_outline_rounded,
+                          size: 16, color: AppColors.teal),
                       const SizedBox(width: 10),
                       Expanded(
                         child: AppText.bodySm(
@@ -116,7 +124,8 @@ class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
                     ]),
                   ),
                   const SizedBox(height: 20),
-                  AppText.labelMd('Bank Account', color: AppColors.textSecondary),
+                  AppText.labelMd('Bank Account',
+                      color: AppColors.textSecondary),
                   const SizedBox(height: 10),
                   AppTextField(
                     controller: _name,
@@ -165,7 +174,8 @@ class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
                     prefix: const Icon(Icons.qr_code_rounded),
                   ),
                   const SizedBox(height: 28),
-                  AppButton.primary(
+                  AppButton(
+                    variant: AppButtonVariant.primary,
                     label: 'Save Payout Details',
                     onPressed: state.isSaving ? null : _save,
                     isLoading: state.isSaving,
@@ -181,6 +191,7 @@ class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
 
 class _UpperCaseFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) =>
+  TextEditingValue formatEditUpdate(
+          TextEditingValue oldValue, TextEditingValue newValue) =>
       newValue.copyWith(text: newValue.text.toUpperCase());
 }

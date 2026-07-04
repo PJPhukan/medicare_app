@@ -11,12 +11,16 @@ class AuthShell extends StatelessWidget {
     super.key,
     required this.child,
     this.onBack,
-    this.showBack = false,
+    this.leading = AppBarLeading.none,
+    this.bottomBar,
   });
 
   final Widget child;
   final VoidCallback? onBack;
-  final bool showBack;
+  final AppBarLeading leading;
+
+  /// Pinned outside the scroll area — use for CTA buttons.
+  final Widget? bottomBar;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +50,7 @@ class AuthShell extends StatelessWidget {
           SafeArea(
             child: Column(
               children: [
-                if (showBack)
+                if (leading == AppBarLeading.back)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Row(
@@ -73,6 +77,11 @@ class AuthShell extends StatelessWidget {
                     child: child,
                   ),
                 ),
+                if (bottomBar != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: bottomBar,
+                  ),
               ],
             ),
           ),

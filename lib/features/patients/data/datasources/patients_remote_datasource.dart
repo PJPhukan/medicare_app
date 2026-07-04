@@ -12,7 +12,7 @@ class PatientsRemoteDataSource {
     final res = await _dio.get<Map<String, dynamic>>(
       ApiConstants.patientProfiles,
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Patient.fromJson(e as Map<String, dynamic>))
         .toList();

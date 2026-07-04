@@ -100,8 +100,9 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
       state = state.copyWith(
         categories: cats.whereType<ProfessionalCategory>().toList(),
       );
-    } on Exception catch (e) {
+    } catch (e, s) {
       AppLogger.e('Failed to load categories: $e', tag: 'Professionals');
+        if (!mounted) return;
     }
   }
 
@@ -112,7 +113,7 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
       final created = await _repo.requestCategory(name);
       await loadCategories();
       return created.id;
-    } on Exception catch (e) {
+    } catch (e, s) {
       AppLogger.e('Failed to request category: $e', tag: 'Professionals');
       return null;
     }
@@ -152,7 +153,8 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
         fallbackAreas:    page.fallbackAreas,
         currentArea:      page.area,
       );
-    } on Exception catch (e) {
+    } catch (e, s) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -186,7 +188,7 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
         totalPages:    page.pages,
         isLoadingMore: false,
       );
-    } on Exception catch (e) {
+    } catch (e, s) {
       state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }

@@ -13,8 +13,8 @@ class CatalogMedicine extends CatalogMedicineEntity {
 
   factory CatalogMedicine.fromJson(Map<String, dynamic> json) =>
       CatalogMedicine(
-        id: json['id'] as String,
-        name: json['name'] as String,
+        id: json['id']?.toString() ?? '',
+        name: json['name'] as String? ?? '',
         genericName: json['genericName'] as String?,
         dosageForm: json['dosageForm'] as String?,
         strength: json['strength'] as String?,
@@ -33,8 +33,8 @@ class MedicineDoseTime extends MedicineDoseTimeEntity {
 
   factory MedicineDoseTime.fromJson(Map<String, dynamic> json) =>
       MedicineDoseTime(
-        id: json['id'] as String,
-        scheduledTime: json['scheduledTime'] as String,
+        id: json['id']?.toString() ?? '',
+        scheduledTime: json['scheduledTime'] as String? ?? '',
         unit: json['unit'] as String?,
         foodTiming: json['foodTiming'] as String?,
       );
@@ -50,8 +50,8 @@ class MedicineDoseSchedule extends MedicineDoseScheduleEntity {
 
   factory MedicineDoseSchedule.fromJson(Map<String, dynamic> json) =>
       MedicineDoseSchedule(
-        id: json['id'] as String,
-        scheduleType: json['scheduleType'] as String,
+        id: json['id']?.toString() ?? '',
+        scheduleType: json['scheduleType'] as String? ?? '',
         isPrn: json['isPrn'] as bool? ?? false,
         doseTimes: (json['doseTimes'] as List<dynamic>? ?? [])
             .map((e) => MedicineDoseTime.fromJson(e as Map<String, dynamic>))
@@ -67,8 +67,8 @@ class MedicineStock extends MedicineStockEntity {
   });
 
   factory MedicineStock.fromJson(Map<String, dynamic> json) => MedicineStock(
-        id: json['id'] as String,
-        quantity: json['quantity'] as int,
+        id: json['id']?.toString() ?? '',
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
         expiryDate: json['expiryDate'] as String?,
       );
 }
@@ -87,14 +87,14 @@ class UserMedicine extends UserMedicineEntity {
   });
 
   factory UserMedicine.fromJson(Map<String, dynamic> json) => UserMedicine(
-        id: json['id'] as String,
-        scope: json['scope'] as String,
+        id: json['id']?.toString() ?? '',
+        scope: json['scope'] as String? ?? '',
         active: json['active'] as bool? ?? true,
-        createdAt: json['createdAt'] as String,
+        createdAt: json['createdAt'] as String? ?? '',
         customName: json['customName'] as String?,
-        medicine: CatalogMedicine.fromJson(
-          json['medicine'] as Map<String, dynamic>,
-        ),
+        medicine: json['medicine'] is Map<String, dynamic>
+            ? CatalogMedicine.fromJson(json['medicine'] as Map<String, dynamic>)
+            : const CatalogMedicine(id: '', name: 'Unknown'),
         doseSchedules: (json['doseSchedules'] as List<dynamic>? ?? [])
             .map((e) => MedicineDoseSchedule.fromJson(e as Map<String, dynamic>))
             .toList(),

@@ -9,9 +9,10 @@ class MedicinesRemoteDataSource {
 
   Future<List<UserMedicine>> getMyMedicines() async {
     final res = await _dio.get<Map<String, dynamic>>(ApiConstants.myMedicines);
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
-        .map((e) => UserMedicine.fromJson(e as Map<String, dynamic>))
+        .whereType<Map<String, dynamic>>()
+        .map(UserMedicine.fromJson)
         .toList();
   }
 

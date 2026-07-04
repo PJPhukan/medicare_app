@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
-import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// Tappable time input that opens the system time picker.
 class AppTimePickerInput extends StatefulWidget {
@@ -40,12 +40,20 @@ class _AppTimePickerInputState extends State<AppTimePickerInput> {
     _selected = widget.initialTime;
   }
 
+  @override
+  void didUpdateWidget(AppTimePickerInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTime != widget.initialTime) {
+      setState(() => _selected = widget.initialTime);
+    }
+  }
+
   String _format(TimeOfDay t) {
     if (widget.use24HourFormat) {
       return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     }
-    final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
-    final min  = t.minute.toString().padLeft(2, '0');
+    final hour   = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final min    = t.minute.toString().padLeft(2, '0');
     final period = t.period == DayPeriod.am ? 'AM' : 'PM';
     return '$hour:$min $period';
   }
@@ -70,53 +78,59 @@ class _AppTimePickerInputState extends State<AppTimePickerInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
-        GestureDetector(
-          onTap: widget.enabled ? _pick : null,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              color: context.inputBg,
-              borderRadius: AppBorderRadius.mdAll,
-              border: Border.all(color: borderCol),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.access_time_rounded,
-                    size: 18, color: AppColors.textSecondary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _selected != null
-                        ? _format(_selected!)
-                        : (widget.hint ?? 'Select time'),
-                    style: AppTypography.bodyMd.copyWith(
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.enabled ? _pick : null,
+            borderRadius: AppBorderRadius.mdAll,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: context.inputBg,
+                borderRadius: AppBorderRadius.mdAll,
+                border: Border.all(color: borderCol),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.access_time_rounded,
+                    size: 18,
+                    color: widget.enabled
+                        ? AppColors.textSecondary
+                        : AppColors.textSecondary.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: AppText.bodyMd(
+                      _selected != null
+                          ? _format(_selected!)
+                          : (widget.hint ?? 'Select time'),
                       color: _selected != null
-                          ? context.primaryText
+                          ? (widget.enabled ? null : AppColors.textSecondary)
                           : AppColors.textHint,
                     ),
                   ),
-                ),
-                const Icon(Icons.keyboard_arrow_down_rounded,
-                    size: 18, color: AppColors.textSecondary),
-              ],
+                  const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 18, color: AppColors.textSecondary),
+                ],
+              ),
             ),
           ),
         ),
         if (hasError) ...[
           const SizedBox(height: 5),
           Row(children: [
-            const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.error),
+            const Icon(Icons.error_outline_rounded,
+                size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(child: Text(widget.error!,
-                style: AppTypography.bodyXs.copyWith(color: AppColors.error))),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(widget.helper!,
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(widget.helper!),
         ],
       ],
     );

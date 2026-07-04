@@ -7,15 +7,10 @@ import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart' hide AppShell;
 import '../../../../core/utils/logger.dart';
-import '../../../auth/presentation/screens/auth_flow.dart';
-import '../../../shell/presentation/screens/app_shell.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
-import '../../../support/presentation/screens/support_screen.dart';
-import '../../../premium/presentation/screens/subscription_management_screen.dart';
 import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
-import '../../../professional_profile/presentation/screens/become_professional_screen.dart';
-import '../../../professional_profile/presentation/screens/pro_hub_screen.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -91,25 +86,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         content: AppText.bodyMd(AppStrings.signOutConfirm, color: AppColors.textSecondary),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => ctx.pop(false),
             child: const Text(AppStrings.cancel,
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               AppLogger.i('Sign-out confirmed', tag: 'Settings');
-              Navigator.pop(ctx);
-              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => AuthFlow(
-                    onAuthenticated: () => Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AppShell()),
-                    ),
-                  ),
-                ),
-                (_) => false,
-              );
+              ctx.pop();
+              // logout() clears token + calls API; router redirect handles navigation
+              ref.read(authProvider.notifier).logout();
             },
             child: const Text(AppStrings.signOut,
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.red)),
@@ -130,12 +116,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         content: AppText.bodyMd(AppStrings.deleteAccountConfirm, color: AppColors.textSecondary),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => ctx.pop(false),
             child: const Text(AppStrings.cancel,
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => ctx.pop(true),
             child: const Text(AppStrings.deleteAccount,
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.red)),
           ),
@@ -159,14 +145,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _openPlanSheet() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const SubscriptionManagementScreen(),
-      ),
-    );
-  }
+  void _openPlanSheet() => context.push(AppRoutes.settingsPremium);
 
   void _openExportSheet() {
     showModalBottomSheet(
@@ -175,7 +154,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _ExportSheet(
         onExport: (format) {
-          Navigator.pop(context);
+          context.pop();
           _showSnack(AppStrings.exportStarted);
         },
       ),
@@ -235,10 +214,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => ProfileScreen()),
-                      ),
+                      onTap: () => context.push(AppRoutes.profile),
                       child: Container(
                         padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -255,7 +231,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         child: Row(
                           children: [
-                            AppVerifiedAvatar(
+                            AppAvatar(
                               name: displayName,
                               imageUrl: user?.avatarUrl,
                               isVerified: isVerifiedPro,
@@ -440,7 +416,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               title: AppStrings.editProfile,
               showChevron: true,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+              onTap: () => context.push(AppRoutes.profile),
             ),
             AppListTile(
               leading: Container(
@@ -459,7 +435,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               title: AppStrings.healthProfileTitle,
               showChevron: true,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+              onTap: () => context.push(AppRoutes.profile),
             ),
             AppListTile(
               leading: Container(
@@ -709,15 +685,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _openBecomePro() => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
-      );
+  void _openBecomePro() => context.push(AppRoutes.settingsPro);
 
-  void _openProHub() => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ProHubScreen()),
-      );
+  void _openProHub() => context.push(AppRoutes.settingsProHub);
 
   // ── Notifications tab ────────────────────────────────────────────────────────
 
@@ -1040,7 +1010,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               title: AppStrings.helpCenter,
               showChevron: true,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen())),
+              onTap: () => context.push(AppRoutes.support),
             ),
             AppListTile(
               leading: Container(
@@ -1196,7 +1166,7 @@ class _LanguageSheet extends StatelessWidget {
             return GestureDetector(
               onTap: isAvail
                   ? () {
-                      Navigator.pop(context);
+                      context.pop();
                       onSelect(lang.label);
                     }
                   : null,
@@ -1297,7 +1267,7 @@ class _ExportSheet extends StatelessWidget {
           ),
           SizedBox(height: 12),
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => context.pop(),
             child: Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(vertical: 13),
@@ -1388,7 +1358,7 @@ class _PickerSheet extends StatelessWidget {
             final isSel = opt == selected;
             return GestureDetector(
               onTap: () {
-                Navigator.pop(context);
+                context.pop();
                 onSelect(opt);
               },
               child: Container(

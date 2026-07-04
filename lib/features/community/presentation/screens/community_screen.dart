@@ -8,8 +8,9 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/post_entity.dart';
 import '../providers/community_provider.dart';
-import 'create_post_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'post_detail_screen.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 
 const _kCategories = ['All', 'Diabetes', 'Hypertension', 'Mental Health', 'General', 'Nutrition'];
@@ -53,10 +54,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
         backgroundColor: context.bg,
         floatingActionButton: AppFAB(
           icon: const Icon(Icons.edit_rounded, color: Colors.white),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreatePostScreen()),
-          ).then((created) {
+          onPressed: () => context.push(AppRoutes.communityCreate).then((created) {
             if (created == true) ref.read(communityProvider.notifier).load();
           }),
         ),
@@ -137,21 +135,17 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                         return _PostCard(
                           post: post,
                           onLike: () => _toggleLike(post),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PostDetailScreen(
-                                post: PostArgs(
-                                  id: post.id,
-                                  authorName: post.author.name,
-                                  category: post.title,
-                                  content: post.body,
-                                  timeAgo: _timeAgo(post.createdAt),
-                                  likes: post.likesCount,
-                                  commentCount: post.commentsCount,
-                                  liked: post.isLikedByMe,
-                                ),
-                              ),
+                          onTap: () => context.push(
+                            AppRoutes.communityPost,
+                            extra: PostArgs(
+                              id: post.id,
+                              authorName: post.author.name,
+                              category: post.title,
+                              content: post.body,
+                              timeAgo: _timeAgo(post.createdAt),
+                              likes: post.likesCount,
+                              commentCount: post.commentsCount,
+                              liked: post.isLikedByMe,
                             ),
                           ),
                         );

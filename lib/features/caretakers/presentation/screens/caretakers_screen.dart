@@ -8,7 +8,10 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/caretaker_entity.dart';
 import '../providers/caretakers_provider.dart';
-import 'invite_caretaker_screen.dart';
+import '../../../connections/domain/entities/connection_entity.dart';
+import '../../../connections/presentation/providers/connections_provider.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 
 String _fmtMonth(String iso) {
   try {
@@ -27,7 +30,7 @@ class CaretakersScreen extends ConsumerStatefulWidget {
 
 class _CaretakersScreenState extends ConsumerState<CaretakersScreen> {
   Future<void> _inviteCaretaker() async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const InviteCaretakerScreen()));
+    await context.push(AppRoutes.caretakerInvite);
     if (mounted) ref.read(caretakersProvider.notifier).load();
   }
 
@@ -50,31 +53,33 @@ class _CaretakersScreenState extends ConsumerState<CaretakersScreen> {
   @override
   Widget build(BuildContext context) {
     final st = ref.watch(caretakersProvider);
+    final activeProfessionals = ref
+        .watch(connectionsProvider)
+        .connections
+        .where((c) => c.status == 'ACTIVE')
+        .toList();
+
+    final isEmpty = st.caretakers.isEmpty && activeProfessionals.isEmpty;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
         backgroundColor: context.bg,
         body: CustomScrollView(
           slivers: [
-            SliverAppBar(
-              backgroundColor: context.bg,
-              surfaceTintColor: Colors.transparent,
-              pinned: true,
-              expandedHeight: 100,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 20, bottom: 14),
-                title: AppText.h2(AppStrings.caretakers),
-                background: Container(color: context.bg),
+            AppSliverAppBar(
+              config: AppBarConfig(
+                title: AppStrings.caretakers,
+                subtitle: 'People who help manage your health',
+                actions: [
+                  AppIconButton(
+                    icon: const Icon(Icons.person_add_rounded),
+                    color: AppColors.teal,
+                    onPressed: _inviteCaretaker,
+                    tooltip: AppStrings.addCaretaker,
+                  ),
+                ],
               ),
-              actions: [
-                AppIconButton(
-                  icon: const Icon(Icons.person_add_rounded),
-                  color: AppColors.teal,
-                  onPressed: _inviteCaretaker,
-                  tooltip: AppStrings.addCaretaker,
-                ),
-                const SizedBox(width: 8),
-              ],
             ),
 
             SliverToBoxAdapter(
@@ -104,7 +109,7 @@ class _CaretakersScreenState extends ConsumerState<CaretakersScreen> {
               const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator(color: AppColors.teal, strokeWidth: 2)),
               )
-            else if (st.error != null && st.caretakers.isEmpty)
+            else if (st.error != null && isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
@@ -112,7 +117,8 @@ class _CaretakersScreenState extends ConsumerState<CaretakersScreen> {
                     children: [
                       AppText.bodySm(st.error!, color: AppColors.error),
                       const SizedBox(height: 12),
-                      AppButton.ghost(
+                      AppButton(
+                        variant: AppButtonVariant.ghost,
                         label: 'Retry',
                         color: AppColors.teal,
                         onPressed: () => ref.read(caretakersProvider.notifier).load(),
@@ -121,7 +127,7 @@ class _CaretakersScreenState extends ConsumerState<CaretakersScreen> {
                   ),
                 ),
               )
-            else if (st.caretakers.isEmpty)
+            else if (isEmpty)
               SliverFillRemaining(
                 child: AppEmptyState(
                   icon: Icons.supervisor_account_rounded,
@@ -131,19 +137,56 @@ class _CaretakersScreenState extends ConsumerState<CaretakersScreen> {
                   actionLabel: AppStrings.addCaretaker,
                 ),
               )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) => _CaretakerCard(
-                      caretaker: st.caretakers[i],
-                      onRemove: () => _removeCaretaker(st.caretakers[i]),
+            else ...[
+              // ── Family & Friends ───────────────────────────────────────────
+              if (st.caretakers.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                    child: AppText.labelXs(
+                      'FAMILY & FRIENDS',
+                      color: AppColors.textHint,
+                      fontWeight: FontWeight.w700,
                     ),
-                    childCount: st.caretakers.length,
                   ),
                 ),
-              ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _CaretakerCard(
+                        caretaker: st.caretakers[i],
+                        onRemove: () => _removeCaretaker(st.caretakers[i]),
+                      ),
+                      childCount: st.caretakers.length,
+                    ),
+                  ),
+                ),
+              ],
+
+              // ── Professionals ──────────────────────────────────────────────
+              if (activeProfessionals.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                    child: AppText.labelXs(
+                      'PROFESSIONALS',
+                      color: AppColors.textHint,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _ProfessionalCaretakerCard(conn: activeProfessionals[i]),
+                      childCount: activeProfessionals.length,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ],
         ),
       ),
@@ -224,6 +267,56 @@ class _CaretakerCard extends StatelessWidget {
           AppText.bodyXs(
             '${AppStrings.caretakerSince} ${_fmtMonth(caretaker.createdAt)}',
             color: AppColors.textHint,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Professional caretaker card ──────────────────────────────────────────────
+
+class _ProfessionalCaretakerCard extends StatelessWidget {
+  final ConnectionEntity conn;
+  const _ProfessionalCaretakerCard({required this.conn});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = conn.professional.displayName;
+    final planLabel = switch (conn.planType) {
+      'HOURLY' => 'Hourly',
+      'DAILY' => 'Daily',
+      'MONTHLY' => 'Monthly',
+      _ => conn.planType,
+    };
+
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      borderRadius: AppBorderRadius.lgAll,
+      child: Row(
+        children: [
+          AppContainer.tinted(
+            color: AppColors.teal,
+            borderRadius: AppBorderRadius.mdAll,
+            padding: const EdgeInsets.all(10),
+            child: const Icon(Icons.medical_services_rounded, color: AppColors.teal, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppText.bodyMd(name, fontWeight: FontWeight.w700),
+                AppText.bodyXs('$planLabel plan · Active', color: AppColors.textSecondary),
+              ],
+            ),
+          ),
+          AppContainer.tinted(
+            color: AppColors.teal,
+            borderRadius: AppBorderRadius.pill,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: AppText.labelXs('Professional', color: AppColors.teal),
           ),
         ],
       ),

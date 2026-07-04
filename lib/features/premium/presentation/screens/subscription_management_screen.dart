@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,8 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/plan_entity.dart';
 import '../../domain/entities/my_subscription_entity.dart';
 import '../providers/subscription_provider.dart';
+import '../widgets/subscription_coupon_section.dart';
+import '../../../../core/services/razorpay_checkout.dart';
 
 class SubscriptionManagementScreen extends ConsumerStatefulWidget {
   const SubscriptionManagementScreen({super.key});
@@ -21,14 +24,7 @@ class _SubscriptionManagementScreenState
     extends ConsumerState<SubscriptionManagementScreen> {
   String _billingCycle = 'monthly';
   String? _selectedPlanId;
-  final _couponCtrl = TextEditingController();
   bool _couponLoading = false;
-
-  @override
-  void dispose() {
-    _couponCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +44,7 @@ class _SubscriptionManagementScreenState
           ),
           leading: IconButton(
             icon: Icon(Icons.arrow_back_rounded, color: context.primaryText),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
           ),
           title: const Text('Subscription', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         ),
@@ -104,15 +100,15 @@ class _SubscriptionManagementScreenState
                                           orElse: () => st.plans.first)
                                       .isFree)) ...[
                             const SizedBox(height: 8),
-                            _CouponField(
-                              controller: _couponCtrl,
-                              loading: _couponLoading,
+                            SubscriptionCouponSection(
                               coupon: st.coupon,
-                              onValidate: _validateCoupon,
-                              onClear: () {
-                                _couponCtrl.clear();
-                                ref.read(subscriptionProvider.notifier).clearCoupon();
-                              },
+                              loading: _couponLoading,
+                              planId: _selectedPlanId,
+                              availableCoupons: st.availableCoupons,
+                              onValidate: (code, {planId}) =>
+                                  _validateCoupon(code, planId: planId),
+                              onClear: () =>
+                                  ref.read(subscriptionProvider.notifier).clearCoupon(),
                             ),
                           ],
 
@@ -125,9 +121,8 @@ class _SubscriptionManagementScreenState
                                 orElse: () => st.plans.first,
                               ),
                               billingCycle: _billingCycle,
-                              couponCode: st.coupon?.valid == true
-                                  ? _couponCtrl.text.trim()
-                                  : null,
+                              couponCode:
+                                  st.coupon?.valid == true ? st.coupon?.code : null,
                               isActing: st.isActing,
                               onConfirm: _onConfirm,
                             ),
@@ -157,14 +152,13 @@ class _SubscriptionManagementScreenState
     );
   }
 
-  Future<void> _validateCoupon() async {
-    final code = _couponCtrl.text.trim();
+  Future<void> _validateCoupon(String code, {String? planId}) async {
     if (code.isEmpty) return;
     setState(() => _couponLoading = true);
     await ref
         .read(subscriptionProvider.notifier)
-        .validateCoupon(code, planId: _selectedPlanId);
-    setState(() => _couponLoading = false);
+        .validateCoupon(code, planId: planId ?? _selectedPlanId);
+    if (mounted) setState(() => _couponLoading = false);
   }
 
   Future<void> _onConfirm() async {
@@ -175,20 +169,44 @@ class _SubscriptionManagementScreenState
 
     if (plan.isFree) {
       await ref.read(subscriptionProvider.notifier).selectPlan(plan.id);
-      if (mounted) Navigator.pop(context);
+      if (mounted) context.pop();
       return;
     }
 
-    final result = await ref.read(subscriptionProvider.notifier).purchasePlan(
-          planId: plan.id,
-          billingCycle: _billingCycle,
-          couponCode: ref.read(subscriptionProvider).coupon?.valid == true
-              ? _couponCtrl.text.trim()
-              : null,
-        );
+    final notifier = ref.read(subscriptionProvider.notifier);
+    final couponCode = ref.read(subscriptionProvider).coupon?.valid == true
+        ? ref.read(subscriptionProvider).coupon?.code
+        : null;
 
-    if (result != null && mounted) {
-      _showSuccess(result.planName, result.expiresAt);
+    final order = await notifier.createOrder(
+      planId: plan.id,
+      billingCycle: _billingCycle,
+      couponCode: couponCode,
+    );
+    if (!mounted || order == null) return;
+
+    try {
+      final result = await RazorpayCheckout().open(
+        keyId: order.razorpayKeyId,
+        orderId: order.razorpayOrderId,
+        amountPaise: order.amountPaise,
+        name: plan.name,
+        currency: order.currency,
+      );
+      final success = await notifier.confirmPayment(
+        razorpayOrderId: result.orderId,
+        razorpayPaymentId: result.paymentId,
+        razorpaySignature: result.signature,
+      );
+      if (success && mounted) {
+        final sub = ref.read(subscriptionProvider).mySubscription;
+        _showSuccess(
+          plan.name,
+          sub?.expiresAt?.toIso8601String() ?? '',
+        );
+      }
+    } on RazorpayCheckoutException {
+      // user cancelled — no-op
     }
   }
 
@@ -208,8 +226,8 @@ class _SubscriptionManagementScreenState
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
+              context.pop();
+              context.pop();
             },
             child: const Text('Done', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.teal)),
           ),
@@ -462,117 +480,6 @@ class _PlanCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Coupon field ──────────────────────────────────────────────────────────────
-
-class _CouponField extends StatelessWidget {
-  final TextEditingController controller;
-  final bool loading;
-  final dynamic coupon;
-  final VoidCallback onValidate;
-  final VoidCallback onClear;
-
-  const _CouponField({
-    required this.controller,
-    required this.loading,
-    required this.coupon,
-    required this.onValidate,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isValid = coupon?.valid == true;
-    final isInvalid = coupon != null && coupon.valid == false;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Coupon code', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: context.inputBg,
-                  borderRadius: AppBorderRadius.lgAll,
-                  border: Border.all(
-                    color: isValid ? AppColors.teal : isInvalid ? AppColors.red : context.borderCol,
-                  ),
-                ),
-                child: TextField(
-                  controller: controller,
-                  style: TextStyle(fontSize: 14, color: context.primaryText),
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    hintText: 'e.g. SAVE20',
-                    hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    suffixIcon: controller.text.isNotEmpty
-                        ? GestureDetector(
-                            onTap: onClear,
-                            child: const Icon(Icons.close_rounded, size: 16, color: AppColors.textHint),
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: loading ? null : onValidate,
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.teal,
-                  borderRadius: AppBorderRadius.lgAll,
-                ),
-                alignment: Alignment.center,
-                child: loading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text('Apply', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
-        if (isValid) ...[
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 14),
-              const SizedBox(width: 6),
-              AppText.bodyXs(
-                coupon.discountType == 'PERCENTAGE'
-                    ? '${coupon.discountValue?.toStringAsFixed(0)}% off applied'
-                    : coupon.freePlanName != null
-                        ? 'Free ${coupon.freePlanName} plan applied'
-                        : 'Coupon applied',
-                color: AppColors.teal,
-              ),
-            ],
-          ),
-        ],
-        if (isInvalid) ...[
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 14),
-              const SizedBox(width: 6),
-              AppText.bodyXs(coupon.reason ?? 'Invalid coupon', color: AppColors.red),
-            ],
-          ),
-        ],
-      ],
     );
   }
 }

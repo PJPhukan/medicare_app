@@ -18,6 +18,8 @@ class AppAvatar extends StatelessWidget {
     this.color,
     this.borderColor,
     this.borderWidth = 0,
+    this.isVerified = false,
+    this.badgeColor,
     this.onTap,
   });
 
@@ -28,9 +30,11 @@ class AppAvatar extends StatelessWidget {
   final Color? color;
   final Color? borderColor;
   final double borderWidth;
+  final bool isVerified;
+  final Color? badgeColor;
   final VoidCallback? onTap;
 
-  static double _diameter(AppAvatarSize s) => switch (s) {
+  static double diameter(AppAvatarSize s) => switch (s) {
     AppAvatarSize.xs => 28,
     AppAvatarSize.sm => 36,
     AppAvatarSize.md => 44,
@@ -38,12 +42,28 @@ class AppAvatar extends StatelessWidget {
     AppAvatarSize.xl => 72,
   };
 
-  static double _fontSize(AppAvatarSize s) => switch (s) {
+  static double fontSize(AppAvatarSize s) => switch (s) {
     AppAvatarSize.xs => 10,
     AppAvatarSize.sm => 13,
     AppAvatarSize.md => 16,
     AppAvatarSize.lg => 20,
     AppAvatarSize.xl => 26,
+  };
+
+  static double _badgeDiameter(AppAvatarSize s) => switch (s) {
+    AppAvatarSize.xs => 12,
+    AppAvatarSize.sm => 14,
+    AppAvatarSize.md => 18,
+    AppAvatarSize.lg => 22,
+    AppAvatarSize.xl => 28,
+  };
+
+  static double _badgeIconSize(AppAvatarSize s) => switch (s) {
+    AppAvatarSize.xs => 7,
+    AppAvatarSize.sm => 8,
+    AppAvatarSize.md => 11,
+    AppAvatarSize.lg => 13,
+    AppAvatarSize.xl => 17,
   };
 
   String get _initials {
@@ -65,7 +85,7 @@ class AppAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final d  = _diameter(size);
+    final d  = diameter(size);
     final br = shape == AppAvatarShape.circle
         ? BorderRadius.circular(d)
         : AppBorderRadius.lgAll;
@@ -106,10 +126,37 @@ class AppAvatar extends StatelessWidget {
       );
     }
 
+    // Always reserve badge space so layout size is identical whether
+    // isVerified is true or false — prevents Row alignment shifts.
+    final badgeSize = _badgeDiameter(size);
+    final totalSize = d + (borderWidth * 2) + badgeSize * .4;
+
+    Widget result = SizedBox(
+      width: totalSize,
+      height: totalSize,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          avatar,
+          if (isVerified)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: _VerifiedBadge(
+                diameter: badgeSize,
+                iconSize: _badgeIconSize(size),
+                color: badgeColor ?? AppColors.teal,
+                borderColor: context.cardBg,
+              ),
+            ),
+        ],
+      ),
+    );
+
     if (onTap != null) {
-      return GestureDetector(onTap: onTap, child: avatar);
+      return GestureDetector(onTap: onTap, child: result);
     }
-    return avatar;
+    return result;
   }
 
   Widget _buildInitials(double d, Color bg) {
@@ -120,7 +167,7 @@ class AppAvatar extends StatelessWidget {
         child: Text(
           _initials,
           style: TextStyle(
-            fontSize: _fontSize(size),
+            fontSize: fontSize(size),
             fontWeight: FontWeight.w700,
             color: AppColors.textInverse,
           ),
@@ -130,67 +177,40 @@ class AppAvatar extends StatelessWidget {
   }
 }
 
-// ─── Avatar group ─────────────────────────────────────────────────────────────
+// ─── Verified badge ───────────────────────────────────────────────────────────
 
-class AppAvatarGroup extends StatelessWidget {
-  const AppAvatarGroup({
-    super.key,
-    required this.imageUrls,
-    this.names,
-    this.max = 3,
-    this.size = AppAvatarSize.sm,
-    this.overlap = 12,
+class _VerifiedBadge extends StatelessWidget {
+  const _VerifiedBadge({
+    required this.diameter,
+    required this.iconSize,
+    required this.color,
+    required this.borderColor,
   });
 
-  final List<String?> imageUrls;
-  final List<String?>? names;
-  final int max;
-  final AppAvatarSize size;
-  final double overlap;
+  final double diameter;
+  final double iconSize;
+  final Color color;
+  final Color borderColor;
 
   @override
   Widget build(BuildContext context) {
-    final shown = imageUrls.take(max).toList();
-    final extra = imageUrls.length - max;
-    final d = AppAvatar._diameter(size);
-
-    return SizedBox(
-      height: d,
-      width: d + (shown.length - 1 + (extra > 0 ? 1 : 0)) * (d - overlap),
-      child: Stack(
-        children: [
-          ...shown.asMap().entries.map((e) => Positioned(
-            left: e.key * (d - overlap),
-            child: AppAvatar(
-              imageUrl: e.value,
-              name: names?.elementAtOrNull(e.key),
-              size: size,
-              borderWidth: 2,
-            ),
-          )),
-          if (extra > 0)
-            Positioned(
-              left: shown.length * (d - overlap),
-              child: Container(
-                width: d, height: d,
-                decoration: BoxDecoration(
-                  color: context.borderCol,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: context.cardBg, width: 2),
-                ),
-                child: Center(
-                  child: Text(
-                    '+$extra',
-                    style: TextStyle(
-                      fontSize: AppAvatar._fontSize(size) - 1,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: .35),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
+      ),
+      child: Center(
+        child: Icon(Icons.check_rounded, size: iconSize, color: Colors.white),
       ),
     );
   }

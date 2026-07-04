@@ -17,6 +17,11 @@ import '../../domain/usecases/cancel_subscription_usecase.dart';
 import '../../domain/usecases/toggle_auto_renew_usecase.dart';
 import '../../domain/usecases/validate_coupon_usecase.dart';
 import '../../domain/usecases/apply_coupon_usecase.dart';
+import '../../domain/usecases/create_subscription_order_usecase.dart';
+import '../../domain/usecases/confirm_subscription_payment_usecase.dart';
+import '../../domain/usecases/get_available_coupons_usecase.dart';
+import '../../domain/entities/subscription_order_entity.dart';
+import '../../domain/entities/available_coupon_entity.dart';
 
 // ── DI providers ──────────────────────────────────────────────────────────────
 
@@ -68,11 +73,26 @@ final applyCouponProvider = Provider<ApplyCouponUseCase>((ref) {
   return ApplyCouponUseCase(ref.read(subscriptionRepositoryProvider));
 });
 
+final createSubscriptionOrderProvider = Provider<CreateSubscriptionOrderUseCase>((ref) {
+  ref.watch(authTokenProvider);
+  return CreateSubscriptionOrderUseCase(ref.read(subscriptionRepositoryProvider));
+});
+
+final confirmSubscriptionPaymentProvider = Provider<ConfirmSubscriptionPaymentUseCase>((ref) {
+  ref.watch(authTokenProvider);
+  return ConfirmSubscriptionPaymentUseCase(ref.read(subscriptionRepositoryProvider));
+});
+
+final getAvailableCouponsProvider = Provider<GetAvailableCouponsUseCase>(
+  (ref) => GetAvailableCouponsUseCase(ref.read(subscriptionRepositoryProvider)),
+);
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 class SubscriptionState {
   const SubscriptionState({
     this.plans = const [],
+    this.availableCoupons = const [],
     this.mySubscription,
     this.coupon,
     this.purchaseResult,
@@ -83,6 +103,7 @@ class SubscriptionState {
   });
 
   final List<PlanEntity> plans;
+  final List<AvailableCouponEntity> availableCoupons;
   final MySubscriptionEntity? mySubscription;
   final CouponEntity? coupon;
   final PurchaseResultEntity? purchaseResult;
@@ -96,6 +117,7 @@ class SubscriptionState {
 
   SubscriptionState copyWith({
     List<PlanEntity>? plans,
+    List<AvailableCouponEntity>? availableCoupons,
     MySubscriptionEntity? mySubscription,
     bool clearSubscription = false,
     CouponEntity? coupon,
@@ -110,6 +132,7 @@ class SubscriptionState {
   }) =>
       SubscriptionState(
         plans: plans ?? this.plans,
+        availableCoupons: availableCoupons ?? this.availableCoupons,
         mySubscription: clearSubscription ? null : mySubscription ?? this.mySubscription,
         coupon: clearCoupon ? null : coupon ?? this.coupon,
         purchaseResult: clearPurchaseResult ? null : purchaseResult ?? this.purchaseResult,
@@ -132,6 +155,9 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
     required ToggleAutoRenewUseCase toggleAutoRenew,
     required ValidateCouponUseCase validateCoupon,
     required ApplyCouponUseCase applyCoupon,
+    required CreateSubscriptionOrderUseCase createOrder,
+    required ConfirmSubscriptionPaymentUseCase confirmPayment,
+    required GetAvailableCouponsUseCase getAvailableCoupons,
   })  : _getPlans = getPlans,
         _getMine = getMySubscription,
         _selectPlan = selectPlan,
@@ -140,7 +166,10 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
         _toggleAutoRenew = toggleAutoRenew,
         _validateCoupon = validateCoupon,
         _applyCoupon = applyCoupon,
-        super(const SubscriptionState()) {
+        _createOrder = createOrder,
+        _confirmPayment = confirmPayment,
+        _getAvailableCoupons = getAvailableCoupons,
+        super(const SubscriptionState(isLoadingPlans: true, isLoadingMine: true)) {
     loadAll();
   }
 
@@ -152,9 +181,19 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
   final ToggleAutoRenewUseCase _toggleAutoRenew;
   final ValidateCouponUseCase _validateCoupon;
   final ApplyCouponUseCase _applyCoupon;
+  final CreateSubscriptionOrderUseCase _createOrder;
+  final ConfirmSubscriptionPaymentUseCase _confirmPayment;
+  final GetAvailableCouponsUseCase _getAvailableCoupons;
 
   Future<void> loadAll() async {
-    await Future.wait([loadPlans(), loadMySubscription()]);
+    await Future.wait([loadPlans(), loadMySubscription(), loadAvailableCoupons()]);
+  }
+
+  Future<void> loadAvailableCoupons() async {
+    try {
+      final coupons = await _getAvailableCoupons();
+      state = state.copyWith(availableCoupons: coupons);
+    } catch (_) {}
   }
 
   Future<void> loadPlans() async {
@@ -278,6 +317,53 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
     }
   }
 
+  Future<SubscriptionOrderEntity?> createOrder({
+    required String planId,
+    required String billingCycle,
+    String? couponCode,
+  }) async {
+    AppLogger.i('Create order → plan:$planId cycle:$billingCycle', tag: 'Subscription');
+    state = state.copyWith(isActing: true, clearError: true);
+    try {
+      final order = await _createOrder(
+        planId: planId,
+        billingCycle: billingCycle,
+        couponCode: couponCode,
+      );
+      state = state.copyWith(isActing: false);
+      return order;
+    } catch (e, s) {
+      AppLogger.e('Create order failed', tag: 'Subscription', error: e, stack: s);
+      state = state.copyWith(isActing: false, error: e.toString());
+      return null;
+    }
+  }
+
+  Future<bool> confirmPayment({
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  }) async {
+    AppLogger.i('Confirm payment → order:$razorpayOrderId', tag: 'Subscription');
+    state = state.copyWith(isActing: true, clearError: true);
+    try {
+      await _confirmPayment(
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: razorpayPaymentId,
+        razorpaySignature: razorpaySignature,
+      );
+      await loadMySubscription();
+      AppLogger.i('Payment confirmed ✓', tag: 'Subscription');
+      AppLogger.track('subscription.paid', meta: {'planId': razorpayOrderId});
+      state = state.copyWith(isActing: false);
+      return true;
+    } catch (e, s) {
+      AppLogger.e('Confirm payment failed', tag: 'Subscription', error: e, stack: s);
+      state = state.copyWith(isActing: false, error: e.toString());
+      return false;
+    }
+  }
+
   void clearCoupon() => state = state.copyWith(clearCoupon: true);
   void clearError() => state = state.copyWith(clearError: true);
 }
@@ -296,5 +382,8 @@ final subscriptionProvider =
     toggleAutoRenew: ref.read(toggleAutoRenewProvider),
     validateCoupon: ref.read(validateCouponProvider),
     applyCoupon: ref.read(applyCouponProvider),
+    createOrder: ref.read(createSubscriptionOrderProvider),
+    confirmPayment: ref.read(confirmSubscriptionPaymentProvider),
+    getAvailableCoupons: ref.read(getAvailableCouponsProvider),
   );
 });

@@ -66,7 +66,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         : 'your number';
 
     return AuthShell(
-      showBack: true,
+      leading: AppBarLeading.back,
       onBack: widget.onBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

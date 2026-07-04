@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// Password input with show / hide toggle.
 class AppPasswordInput extends StatefulWidget {
@@ -78,7 +79,7 @@ class _AppPasswordInputState extends State<AppPasswordInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
         Container(
@@ -104,9 +105,11 @@ class _AppPasswordInputState extends State<AppPasswordInput> {
               hintText: widget.hint ?? 'Enter password',
               hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
               prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.textSecondary),
-              suffixIcon: GestureDetector(
-                onTap: () => setState(() => _obscure = !_obscure),
-                child: Icon(
+              suffixIcon: IconButton(
+                // Tooltip describes what the button will do, not the current state.
+                tooltip: _obscure ? 'Show password' : 'Hide password',
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
                   _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                   size: 18,
                   color: AppColors.textSecondary,
@@ -136,10 +139,8 @@ class _AppPasswordInputState extends State<AppPasswordInput> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(_strengthLabel,
-                style: AppTypography.bodyXs.copyWith(
-                  color: _strengthColor, fontWeight: FontWeight.w600,
-                )),
+            AppText.bodyXs(_strengthLabel,
+                color: _strengthColor, fontWeight: FontWeight.w600),
           ]),
         ],
         if (hasError) ...[
@@ -147,15 +148,11 @@ class _AppPasswordInputState extends State<AppPasswordInput> {
           Row(children: [
             const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(
-              child: Text(widget.error!,
-                  style: AppTypography.bodyXs.copyWith(color: AppColors.error)),
-            ),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(widget.helper!,
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(widget.helper!),
         ],
       ],
     );

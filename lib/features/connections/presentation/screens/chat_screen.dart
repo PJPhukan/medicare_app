@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -138,7 +139,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         messageText: msg.text,
         reasonCtrl: reasonCtrl,
         onSubmit: () {
-          Navigator.pop(ctx);
+          ctx.pop();
           AppSnackbar.info(context, AppStrings.messageReported);
         },
       ),
@@ -160,7 +161,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             _ChatHeader(
               professionalName: widget.professionalName,
               specialty: widget.professionalSpecialty,
-              onBack: () => Navigator.pop(context),
+              onBack: () => context.pop(),
               onRate: _showRatingSheet,
             ),
 
@@ -438,7 +439,7 @@ class _RatingSheetState extends State<_RatingSheet> {
 
   void _submit() {
     if (_stars == 0) return;
-    Navigator.pop(context);
+    context.pop();
     AppSnackbar.success(context, AppStrings.ratingSubmitted);
   }
 
@@ -499,7 +500,8 @@ class _RatingSheetState extends State<_RatingSheet> {
           ),
           const SizedBox(height: 16),
 
-          AppButton.primary(
+          AppButton(
+            variant: AppButtonVariant.primary,
             label: AppStrings.submitRating,
             isFullWidth: true,
             onPressed: _stars > 0 ? _submit : null,
@@ -570,7 +572,8 @@ class _ReportSheet extends StatelessWidget {
               maxLength: 200,
             ),
             const SizedBox(height: 16),
-            AppButton.danger(
+            AppButton(
+              variant: AppButtonVariant.danger,
               label: AppStrings.submitReport,
               isFullWidth: true,
               onPressed: onSubmit,

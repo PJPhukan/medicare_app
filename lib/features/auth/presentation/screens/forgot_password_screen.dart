@@ -39,7 +39,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     if (err != null) { setState(() => _idError = err); return; }
     final id = _idCtrl.text.trim();
     try {
-      await ref.read(authProvider.notifier).forgotPassword(id);
+      await ref.read(authProvider.notifier).forgotPassword(identifier: id);
       widget.onSent(id);
     } catch (_) {}
   }
@@ -53,7 +53,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     final isLoading = authState.isLoading;
 
     return AuthShell(
-      showBack: true,
+      leading: AppBarLeading.back,
       onBack: widget.onBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

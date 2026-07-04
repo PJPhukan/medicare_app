@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
@@ -26,6 +28,7 @@ import '../../../emergency/presentation/screens/emergency_screen.dart';
 import '../../../reminders/presentation/screens/reminders_screen.dart';
 import '../../../patients/presentation/screens/patients_screen.dart';
 import '../../../caretakers/presentation/screens/caretakers_screen.dart';
+import '../../../community/presentation/screens/community_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
 import '../../../professional_profile/presentation/screens/pro_hub_screen.dart';
 import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
@@ -67,6 +70,7 @@ const _slugMeta = <String, _SlugMeta>{
   'emergency':     _SlugMeta(outlineIcon: Icons.emergency_outlined, filledIcon: Icons.emergency_rounded, color: AppColors.red, section: 'Emergency'),
   'patients':      _SlugMeta(outlineIcon: Icons.people_alt_outlined, filledIcon: Icons.people_alt_rounded, color: AppColors.teal, section: 'People & Care'),
   'caretakers':    _SlugMeta(outlineIcon: Icons.supervisor_account_outlined, filledIcon: Icons.supervisor_account_rounded, color: AppColors.blue, section: 'People & Care'),
+  'community':     _SlugMeta(outlineIcon: Icons.groups_outlined, filledIcon: Icons.groups_rounded, color: AppColors.green, section: 'People & Care'),
   'notes':         _SlugMeta(outlineIcon: Icons.sticky_note_2_outlined, filledIcon: Icons.sticky_note_2_rounded, color: AppColors.amber, section: 'People & Care'),
   'settings':      _SlugMeta(outlineIcon: Icons.settings_outlined, filledIcon: Icons.settings_rounded, color: AppColors.textSecondary, section: 'People & Care'),
   'profile':       _SlugMeta(outlineIcon: Icons.person_outline_rounded, filledIcon: Icons.person_rounded, color: AppColors.blue, section: 'Overview'),
@@ -96,6 +100,7 @@ Widget? _pushScreenForSlug(String slug) => switch (slug) {
   'emergency'     => const EmergencyScreen(),
   'patients'      => const PatientsScreen(),
   'caretakers'    => const CaretakersScreen(),
+  'community'     => const CommunityScreen(),
   'notes'         => const NotesScreen(),
   'settings'      => const SettingsScreen(),
   'profile'       => const ProfileScreen(),
@@ -113,6 +118,16 @@ Widget? _pushScreenForSlug(String slug) => switch (slug) {
 // (easy to forget when configuring in admin). Resolve slugs tolerantly so a
 // missing or extra leading slash never silently hides a tab.
 String _stripSlash(String s) => s.startsWith('/') ? s.substring(1) : s;
+
+// Map sidebar-only slugs to go_router routes (tabs handled separately)
+String? _slugToRoute(String slug) => switch (_stripSlash(slug)) {
+  'profile'                              => AppRoutes.profile,
+  'settings'                             => AppRoutes.settings,
+  'pro-profile' || 'professional-profile' => AppRoutes.settingsProHub,
+  'connections'                          => AppRoutes.professionalsConnections,
+  'help' || 'support' || 'privacy'       => AppRoutes.support,
+  _                                      => null,
+};
 
 _SlugMeta? _metaForSlug(String slug) =>
     _slugMeta[slug] ??
@@ -150,10 +165,10 @@ bool _isProGated(String slug, String tabType) =>
     tabType == 'ROLE_ONLY' || _isProGatedSlug(slug);
 
 // Fallback CORE tabs when backend is unavailable
-const _fallbackSlugs = ['home', 'medicines', 'vitals', 'professionals', 'messages'];
+const _fallbackSlugs = ['home', 'medicines', 'vitals', 'professionals', 'settings'];
 const _fallbackLabels = [
   AppStrings.tabHome, AppStrings.tabMedicines, AppStrings.tabVitals,
-  AppStrings.tabProfessionals, AppStrings.tabMessages,
+  AppStrings.tabProfessionals, AppStrings.tabSettings,
 ];
 
 // ─── Active core tab ──────────────────────────────────────────────────────────
@@ -213,9 +228,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     } else {
       final ctx = appShellKey.currentContext;
       if (ctx == null) return;
-      Navigator.of(ctx).push(
-        MaterialPageRoute(builder: (_) => const _ComingSoonScreen()),
-      );
+      final route = _slugToRoute(slug);
+      if (route != null) ctx.push(route);
     }
   }
 
@@ -615,13 +629,9 @@ class _AppSidebar extends ConsumerWidget {
                                 Scaffold.of(context).closeDrawer();
                                 showFeedbackSheet(context);
                               } else {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => _resolveScreen(tab.slug) ?? const _ComingSoonScreen(),
-                                  ),
-                                );
+                                Scaffold.of(context).closeDrawer();
+                                final route = _slugToRoute(tab.slug);
+                                if (route != null) context.push(route);
                               }
                             },
                           );
@@ -677,7 +687,11 @@ class _AppSidebar extends ConsumerWidget {
                 title: const Text('Sign Out',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0, color: AppColors.red)),
                 onTap: () {
-                  Navigator.pop(context);
+                  // Capture the notifier before closing the drawer — the drawer's
+                  // animation disposes this ConsumerWidget's ref, making a late
+                  // ref.read() on it silently fail inside the dialog callback.
+                  final authNotifier = ref.read(authProvider.notifier);
+                  Scaffold.of(context).closeDrawer();
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
@@ -688,14 +702,14 @@ class _AppSidebar extends ConsumerWidget {
                           color: AppColors.textSecondary),
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.pop(ctx),
+                          onPressed: () => ctx.pop(),
                           child: const Text(AppStrings.cancel,
                               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.textSecondary)),
                         ),
                         TextButton(
                           onPressed: () {
-                            Navigator.pop(ctx);
-                            ref.read(authProvider.notifier).logout();
+                            ctx.pop();
+                            authNotifier.logout();
                           },
                           child: const Text('Sign Out',
                               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: AppColors.red)),
@@ -749,7 +763,7 @@ class _SidebarSection extends StatelessWidget {
               ],
               Text(
                 label.toUpperCase(),
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: labelColor),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: labelColor),
               ),
             ],
           ),
@@ -793,8 +807,8 @@ class _SidebarItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        margin: const EdgeInsets.only(bottom: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: AppBorderRadius.mdAll,
           color: isActive
@@ -824,7 +838,7 @@ class _SidebarItem extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 16,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                   letterSpacing: 0,
                   color: isActive
@@ -995,9 +1009,9 @@ class _ComingSoonScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 28),
-                if (Navigator.canPop(context))
+                if (context.canPop())
                   OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => context.pop(),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.teal,
                       side: const BorderSide(color: AppColors.teal, width: 1.5),

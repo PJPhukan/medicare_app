@@ -241,7 +241,8 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
                 AppText.bodySm('${AppStrings.sosSendingIn} $_count…',
                     color: AppColors.textSecondary),
                 const SizedBox(height: 10),
-                AppButton.outline(
+                AppButton(
+                  variant: AppButtonVariant.outline,
                   label: AppStrings.cancel,
                   size: AppButtonSize.sm,
                   onPressed: _cancel,
@@ -283,7 +284,8 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                AppButton.outline(
+                AppButton(
+                  variant: AppButtonVariant.outline,
                   label: AppStrings.dismiss,
                   size: AppButtonSize.sm,
                   onPressed: _dismiss,

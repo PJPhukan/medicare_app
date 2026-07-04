@@ -8,7 +8,7 @@ class AlertsRemoteDataSource {
 
   Future<List<Alert>> getAlerts() async {
     final res = await _dio.get<Map<String, dynamic>>('/alerts');
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Alert.fromJson(e as Map<String, dynamic>))
         .toList();

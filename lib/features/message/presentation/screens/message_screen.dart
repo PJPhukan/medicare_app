@@ -9,7 +9,9 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/conversation_entity.dart';
 import '../providers/message_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import 'thread_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/router/route_args.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 
 class MessageScreen extends ConsumerStatefulWidget {
@@ -102,13 +104,11 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                         child: _ConvTile(
                           conv: conv,
                           contactName: name,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ThreadScreen(
-                                conversationId: conv.id,
-                                contactName: name,
-                              ),
+                          onTap: () => context.push(
+                            AppRoutes.thread,
+                            extra: ThreadArgs(
+                              conversationId: conv.id,
+                              contactName: name,
                             ),
                           ),
                         ),

@@ -66,7 +66,8 @@ class RemindersNotifier extends StateNotifier<RemindersState> {
         schedules: schedules,
         userName: _userName,
       );
-    } on Exception catch (e) {
+    } catch (e, s) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

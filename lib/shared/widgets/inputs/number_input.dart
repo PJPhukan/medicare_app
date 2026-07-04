@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// Numeric input with optional min / max clamping, unit suffix, and
 /// increment / decrement arrow buttons.
@@ -86,7 +87,7 @@ class _AppNumberInputState extends State<AppNumberInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
         Container(
@@ -124,9 +125,8 @@ class _AppNumberInputState extends State<AppNumberInput> {
                     hintText: widget.hint ?? '0',
                     hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
                     suffix: widget.unit != null
-                        ? Text(widget.unit!,
-                            style: AppTypography.bodySm
-                                .copyWith(color: AppColors.textSecondary))
+                        ? AppText.bodySm(widget.unit!,
+                            color: AppColors.textSecondary)
                         : null,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -154,12 +154,11 @@ class _AppNumberInputState extends State<AppNumberInput> {
           Row(children: [
             const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(child: Text(widget.error!,
-                style: AppTypography.bodyXs.copyWith(color: AppColors.error))),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(widget.helper!, style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(widget.helper!),
         ],
       ],
     );
@@ -183,7 +182,7 @@ class _StepBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: enabled ? onTap : null,
       child: Container(
         width: 42,
@@ -193,8 +192,11 @@ class _StepBtn extends StatelessWidget {
               ? Border(right: BorderSide(color: border))
               : Border(left: BorderSide(color: border)),
         ),
-        child: Icon(icon, size: 18,
-            color: enabled ? AppColors.teal : AppColors.textHint),
+        child: Icon(
+          icon,
+          size: 18,
+          color: enabled ? AppColors.teal : AppColors.textHint,
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/api/client.dart';
@@ -9,13 +10,10 @@ import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
-import '../../domain/usecases/login_usecase.dart';
-import '../../domain/usecases/logout_usecase.dart';
-import '../../domain/usecases/verify_otp_usecase.dart';
 
 // ── Auth state ────────────────────────────────────────────────────────────────
 
-class AuthState {
+class AuthState extends Equatable {
   const AuthState({this.token, this.user, this.isLoading = false, this.error});
 
   final String? token;
@@ -39,19 +37,18 @@ class AuthState {
         isLoading: isLoading ?? this.isLoading,
         error: clearError ? null : (error ?? this.error),
       );
+
+  @override
+  List<Object?> get props => [token, user, isLoading, error];
 }
 
 // ── Auth notifier ─────────────────────────────────────────────────────────────
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._login, this._logout, this._verifyOtp, this._repo)
-      : super(const AuthState()) {
+  AuthNotifier(this._repo) : super(const AuthState()) {
     initialized = _init();
   }
 
-  final LoginUseCase _login;
-  final LogoutUseCase _logout;
-  final VerifyOtpUseCase _verifyOtp;
   final AuthRepository _repo;
 
   /// Completes once the cached token/user have been loaded from secure storage.
@@ -68,6 +65,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  void _setAuthenticated(AuthSession result) {
+    state = AuthState(token: result.token, user: result.user);
+  }
+
   Future<void> loginWithPassword({
     required String identifier,
     required String password,
@@ -75,8 +76,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     AppLogger.i('Login attempt (password)', tag: 'Auth');
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final result = await _login(identifier: identifier, password: password);
-      state = AuthState(token: result.token, user: result.user);
+      final result = await _repo.login(identifier: identifier, password: password);
+      _setAuthenticated(result);
       AppLogger.i('Login success → uid:${result.user.id}', tag: 'Auth');
       AppLogger.track('auth.login');
     } on Exception catch (e, s) {
@@ -112,8 +113,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     AppLogger.i('OTP verify attempt', tag: 'Auth');
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final result = await _verifyOtp(identifier: identifier, otp: otp);
-      state = AuthState(token: result.token, user: result.user);
+      final result = await _repo.verifyOtp(identifier: identifier, otp: otp);
+      _setAuthenticated(result);
       AppLogger.i('OTP verified → uid:${result.user.id}', tag: 'Auth');
       AppLogger.track('auth.otp_verified');
     } on Exception catch (e, s) {
@@ -138,7 +139,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         phone: phone,
         password: password,
       );
-      state = AuthState(token: result.token, user: result.user);
+      _setAuthenticated(result);
       AppLogger.i('Register success → uid:${result.user.id}', tag: 'Auth');
       AppLogger.track('auth.register');
     } on Exception catch (e, s) {
@@ -148,11 +149,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> forgotPassword(String identifier) async {
+  Future<void> forgotPassword({required String identifier}) async {
     AppLogger.i('Forgot password request', tag: 'Auth');
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      await _repo.forgotPassword(identifier);
+      await _repo.forgotPassword(identifier: identifier);
       state = state.copyWith(isLoading: false);
       AppLogger.i('Forgot password OTP sent ✓', tag: 'Auth');
     } on Exception catch (e, s) {
@@ -183,7 +184,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     AppLogger.i('Logout → uid:${state.user?.id}', tag: 'Auth');
     AppLogger.track('auth.logout');
-    await _logout();
+    await _repo.logout();
     state = const AuthState();
     AppLogger.i('Logged out ✓', tag: 'Auth');
   }
@@ -199,7 +200,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     AppLogger.i('Session expired (401) → signing out', tag: 'Auth');
     try {
       try {
-        await _logout(); // best-effort server logout; ignore failures
+        await _repo.logout(); // best-effort server logout; ignore failures
       } catch (_) {}
       state = const AuthState();
     } finally {
@@ -208,9 +209,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _msg(Exception e) {
-    if (e is DioException) {
-      return e.message ?? 'An unexpected error occurred';
-    }
+    if (e is DioException) return e.message ?? 'An unexpected error occurred';
     return e.toString();
   }
 }
@@ -236,27 +235,9 @@ final authRepositoryProvider = Provider<AuthRepository>(
   ),
 );
 
-final _loginUseCaseProvider = Provider<LoginUseCase>(
-  (ref) => LoginUseCase(ref.read(authRepositoryProvider)),
-);
-
-final _logoutUseCaseProvider = Provider<LogoutUseCase>(
-  (ref) => LogoutUseCase(ref.read(authRepositoryProvider)),
-);
-
-final _verifyOtpUseCaseProvider = Provider<VerifyOtpUseCase>(
-  (ref) => VerifyOtpUseCase(ref.read(authRepositoryProvider)),
-);
-
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
   (ref) {
-    final notifier = AuthNotifier(
-      ref.read(_loginUseCaseProvider),
-      ref.read(_logoutUseCaseProvider),
-      ref.read(_verifyOtpUseCaseProvider),
-      ref.read(authRepositoryProvider),
-    );
-    // Sign out automatically when any request reports an expired session (401).
+    final notifier = AuthNotifier(ref.read(authRepositoryProvider));
     SessionEvents.instance.onUnauthorized = notifier.handleSessionExpired;
     return notifier;
   },

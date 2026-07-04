@@ -10,7 +10,7 @@ class CaretakersRemoteDataSource {
   Future<List<Caretaker>> getCaretakers() async {
     final res =
         await _dio.get<Map<String, dynamic>>(ApiConstants.myCaretakers);
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Caretaker.fromJson(e as Map<String, dynamic>))
         .toList();

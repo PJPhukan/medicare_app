@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
-import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../widgets/auth_shell.dart';
@@ -14,11 +14,13 @@ class QuizScreen extends StatefulWidget {
     required this.draft,
     required this.onContinue,
     required this.onBack,
+    required this.onDraftChanged,
   });
 
   final AuthDraft draft;
   final VoidCallback onContinue;
   final VoidCallback onBack;
+  final void Function(AuthDraft) onDraftChanged;
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -27,7 +29,6 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> {
   late final TextEditingController _ageCtrl;
   String _bloodGroup = '';
-  String? _ageError;
 
   @override
   void initState() {
@@ -43,17 +44,19 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _continue() {
-    final err = Validators.age(_ageCtrl.text);
-    if (err != null) { setState(() => _ageError = err); return; }
-    widget.draft.age        = _ageCtrl.text.trim();
-    widget.draft.bloodGroup = _bloodGroup;
+    final age = _ageCtrl.text.trim();
+    if (Validators.age(age) != null) return;
+    widget.onDraftChanged(widget.draft.copyWith(
+      age: age,
+      bloodGroup: _bloodGroup,
+    ));
     widget.onContinue();
   }
 
   @override
   Widget build(BuildContext context) {
     return AuthShell(
-      showBack: true,
+      leading: AppBarLeading.back,
       onBack: widget.onBack,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -62,66 +65,34 @@ class _QuizScreenState extends State<QuizScreen> {
           const Center(child: AppBrand()),
           const SizedBox(height: 16),
 
-          AuthStepper(
-              steps: const ['Account', 'Health', 'Emergency', 'Plan'], current: 1),
-
           Center(
             child: Column(
               children: [
                 AppText.h1(AppStrings.quizTitle, fontWeight: FontWeight.w800),
                 const SizedBox(height: 6),
-                AppText.bodyMd(AppStrings.quizSubtitle, color: AppColors.textSecondary, textAlign: TextAlign.center),
+                AppText.bodyMd(AppStrings.quizSubtitle,
+                    color: AppColors.textSecondary, textAlign: TextAlign.center),
               ],
             ),
           ),
+
           const SizedBox(height: 28),
 
-          AppText.labelSm(AppStrings.yourAge, color: AppColors.textSecondary),
-          const SizedBox(height: 8),
-
-          AnimatedBuilder(
-            animation: _ageCtrl,
-            builder: (_, __) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Intentionally large custom age input — no generic equivalent
-                TextField(
-                  controller: _ageCtrl,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 3,
-                  onChanged: (_) => setState(() => _ageError = null),
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: AppStrings.ageHint,
-                    hintStyle: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.borderCol),
-                    filled: true,
-                    fillColor: context.inputBg,
-                    counterText: '',
-                    contentPadding: const EdgeInsets.symmetric(vertical: 18),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: _ageError != null
-                            ? AppColors.error
-                            : context.borderCol,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: _ageError != null ? AppColors.error : AppColors.teal,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-                if (_ageError != null) ...[
-                  const SizedBox(height: 4),
-                  AppText.labelSm(_ageError!, color: AppColors.error),
-                ],
-              ],
-            ),
+          ValueListenableBuilder(
+            valueListenable: _ageCtrl,
+            builder: (_, __, ___) {
+              final age   = _ageCtrl.text.trim();
+              final error = Validators.age(age);
+              return AppTextField(
+                controller:      _ageCtrl,
+                label:           AppStrings.yourAge,
+                hint:            AppStrings.ageHint,
+                keyboardType:    TextInputType.number,
+                maxLength:       3,
+                errorText:       age.isNotEmpty ? error : null,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              );
+            },
           ),
           const SizedBox(height: 24),
 
@@ -140,11 +111,11 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
           const SizedBox(height: 32),
 
-          AnimatedBuilder(
-            animation: _ageCtrl,
-            builder: (_, __) => AuthButton(
-              label: AppStrings.continueText,
-              enabled: _ageCtrl.text.trim().isNotEmpty,
+          ValueListenableBuilder(
+            valueListenable: _ageCtrl,
+            builder: (_, __, ___) => AuthButton(
+              label:     AppStrings.continueText,
+              enabled:   Validators.age(_ageCtrl.text.trim()) == null,
               onPressed: _continue,
             ),
           ),

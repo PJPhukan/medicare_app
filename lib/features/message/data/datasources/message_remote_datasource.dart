@@ -12,7 +12,7 @@ class MessageRemoteDataSource {
     final res = await _dio.get<Map<String, dynamic>>(
       ApiConstants.conversations,
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Conversation.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -22,7 +22,7 @@ class MessageRemoteDataSource {
     final res = await _dio.get<Map<String, dynamic>>(
       '${ApiConstants.users}/messages/conversations/$conversationId/messages',
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Message.fromJson(e as Map<String, dynamic>))
         .toList();

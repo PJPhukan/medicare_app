@@ -4,7 +4,7 @@ abstract class ApiConstants {
   // or for a LAN device: `--dart-define=API_BASE_URL=http://192.168.x.x:4000`
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.29.232:4000',
+    defaultValue: 'http://192.168.29.210:4000',
   );
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ abstract class ApiConstants {
   // ── Vitals ────────────────────────────────────────────────────────────────
   static const String vitalConfigs = '/api/vitals';
   static const String myVitals = '/api/vitals/me';
+  static String vitalHistory(String configId) => '/api/vitals/me/$configId/history';
 
   // ── Reminders / Schedule ──────────────────────────────────────────────────
   static const String reminderSchedules = '/api/reminders/schedules';
@@ -64,6 +65,9 @@ abstract class ApiConstants {
   static const String myCaretakers = '/api/patients/my-caretakers';
   static const String myMedicalProfile = '/api/patients/my-profile';
 
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+  static const String dashboard = '/api/dashboard';
+
   // ── Banners ───────────────────────────────────────────────────────────────
   static const String bannerConfig = '/api/banners/config';
 
@@ -77,6 +81,9 @@ abstract class ApiConstants {
   static const String autoRenew = '/api/subscriptions/auto-renew';
   static const String validateCoupon = '/api/subscriptions/coupon/validate';
   static const String applyCoupon = '/api/subscriptions/coupon/apply';
+  static const String availableCoupons = '/api/subscriptions/coupons/available';
+  static const String createSubscriptionOrder = '/api/subscriptions/create-order';
+  static const String confirmSubscriptionPayment = '/api/subscriptions/confirm-payment';
 
   // ── Users ─────────────────────────────────────────────────────────────────
   static const String users = '/api/users';
@@ -84,7 +91,8 @@ abstract class ApiConstants {
   static const String userProfile = '/api/users/me';
   static const String userAvatar = '/api/users/me/avatar';
 
-  // ── Emergency contacts ────────────────────────────────────────────────────
+  // ── Emergency ─────────────────────────────────────────────────────────────
+  static const String emergencyProfile  = '/api/emergency/profile';
   static const String emergencyContacts = '/api/emergency/contacts';
 
   // ── Messages ──────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,7 +102,7 @@ class _AddVitalScreenState extends ConsumerState<AddVitalScreen> {
             notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           );
       if (mounted) {
-        Navigator.pop(context);
+        context.pop();
         AppSnackbar.success(context, '${config.name} reading saved.');
       }
     } catch (e) {
@@ -143,7 +144,7 @@ class _AddVitalScreenState extends ConsumerState<AddVitalScreen> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => context.pop(),
             child: Padding(
               padding: const EdgeInsets.only(left: 8),
               child: Icon(Icons.close_rounded, color: context.primaryText),

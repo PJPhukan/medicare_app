@@ -55,6 +55,26 @@ class VitalsRepositoryImpl implements VitalsRepository {
   }
 
   @override
+  Future<({List<VitalReadingEntity> readings, String? nextCursor})>
+      getVitalHistory({
+    required String configId,
+    required String filter,
+    String? cursor,
+    int limit = 20,
+  }) async {
+    final result = await _ds.getVitalHistory(
+      configId: configId,
+      filter: filter,
+      cursor: cursor,
+      limit: limit,
+    );
+    return (
+      readings: result.readings,
+      nextCursor: result.nextCursor,
+    );
+  }
+
+  @override
   Future<VitalReadingEntity> updateReading({
     required String id,
     required List<Map<String, dynamic>> values,

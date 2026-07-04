@@ -8,12 +8,13 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../data/models/banner_config.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
-import '../../../notifications/presentation/screens/notifications_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/graphs/charts.dart';
 import '../../../../shared/widgets/skeleton/skeleton.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../providers/dashboard_provider.dart';
+import '../../../../core/services/firebase_messaging_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
 import '../../../schedule/data/models/appointment_model.dart' as dash_model;
@@ -109,17 +110,12 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  BannerConfig? _bannerConfig;
-
   @override
   void initState() {
     super.initState();
-    _loadBanners();
-  }
-
-  Future<void> _loadBanners() async {
-    final c = await BannerConfig.fetch();
-    if (mounted) setState(() => _bannerConfig = c);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FirebaseMessagingService.requestPermission();
+    });
   }
 
   String get _greeting {
@@ -154,13 +150,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ? 100
             : ((takenCount / doses.length) * 100).round();
 
+    // Show a non-blocking error banner when the dashboard fails to load so the
+    // user knows to pull-to-refresh rather than wondering why data is missing.
+    if (!isLoading && state.error != null && state.stats == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Dashboard failed to load — pull down to retry'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => ref.read(dashboardProvider.notifier).load(),
+          ),
+          duration: const Duration(seconds: 6),
+        ));
+      });
+    }
+
     return Scaffold(
       backgroundColor: context.bg,
       body: RefreshIndicator(
-        onRefresh: () => Future.wait([
-          ref.read(dashboardProvider.notifier).load(),
-          _loadBanners(),
-        ]),
+        onRefresh: () => ref.read(dashboardProvider.notifier).load(),
         child: CustomScrollView(
           slivers: [
 
@@ -188,13 +197,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 _NotifBell(count: stats?.unreadNotifications ?? 0),
                 const SizedBox(width: 6),
                 GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                  ),
+                  onTap: () => context.push(AppRoutes.profile),
                   child: Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: AppVerifiedAvatar(
+                    child: AppAvatar(
                       name: user?.displayName ?? '',
                       imageUrl: user?.avatarUrl,
                       isVerified: isVerifiedPro,
@@ -213,11 +219,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   alignment: Alignment.center,
                   child: FractionallySizedBox(
                     widthFactor: 0.98,
-                    child: _bannerConfig == null
+                    child: isLoading
                         ? const BannerCarouselSkeleton()
-                        : _bannerConfig!.shouldShow
-                            ? _BannerCarousel(banners: _bannerConfig!.banners)
-                            : const SizedBox.shrink(),
+                        : _BannerCarousel(
+                            banners: state.banners.isNotEmpty
+                                ? state.banners
+                                : kFallbackBanners,
+                          ),
                   ),
                 ),
               ),
@@ -456,10 +464,7 @@ class _NotifBell extends StatelessWidget {
           icon: const Icon(Icons.notifications_outlined, size: 28),
           color: context.secondaryText,
           backgroundColor: Colors.transparent,
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-          ),
+          onPressed: () => context.push(AppRoutes.notifications),
         ),
         if (count > 0)
           Positioned(
@@ -536,14 +541,20 @@ class _StatCard extends StatelessWidget {
                       padding: const EdgeInsets.all(8),
                       child: Icon(icon, size: 17, color: color),
                     ),
-                    const Spacer(),
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: color,
-                        height: 1,
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          value,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: color,
+                            height: 1,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -866,7 +877,10 @@ class _BannerCarouselState extends State<_BannerCarousel> {
             controller: _ctrl,
             itemCount: widget.banners.length,
             onPageChanged: (i) => setState(() => _page = i),
-            itemBuilder: (_, i) => _BannerCard(banner: widget.banners[i]),
+            itemBuilder: (_, i) => _BannerCard(
+                  banner: widget.banners[i],
+                  fallback: kFallbackBanners[i % kFallbackBanners.length],
+                ),
           ),
         ),
         if (widget.banners.length > 1) ...[
@@ -895,8 +909,9 @@ class _BannerCarouselState extends State<_BannerCarousel> {
 }
 
 class _BannerCard extends StatelessWidget {
-  const _BannerCard({required this.banner});
+  const _BannerCard({required this.banner, required this.fallback});
   final DashboardBanner banner;
+  final DashboardBanner fallback;
 
   @override
   Widget build(BuildContext context) {
@@ -919,7 +934,7 @@ class _BannerCard extends StatelessWidget {
               ),
             ),
           ),
-          errorWidget: (_, __, ___) => _GradientBanner(banner: banner),
+          errorWidget: (_, __, ___) => _GradientBanner(banner: fallback),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../../../core/theme/app_colors.dart';
@@ -52,7 +53,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
     if (_rating < 0) return;
     setState(() => _submitted = true);
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) Navigator.pop(context);
+      if (mounted) context.pop();
     });
   }
 

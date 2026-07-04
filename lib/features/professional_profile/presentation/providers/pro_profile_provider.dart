@@ -68,7 +68,7 @@ class ProProfileNotifier extends StateNotifier<ProProfileState> {
       state = state.copyWith(profile: entity, isLoading: false, notFound: false);
       return entity;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      if (mounted) state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
   }
@@ -90,6 +90,7 @@ class ProProfileNotifier extends StateNotifier<ProProfileState> {
       );
     } on Exception catch (e, s) {
       AppLogger.e('Pro profile load failed', tag: 'ProProfile', error: e, stack: s);
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

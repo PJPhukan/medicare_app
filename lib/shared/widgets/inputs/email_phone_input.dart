@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../../core/data/country_codes.dart';
 import '../../../core/theme/app_colors.dart';
@@ -168,7 +169,7 @@ class _AppEmailPhoneInputState extends State<AppEmailPhoneInput> {
                   onChanged: _onChanged,
                   style: AppTypography.bodyMd,
                   decoration: InputDecoration(
-                    hintText: widget.hint ?? 'Email or mobile number',
+                    hintText: widget.hint ,
                     hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
                     filled: true,
                     fillColor: context.inputBg,
@@ -272,7 +273,7 @@ class _CountryPickerButton extends StatelessWidget {
         selected: selected,
         onSelect: (c) {
           onSelected(c);
-          Navigator.pop(context);
+          context.pop();
         },
       ),
     );
@@ -346,7 +347,7 @@ class _CountrySheetState extends State<_CountrySheet> {
                       style: AppTypography.h3.copyWith(fontSize: 17)),
                 ),
                 GestureDetector(
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => context.pop(),
                   child: const Icon(Icons.close_rounded, size: 20),
                 ),
               ],

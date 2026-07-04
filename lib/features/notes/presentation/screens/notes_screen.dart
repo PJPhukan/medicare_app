@@ -8,7 +8,8 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/note_entity.dart';
 import '../providers/notes_provider.dart';
-import 'note_editor_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 
 // ─── Mutable view-model used by NoteEditorScreen ─────────────────────────────
 
@@ -82,10 +83,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       colour: _hexToColor(entity.color),
       updatedAt: DateTime.tryParse(entity.updatedAt ?? entity.createdAt) ?? DateTime.now(),
     );
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => NoteEditorScreen(note: nd)),
-    );
+    await context.push(AppRoutes.noteEditor, extra: nd);
     if (!mounted) return;
     await ref.read(notesProvider.notifier).updateNote(
           id: entity.id,
@@ -103,10 +101,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       colour: _kPalette[0],
       updatedAt: DateTime.now(),
     );
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => NoteEditorScreen(note: nd)),
-    );
+    await context.push(AppRoutes.noteEditor, extra: nd);
     if (!mounted) return;
     if (nd.title.isEmpty && nd.content.isEmpty) return;
     await ref.read(notesProvider.notifier).createNote(

@@ -1,8 +1,8 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -15,6 +15,7 @@ import '../../domain/entities/medicine_entity.dart';
 // ─── Mock data model ──────────────────────────────────────────────────────────
 
 enum _MedScope { personal, sharedMaster, sharedMember }
+
 enum _MedStatus { active, lowStock, prn }
 
 class _Med {
@@ -42,7 +43,6 @@ class _Med {
     this.status = _MedStatus.active,
   });
 }
-
 
 // ─── Dose timeline helpers ────────────────────────────────────────────────────
 
@@ -143,7 +143,8 @@ class MedicinesScreen extends ConsumerStatefulWidget {
   ConsumerState<MedicinesScreen> createState() => _MedicinesScreenState();
 }
 
-class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerProviderStateMixin {
+class _MedicinesScreenState extends ConsumerState<MedicinesScreen>
+    with TickerProviderStateMixin {
   final _searchCtrl = TextEditingController();
   bool _isGrid = true;
   int _statusFilter = 0; // 0=All, 1=Active, 2=LowStock, 3=PRN
@@ -172,13 +173,18 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
     final meds = _allMeds;
     return meds.where((m) {
       if (_scopeFilter == 'mine' && m.scope != _MedScope.personal) return false;
-      if (_scopeFilter == 'shared' && m.scope != _MedScope.sharedMaster) return false;
-      if (_scopeFilter == 'assigned' && m.scope != _MedScope.sharedMember) return false;
+      if (_scopeFilter == 'shared' && m.scope != _MedScope.sharedMaster) {
+        return false;
+      }
+      if (_scopeFilter == 'assigned' && m.scope != _MedScope.sharedMember) {
+        return false;
+      }
       if (_statusFilter == 1 && m.status != _MedStatus.active) return false;
       if (_statusFilter == 2 && m.status != _MedStatus.lowStock) return false;
       if (_statusFilter == 3 && m.status != _MedStatus.prn) return false;
       if (q.isNotEmpty) {
-        return m.name.toLowerCase().contains(q) || m.genericName.toLowerCase().contains(q);
+        return m.name.toLowerCase().contains(q) ||
+            m.genericName.toLowerCase().contains(q);
       }
       return true;
     }).toList();
@@ -237,9 +243,9 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (_, setLocal) {
-          final isDark    = Theme.of(context).brightness == Brightness.dark;
-          final bg        = isDark ? context.cardBg : Colors.white;
-          final border    = isDark ? context.borderCol : AppColors.light300;
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final bg = isDark ? context.cardBg : Colors.white;
+          final border = isDark ? context.borderCol : AppColors.light300;
           final bottomPad = MediaQuery.paddingOf(context).bottom;
 
           Widget filterChip(String label, bool selected, VoidCallback onTap) =>
@@ -247,7 +253,8 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                 onTap: onTap,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   decoration: BoxDecoration(
                     color: selected ? AppColors.teal : Colors.transparent,
                     borderRadius: AppBorderRadius.pill,
@@ -259,7 +266,8 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : AppColors.textSecondary,
+                        color:
+                            selected ? Colors.white : AppColors.textSecondary,
                         letterSpacing: 0,
                       )),
                 ),
@@ -269,7 +277,8 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
             padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 24),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -278,10 +287,12 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                 // Drag handle
                 Center(
                   child: Container(
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     margin: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: border, borderRadius: AppBorderRadius.pill,
+                      color: border,
+                      borderRadius: AppBorderRadius.pill,
                     ),
                   ),
                 ),
@@ -311,11 +322,16 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                     )),
                 const SizedBox(height: 10),
                 Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: _statusLabels.asMap().entries.map((e) =>
-                    filterChip(e.value, tempStatus == e.key, () =>
-                        setLocal(() => tempStatus = e.key)),
-                  ).toList(),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _statusLabels
+                      .asMap()
+                      .entries
+                      .map(
+                        (e) => filterChip(e.value, tempStatus == e.key,
+                            () => setLocal(() => tempStatus = e.key)),
+                      )
+                      .toList(),
                 ),
                 const SizedBox(height: 22),
 
@@ -329,24 +345,28 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
                     )),
                 const SizedBox(height: 10),
                 Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: _scopeOptions.map((opt) =>
-                    filterChip(opt.$2, tempScope == opt.$1, () =>
-                        setLocal(() => tempScope = opt.$1)),
-                  ).toList(),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _scopeOptions
+                      .map(
+                        (opt) => filterChip(opt.$2, tempScope == opt.$1,
+                            () => setLocal(() => tempScope = opt.$1)),
+                      )
+                      .toList(),
                 ),
                 const SizedBox(height: 28),
 
                 // Apply button
-                AppButton.primary(
+                AppButton(
+                  variant: AppButtonVariant.primary,
                   label: 'Apply Filters',
                   isFullWidth: true,
                   onPressed: () {
                     setState(() {
                       _statusFilter = tempStatus;
-                      _scopeFilter  = tempScope;
+                      _scopeFilter = tempScope;
                     });
-                    Navigator.pop(ctx);
+                    ctx.pop();
                   },
                 ),
               ],
@@ -370,237 +390,242 @@ class _MedicinesScreenState extends ConsumerState<MedicinesScreen> with TickerPr
       body: RefreshIndicator(
         onRefresh: () => ref.read(medicinesProvider.notifier).load(),
         child: CustomScrollView(
-        slivers: [
-          // ── App bar ──────────────────────────────────────────────────────
-          SliverAppBar(
-            pinned: true,
-            floating: false,
-            backgroundColor: bg,
-            surfaceTintColor: Colors.transparent,
-            toolbarHeight: 68,
-            leading: AppIconButton(
-              icon: Icon(Icons.menu_rounded, size: 22,
-                  color: context.primaryText),
-              onPressed: openAppSidebar,
-              tooltip: 'Menu',
-              backgroundColor: Colors.transparent,
-            ),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppText.h3(AppStrings.myMedicines,
-                    color: context.primaryText),
-                AppText.bodySm('Manage all your medicines in one place',
-                    color: context.secondaryText),
-              ],
-            ),
-            actions: [
-              // Grid / List toggle
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _isGrid = !_isGrid);
-                },
-                child: Container(
-                  width: 36, height: 36,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: context.cardBg,
-                    borderRadius: AppBorderRadius.mdAll,
-                    border: Border.all(color: context.borderCol),
-                  ),
-                  child: Icon(
-                    _isGrid ? Icons.view_list_rounded : Icons.grid_view_rounded,
-                    size: 18,
+          slivers: [
+            // ── App bar ──────────────────────────────────────────────────────
+            AppSliverAppBar(
+              config: AppBarConfig(
+                title: AppStrings.myMedicines,
+                subtitle: 'Manage all your medicines in one place',
+                actions: [
+                  AppIconButton(
+                    icon: Icon(_isGrid ? Icons.view_list_rounded : Icons.grid_view_rounded),
+                    iconSize: 18,
                     color: context.primaryText,
-                  ),
-                ),
-              ),
-              // Add button
-              GestureDetector(
-                onTap: _openAdd,
-                child: Container(
-                  width: 36, height: 36,
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.teal,
-                    borderRadius: AppBorderRadius.mdAll,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.teal.withValues(alpha: 0.35),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Premium overview hero ────────────────────────────────
-                  _OverviewHero(
-                    meds: _allMeds,
-                    onTapNext: _openDetail,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Search + Filters ─────────────────────────────────────
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppSearchTextVoiceInput(
-                          controller: _searchCtrl,
-                          hint: AppStrings.searchMedicines,
-                          backgroundColor: isDark ? context.cardBg : Colors.white,
-                          borderColor: border,
-                          onChanged: (v) => setState(() => _search = v),
-                          onClear: () => setState(() => _search = ''),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Filters button with active-count badge
-                      GestureDetector(
-                        onTap: _openFilters,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: _activeFilterCount > 0
-                                    ? AppColors.teal.withValues(alpha: 0.10)
-                                    : (isDark ? context.cardBg : Colors.white),
-                                borderRadius: AppBorderRadius.pill,
-                                border: Border.all(
-                                  color: _activeFilterCount > 0 ? AppColors.teal : border,
-                                  width: _activeFilterCount > 0 ? 1.5 : 1.0,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.tune_rounded, size: 14, color: AppColors.teal),
-                                  const SizedBox(width: 6),
-                                  AppText.labelSm('Filters', color: AppColors.teal,
-                                      fontWeight: FontWeight.w600),
-                                ],
-                              ),
-                            ),
-                            if (_activeFilterCount > 0)
-                              Positioned(
-                                top: -5, right: -5,
-                                child: Container(
-                                  width: 17, height: 17,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.teal, shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text('$_activeFilterCount',
-                                        style: const TextStyle(
-                                          fontSize: 9, fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                        )),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // ── Inline status segment ────────────────────────────────
-                  _StatusSegment(
-                    labels: _statusLabels,
-                    selected: _statusFilter,
-                    onSelect: (i) {
+                    size: 36,
+                    borderColor: context.borderCol,
+                    backgroundColor: context.cardBg,
+                    borderRadius: BorderRadius.circular(10),
+                    onPressed: () {
                       HapticFeedback.selectionClick();
-                      setState(() => _statusFilter = i);
+                      setState(() => _isGrid = !_isGrid);
                     },
+                    tooltip: _isGrid ? 'List view' : 'Grid view',
                   ),
-                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: _openAdd,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.teal,
+                        borderRadius: AppBorderRadius.mdAll,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.teal.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.add_rounded,
+                          size: 20, color: Colors.white),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
 
-          // ── Medicine list / grid ──────────────────────────────────────────
-          if (ref.watch(medicinesProvider).isLoading)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                  (_, __) => AppSkeleton(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDark ? context.cardBg : Colors.white,
-                        borderRadius: AppBorderRadius.lgAll,
-                      ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Premium overview hero ────────────────────────────────
+                    _OverviewHero(
+                      meds: _allMeds,
+                      onTapNext: _openDetail,
                     ),
-                  ),
-                  childCount: 6,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.78,
-                ),
-              ),
-            )
-          else if (_visible.isEmpty)
-            SliverFillRemaining(
-              child: Center(
-                child: AppEmptyState(
-                  icon: Icons.medication_rounded,
-                  title: AppStrings.noMedicinesInView,
-                  action: _openAdd,
-                  actionLabel: '+ ${AppStrings.addMedicine}',
-                ),
-              ),
-            )
-          else if (_isGrid)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _MedCard(med: _visible[i], onTap: () => _openDetail(_visible[i])),
-                  childCount: _visible.length,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.78,
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _MedListRow(med: _visible[i], onTap: () => _openDetail(_visible[i])),
-                  ),
-                  childCount: _visible.length,
+                    const SizedBox(height: 16),
+
+                    // ── Search + Filters ─────────────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppSearchTextVoiceInput(
+                            controller: _searchCtrl,
+                            hint: AppStrings.searchMedicines,
+                            backgroundColor:
+                                isDark ? context.cardBg : Colors.white,
+                            borderColor: border,
+                            onChanged: (v) => setState(() => _search = v),
+                            onClear: () => setState(() => _search = ''),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Filters button with active-count badge
+                        GestureDetector(
+                          onTap: _openFilters,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                height: 48,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 14),
+                                decoration: BoxDecoration(
+                                  color: _activeFilterCount > 0
+                                      ? AppColors.teal.withValues(alpha: 0.10)
+                                      : (isDark
+                                          ? context.cardBg
+                                          : Colors.white),
+                                  borderRadius: AppBorderRadius.pill,
+                                  border: Border.all(
+                                    color: _activeFilterCount > 0
+                                        ? AppColors.teal
+                                        : border,
+                                    width: _activeFilterCount > 0 ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.tune_rounded,
+                                        size: 14, color: AppColors.teal),
+                                    const SizedBox(width: 6),
+                                    AppText.labelSm('Filters',
+                                        color: AppColors.teal,
+                                        fontWeight: FontWeight.w600),
+                                  ],
+                                ),
+                              ),
+                              if (_activeFilterCount > 0)
+                                Positioned(
+                                  top: -5,
+                                  right: -5,
+                                  child: Container(
+                                    width: 17,
+                                    height: 17,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.teal,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text('$_activeFilterCount',
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          )),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // ── Inline status segment ────────────────────────────────
+                    _StatusSegment(
+                      labels: _statusLabels,
+                      selected: _statusFilter,
+                      onSelect: (i) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _statusFilter = i);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
               ),
             ),
-        ],
+
+            // ── Medicine list / grid ──────────────────────────────────────────
+            if (ref.watch(medicinesProvider) case final st when st.error != null && !st.isLoading && st.medicines.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: AppEmptyState(
+                    icon: Icons.wifi_off_rounded,
+                    title: 'Could not load medicines',
+                    subtitle: st.error,
+                    action: () => ref.read(medicinesProvider.notifier).load(),
+                    actionLabel: 'Retry',
+                  ),
+                ),
+              )
+            else if (ref.watch(medicinesProvider).isLoading)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, __) => AppSkeleton(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? context.cardBg : Colors.white,
+                          borderRadius: AppBorderRadius.lgAll,
+                        ),
+                      ),
+                    ),
+                    childCount: 6,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.78,
+                  ),
+                ),
+              )
+            else if (_visible.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: AppEmptyState(
+                    icon: Icons.medication_rounded,
+                    title: AppStrings.noMedicinesInView,
+                    action: _openAdd,
+                    actionLabel: '+ ${AppStrings.addMedicine}',
+                  ),
+                ),
+              )
+            else if (_isGrid)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => _MedCard(
+                        med: _visible[i],
+                        onTap: () => _openDetail(_visible[i])),
+                    childCount: _visible.length,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.78,
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _MedListRow(
+                          med: _visible[i],
+                          onTap: () => _openDetail(_visible[i])),
+                    ),
+                    childCount: _visible.length,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -624,7 +649,8 @@ class _OverviewHero extends StatelessWidget {
     final next = _nextDose(doses);
     final takenToday = doses.where((d) => !d.isUpcoming).length;
     final totalToday = doses.length;
-    final dayProgress = totalToday == 0 ? 0.0 : (takenToday / totalToday).clamp(0.0, 1.0);
+    final dayProgress =
+        totalToday == 0 ? 0.0 : (takenToday / totalToday).clamp(0.0, 1.0);
 
     return Container(
       decoration: BoxDecoration(
@@ -659,7 +685,9 @@ class _OverviewHero extends StatelessWidget {
                         Row(
                           children: [
                             Icon(
-                              next == null ? Icons.check_circle_rounded : Icons.medication_liquid_rounded,
+                              next == null
+                                  ? Icons.check_circle_rounded
+                                  : Icons.medication_liquid_rounded,
                               size: 13,
                               color: Colors.white.withValues(alpha: 0.85),
                             ),
@@ -677,7 +705,10 @@ class _OverviewHero extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          next?.med.name ?? (totalToday == 0 ? 'No scheduled doses' : 'You\'re all caught up'),
+                          next?.med.name ??
+                              (totalToday == 0
+                                  ? 'No scheduled doses'
+                                  : 'You\'re all caught up'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -715,8 +746,10 @@ class _OverviewHero extends StatelessWidget {
                           child: CircularProgressIndicator(
                             value: totalToday == 0 ? 0 : dayProgress,
                             strokeWidth: 5,
-                            backgroundColor: Colors.white.withValues(alpha: 0.25),
-                            valueColor: const AlwaysStoppedAnimation(Colors.white),
+                            backgroundColor:
+                                Colors.white.withValues(alpha: 0.25),
+                            valueColor:
+                                const AlwaysStoppedAnimation(Colors.white),
                           ),
                         ),
                         Column(
@@ -761,11 +794,20 @@ class _OverviewHero extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
             child: Row(
               children: [
-                _HeroStat(icon: Icons.medication_rounded, label: 'Total', count: total),
+                _HeroStat(
+                    icon: Icons.medication_rounded,
+                    label: 'Total',
+                    count: total),
                 _HeroDivider(),
-                _HeroStat(icon: Icons.check_circle_outline_rounded, label: 'Active', count: active),
+                _HeroStat(
+                    icon: Icons.check_circle_outline_rounded,
+                    label: 'Active',
+                    count: active),
                 _HeroDivider(),
-                _HeroStat(icon: Icons.warning_amber_rounded, label: 'Low Stock', count: lowStock),
+                _HeroStat(
+                    icon: Icons.warning_amber_rounded,
+                    label: 'Low Stock',
+                    count: lowStock),
               ],
             ),
           ),
@@ -779,7 +821,8 @@ class _HeroStat extends StatelessWidget {
   final IconData icon;
   final String label;
   final int count;
-  const _HeroStat({required this.icon, required this.label, required this.count});
+  const _HeroStat(
+      {required this.icon, required this.label, required this.count});
 
   @override
   Widget build(BuildContext context) {
@@ -792,12 +835,19 @@ class _HeroStat extends StatelessWidget {
               Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.9)),
               const SizedBox(width: 6),
               Text('$count',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1)),
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      height: 1)),
             ],
           ),
           const SizedBox(height: 4),
           Text(label,
-              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.82))),
+              style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.82))),
         ],
       ),
     );
@@ -819,7 +869,8 @@ class _StatusSegment extends StatelessWidget {
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onSelect;
-  const _StatusSegment({required this.labels, required this.selected, required this.onSelect});
+  const _StatusSegment(
+      {required this.labels, required this.selected, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
@@ -883,33 +934,42 @@ class _StatusBadge extends StatelessWidget {
           AppColors.green,
           Row(mainAxisSize: MainAxisSize.min, children: [
             Container(
-              width: 7, height: 7,
-              decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle),
+              width: 7,
+              height: 7,
+              decoration: const BoxDecoration(
+                  color: AppColors.green, shape: BoxShape.circle),
             ),
             const SizedBox(width: 5),
             Text(AppStrings.activeStatus,
                 style: const TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w600,
-                    color: AppColors.green, letterSpacing: 0.3)),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.green,
+                    letterSpacing: 0.3)),
           ]),
         ),
       _MedStatus.lowStock => _badge(
           AppColors.amber,
           Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.warning_amber_rounded, size: 11, color: AppColors.amber),
+            const Icon(Icons.warning_amber_rounded,
+                size: 11, color: AppColors.amber),
             const SizedBox(width: 4),
             Text(AppStrings.lowStockStatus,
                 style: const TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w600,
-                    color: AppColors.amber, letterSpacing: 0.3)),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.amber,
+                    letterSpacing: 0.3)),
           ]),
         ),
       _MedStatus.prn => _badge(
           AppColors.purple,
           Text(AppStrings.prnLabel,
               style: const TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w600,
-                  color: AppColors.purple, letterSpacing: 0.3)),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.purple,
+                  letterSpacing: 0.3)),
         ),
     };
   }
@@ -945,8 +1005,12 @@ class _ScopeBadge extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 9, color: color),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
-            color: color, letterSpacing: 0.3)),
+        Text(label,
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: color,
+                letterSpacing: 0.3)),
       ]),
     );
   }
@@ -960,15 +1024,15 @@ class _MedCard extends StatelessWidget {
   const _MedCard({required this.med, required this.onTap});
 
   Color get _statusColor => switch (med.status) {
-        _MedStatus.active   => AppColors.teal,
+        _MedStatus.active => AppColors.teal,
         _MedStatus.lowStock => AppColors.amber,
-        _MedStatus.prn      => AppColors.purple,
+        _MedStatus.prn => AppColors.purple,
       };
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
-    final border    = isDark ? context.borderCol : AppColors.light300;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final border = isDark ? context.borderCol : AppColors.light300;
     final stockFill = (med.stock / 60).clamp(0.0, 1.0);
 
     return GestureDetector(
@@ -1020,7 +1084,8 @@ class _MedCard extends StatelessWidget {
                               ],
                             ),
                             borderRadius: AppBorderRadius.mdAll,
-                            border: Border.all(color: _statusColor.withValues(alpha: 0.18)),
+                            border: Border.all(
+                                color: _statusColor.withValues(alpha: 0.18)),
                           ),
                           child: Icon(Icons.medication_rounded,
                               color: _statusColor, size: 22),
@@ -1048,27 +1113,32 @@ class _MedCard extends StatelessWidget {
                     // Schedule chips or PRN chip
                     if (med.status == _MedStatus.prn)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           color: AppColors.purple.withValues(alpha: 0.10),
                           borderRadius: AppBorderRadius.pill,
                         ),
                         child: Text(AppStrings.prnNote,
                             style: const TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
                               color: AppColors.purple,
                             )),
                       )
                     else if (med.times.isNotEmpty)
                       Wrap(
-                        spacing: 5, runSpacing: 5,
+                        spacing: 5,
+                        runSpacing: 5,
                         children: med.times.map((t) {
                           final hour = int.tryParse(t.split(':')[0]) ?? 0;
                           final isNight = hour >= 18;
                           return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 4),
                             decoration: BoxDecoration(
-                              color: isDark ? context.inputBg : AppColors.light200,
+                              color:
+                                  isDark ? context.inputBg : AppColors.light200,
                               borderRadius: AppBorderRadius.pill,
                               border: Border.all(color: border),
                             ),
@@ -1087,8 +1157,11 @@ class _MedCard extends StatelessWidget {
                                 const SizedBox(width: 4),
                                 Text(t,
                                     style: TextStyle(
-                                      fontSize: 10, fontWeight: FontWeight.w600,
-                                      color: isDark ? context.primaryText : const Color(0xFF334155),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? context.primaryText
+                                          : const Color(0xFF334155),
                                       letterSpacing: 0.3,
                                     )),
                               ],
@@ -1109,14 +1182,17 @@ class _MedCard extends StatelessWidget {
                               TextSpan(
                                 text: '${med.stock}',
                                 style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w800,
-                                  color: _statusColor, height: 1,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: _statusColor,
+                                  height: 1,
                                 ),
                               ),
                               TextSpan(
                                 text: '  Units',
                                 style: TextStyle(
-                                  fontSize: 11, color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -1162,9 +1238,9 @@ class _MedListRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusColor = switch (med.status) {
-      _MedStatus.active   => AppColors.teal,
+      _MedStatus.active => AppColors.teal,
       _MedStatus.lowStock => AppColors.amber,
-      _MedStatus.prn      => AppColors.purple,
+      _MedStatus.prn => AppColors.purple,
     };
     return GestureDetector(
       onTap: onTap,
@@ -1220,39 +1296,51 @@ class _MedListRow extends StatelessWidget {
                           ],
                         ),
                         borderRadius: AppBorderRadius.mdAll,
-                        border: Border.all(color: statusColor.withValues(alpha: 0.18)),
+                        border: Border.all(
+                            color: statusColor.withValues(alpha: 0.18)),
                       ),
-                      child: Icon(Icons.medication_rounded, color: statusColor, size: 22),
+                      child: Icon(Icons.medication_rounded,
+                          color: statusColor, size: 22),
                     ),
                     const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Expanded(child: AppText.labelMd(med.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                        const SizedBox(width: 8),
-                        _StatusBadge(med.status),
-                      ]),
-                      const SizedBox(height: 2),
-                      AppText.bodySm('${med.strength} · ${med.form}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        Icon(Icons.inventory_2_outlined, size: 12, color: AppColors.textSecondary),
-                        const SizedBox(width: 4),
-                        AppText.bodyXs('${med.stock} units'),
-                        const SizedBox(width: 12),
-                        if (med.times.isNotEmpty) ...[
-                          Icon(Icons.schedule_rounded, size: 12, color: AppColors.textSecondary),
-                          const SizedBox(width: 4),
-                          AppText.bodyXs(med.times.join(' · ')),
-                        ] else
-                          AppText.bodyXs(AppStrings.prnNote, color: AppColors.purple),
-                        const Spacer(),
-                        _ScopeBadge(med.scope),
-                      ]),
-                    ]),
-                  ),
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Expanded(
+                                  child: AppText.labelMd(med.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis)),
+                              const SizedBox(width: 8),
+                              _StatusBadge(med.status),
+                            ]),
+                            const SizedBox(height: 2),
+                            AppText.bodySm('${med.strength} · ${med.form}',
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 6),
+                            Row(children: [
+                              Icon(Icons.inventory_2_outlined,
+                                  size: 12, color: AppColors.textSecondary),
+                              const SizedBox(width: 4),
+                              AppText.bodyXs('${med.stock} units'),
+                              const SizedBox(width: 12),
+                              if (med.times.isNotEmpty) ...[
+                                Icon(Icons.schedule_rounded,
+                                    size: 12, color: AppColors.textSecondary),
+                                const SizedBox(width: 4),
+                                AppText.bodyXs(med.times.join(' · ')),
+                              ] else
+                                AppText.bodyXs(AppStrings.prnNote,
+                                    color: AppColors.purple),
+                              const Spacer(),
+                              _ScopeBadge(med.scope),
+                            ]),
+                          ]),
+                    ),
                     const SizedBox(width: 8),
-                    Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
+                    Icon(Icons.chevron_right_rounded,
+                        color: AppColors.textSecondary, size: 20),
                   ]),
                 ),
               ),
@@ -1275,7 +1363,8 @@ class _DetailSheet extends ConsumerStatefulWidget {
   ConsumerState<_DetailSheet> createState() => _DetailSheetState();
 }
 
-class _DetailSheetState extends ConsumerState<_DetailSheet> with SingleTickerProviderStateMixin {
+class _DetailSheetState extends ConsumerState<_DetailSheet>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabs;
 
   @override
@@ -1299,7 +1388,7 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> with SingleTickerPro
       isDanger: true,
     );
     if (confirmed != true || !mounted) return;
-    Navigator.pop(context);
+    context.pop();
     try {
       await ref.read(medicinesProvider.notifier).deleteMedicine(widget.med.id);
       if (!mounted) return;
@@ -1311,10 +1400,10 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> with SingleTickerPro
   }
 
   Color _statusColorFor(_MedStatus status) => switch (status) {
-    _MedStatus.active   => AppColors.teal,
-    _MedStatus.lowStock => AppColors.amber,
-    _MedStatus.prn      => AppColors.purple,
-  };
+        _MedStatus.active => AppColors.teal,
+        _MedStatus.lowStock => AppColors.amber,
+        _MedStatus.prn => AppColors.purple,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -1335,8 +1424,11 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> with SingleTickerPro
         child: Column(children: [
           // Handle
           const SizedBox(height: 12),
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: border, borderRadius: AppBorderRadius.pill)),
+          Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: border, borderRadius: AppBorderRadius.pill)),
           const SizedBox(height: 12),
 
           // Gradient hero header
@@ -1358,39 +1450,73 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> with SingleTickerPro
               children: [
                 Row(children: [
                   Container(
-                    width: 52, height: 52,
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: AppBorderRadius.mdAll,
                     ),
-                    child: const Icon(Icons.medication_rounded, color: Colors.white, size: 28),
+                    child: const Icon(Icons.medication_rounded,
+                        color: Colors.white, size: 28),
                   ),
                   const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(m.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    Text('${m.genericName} · ${m.strength}', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.75)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ])),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(m.name,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                height: 1.2),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 4),
+                        Text('${m.genericName} · ${m.strength}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withValues(alpha: 0.75)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ])),
                   TextButton(
                     onPressed: () {},
-                    child: Text(AppStrings.edit, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.9), letterSpacing: 0)),
+                    child: Text(AppStrings.edit,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.9),
+                            letterSpacing: 0)),
                   ),
                 ]),
                 if (m.scope != _MedScope.personal) ...[
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: AppBorderRadius.mdAll,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
-                      Icon(m.scope == _MedScope.sharedMaster ? Icons.share_rounded : Icons.person_add_rounded, size: 13, color: Colors.white),
+                      Icon(
+                          m.scope == _MedScope.sharedMaster
+                              ? Icons.share_rounded
+                              : Icons.person_add_rounded,
+                          size: 13,
+                          color: Colors.white),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(
-                        m.scope == _MedScope.sharedMaster ? 'Shared bottle — stock split with other patients' : 'Stock is managed by your caretaker.',
-                        style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9)),
+                      Expanded(
+                          child: Text(
+                        m.scope == _MedScope.sharedMaster
+                            ? 'Shared bottle — stock split with other patients'
+                            : 'Stock is managed by your caretaker.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.9)),
                       )),
                     ]),
                   ),
@@ -1409,11 +1535,15 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> with SingleTickerPro
               isScrollable: true,
               tabAlignment: TabAlignment.start,
               labelStyle: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600,
-                  color: AppColors.teal, letterSpacing: 0),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.teal,
+                  letterSpacing: 0),
               unselectedLabelStyle: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary, letterSpacing: 0),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0),
               indicatorColor: AppColors.teal,
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
@@ -1431,7 +1561,8 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> with SingleTickerPro
             child: TabBarView(
               controller: _tabs,
               children: [
-                _OverviewTab(med: m, controller: ctrl, onRemove: _confirmRemove),
+                _OverviewTab(
+                    med: m, controller: ctrl, onRemove: _confirmRemove),
                 _ScheduleTab(med: m, controller: ctrl),
                 _StockTab(med: m, controller: ctrl),
                 _InfoTab(med: m, controller: ctrl),
@@ -1451,7 +1582,8 @@ class _OverviewTab extends StatelessWidget {
   final ScrollController controller;
   final VoidCallback onRemove;
 
-  const _OverviewTab({required this.med, required this.controller, required this.onRemove});
+  const _OverviewTab(
+      {required this.med, required this.controller, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -1478,19 +1610,24 @@ class _OverviewTab extends StatelessWidget {
               : med.times.isEmpty
                   ? AppText.bodySm(AppStrings.noScheduleSet)
                   : Column(
-                      children: med.times.map((t) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(color: cardBg, borderRadius: AppBorderRadius.mdAll),
-                          child: Row(children: [
-                            AppText.labelMd(t, color: AppColors.teal),
-                            const SizedBox(width: 12),
-                            Expanded(child: AppText.bodySm('1 dose')),
-                            AppText.bodySm(med.food),
-                          ]),
-                        ),
-                      )).toList(),
+                      children: med.times
+                          .map((t) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                      color: cardBg,
+                                      borderRadius: AppBorderRadius.mdAll),
+                                  child: Row(children: [
+                                    AppText.labelMd(t, color: AppColors.teal),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: AppText.bodySm('1 dose')),
+                                    AppText.bodySm(med.food),
+                                  ]),
+                                ),
+                              ))
+                          .toList(),
                     ),
         ),
         const SizedBox(height: 20),
@@ -1499,7 +1636,8 @@ class _OverviewTab extends StatelessWidget {
         _Section(
           label: AppStrings.adherenceLabel,
           child: Row(
-            children: ['M','T','W','T','F','S','S'].asMap().entries.map((e) {
+            children:
+                ['M', 'T', 'W', 'T', 'F', 'S', 'S'].asMap().entries.map((e) {
               final i = e.key;
               final todayIdx = DateTime.now().weekday - 1; // Mon=0
               final isFuture = i > todayIdx;
@@ -1516,7 +1654,8 @@ class _OverviewTab extends StatelessWidget {
                             : AppColors.teal.withValues(alpha: 0.08),
                     borderRadius: AppBorderRadius.smAll,
                     border: isFuture
-                        ? Border.all(color: border, width: 1, style: BorderStyle.solid)
+                        ? Border.all(
+                            color: border, width: 1, style: BorderStyle.solid)
                         : null,
                   ),
                   child: Center(
@@ -1551,10 +1690,11 @@ class _OverviewTab extends StatelessWidget {
         Row(children: [
           if (med.status != _MedStatus.prn)
             Expanded(
-              child: AppButton.primary(
+              child: AppButton(
+                variant: AppButtonVariant.primary,
                 label: AppStrings.markTaken,
                 isFullWidth: true,
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
               ),
             ),
           if (med.status != _MedStatus.prn) const SizedBox(width: 10),
@@ -1592,8 +1732,10 @@ class _ScheduleTab extends StatelessWidget {
       children: [
         Text(AppStrings.fullScheduleLabel,
             style: const TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w600,
-              color: AppColors.textHint, letterSpacing: 1,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textHint,
+              letterSpacing: 1,
             )),
         const SizedBox(height: 12),
         if (med.status == _MedStatus.prn || med.times.isEmpty)
@@ -1602,17 +1744,24 @@ class _ScheduleTab extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.purple.withValues(alpha: 0.08),
               borderRadius: AppBorderRadius.mdAll,
-              border: Border.all(color: AppColors.purple.withValues(alpha: 0.2)),
+              border:
+                  Border.all(color: AppColors.purple.withValues(alpha: 0.2)),
             ),
             child: Row(children: [
-              const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.purple),
+              const Icon(Icons.info_outline_rounded,
+                  size: 16, color: AppColors.purple),
               const SizedBox(width: 10),
               AppText.bodyMd(AppStrings.prnNote, color: AppColors.purple),
             ]),
           )
         else
           ...med.times.asMap().entries.map((e) {
-            final labels = {1: ['Morning'], 2: ['Morning', 'Evening'], 3: ['Morning', 'Afternoon', 'Evening'], 4: ['Morning', 'Noon', 'Evening', 'Night']};
+            final labels = {
+              1: ['Morning'],
+              2: ['Morning', 'Evening'],
+              3: ['Morning', 'Afternoon', 'Evening'],
+              4: ['Morning', 'Noon', 'Evening', 'Night']
+            };
             final label = (labels[med.times.length] ?? [])[e.key];
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -1625,7 +1774,8 @@ class _ScheduleTab extends StatelessWidget {
                 ),
                 child: Row(children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.teal.withValues(alpha: 0.12),
                       borderRadius: AppBorderRadius.smAll,
@@ -1633,11 +1783,17 @@ class _ScheduleTab extends StatelessWidget {
                     child: AppText.labelMd(e.value, color: AppColors.teal),
                   ),
                   const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(label, style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0)),
-                    AppText.bodySm('1 dose · ${med.food}'),
-                  ])),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(label,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0)),
+                        AppText.bodySm('1 dose · ${med.food}'),
+                      ])),
                 ]),
               ),
             );
@@ -1656,7 +1812,8 @@ class _StockTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stockColor = med.status == _MedStatus.lowStock ? AppColors.warning : AppColors.teal;
+    final stockColor =
+        med.status == _MedStatus.lowStock ? AppColors.warning : AppColors.teal;
 
     return ListView(
       controller: controller,
@@ -1674,7 +1831,8 @@ class _StockTab extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${med.stock}',
                   style: TextStyle(
-                    fontSize: 42, fontWeight: FontWeight.w800,
+                    fontSize: 42,
+                    fontWeight: FontWeight.w800,
                     color: context.primaryText,
                   )),
               AppText.bodySm(AppStrings.unitsRemaining),
@@ -1686,10 +1844,12 @@ class _StockTab extends StatelessWidget {
             ]),
             const Spacer(),
             Container(
-              width: 72, height: 72,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: stockColor.withValues(alpha: 0.4), width: 4),
+                border: Border.all(
+                    color: stockColor.withValues(alpha: 0.4), width: 4),
               ),
               child: Center(
                 child: CircularProgressIndicator(
@@ -1704,7 +1864,6 @@ class _StockTab extends StatelessWidget {
         ),
 
         const SizedBox(height: 20),
-
       ],
     );
   }
@@ -1725,8 +1884,14 @@ class _InfoTab extends StatelessWidget {
       children: [
         _AccordionItem(title: 'What is it used for?', body: med.usedFor),
         _AccordionItem(title: 'How to take', body: med.description),
-        _AccordionItem(title: 'Side effects', body: 'Common side effects may include nausea, dizziness, or stomach upset. Contact your doctor if symptoms persist.'),
-        _AccordionItem(title: 'Precautions', body: 'Inform your doctor of all medications you are taking. Do not stop without consulting your healthcare provider.'),
+        _AccordionItem(
+            title: 'Side effects',
+            body:
+                'Common side effects may include nausea, dizziness, or stomach upset. Contact your doctor if symptoms persist.'),
+        _AccordionItem(
+            title: 'Precautions',
+            body:
+                'Inform your doctor of all medications you are taking. Do not stop without consulting your healthcare provider.'),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(12),
@@ -1776,8 +1941,10 @@ class _AccordionItemState extends State<_AccordionItem> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(children: [
               Expanded(child: AppText.labelMd(widget.title)),
-              Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                  size: 20, color: AppColors.textSecondary),
+              Icon(
+                  _open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  size: 20,
+                  color: AppColors.textSecondary),
             ]),
           ),
         ),
@@ -1801,16 +1968,19 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(
-        fontSize: 10, fontWeight: FontWeight.w600,
-        color: AppColors.textHint, letterSpacing: 1,
-      )),
-      const SizedBox(height: 8),
-      child,
-    ],
-  );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textHint,
+                letterSpacing: 1,
+              )),
+          const SizedBox(height: 8),
+          child,
+        ],
+      );
 }
 
 // ─── Add Medicine sheet (4 steps) ────────────────────────────────────────────
@@ -1853,7 +2023,11 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
   List<String> _times = ['09:00', '21:00'];
   String _food = 'with';
   final _doseCtrl = TextEditingController(text: '1 tablet');
-  final _foodOptions = [('before', AppStrings.beforeFood), ('with', AppStrings.withFood), ('after', AppStrings.afterFood)];
+  final _foodOptions = [
+    ('before', AppStrings.beforeFood),
+    ('with', AppStrings.withFood),
+    ('after', AppStrings.afterFood)
+  ];
 
   // Step 3
   final _qtyCtrl = TextEditingController(text: '30');
@@ -1870,9 +2044,13 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
   Future<void> _loadCatalog(String query) async {
     setState(() => _catalogLoading = true);
     try {
-      final results = await ref.read(medicinesRepositoryProvider).searchCatalog(query);
+      final results =
+          await ref.read(medicinesRepositoryProvider).searchCatalog(query);
       if (!mounted) return;
-      setState(() { _catalogItems = results; _catalogLoading = false; });
+      setState(() {
+        _catalogItems = results;
+        _catalogLoading = false;
+      });
     } on Exception catch (_) {
       if (!mounted) return;
       setState(() => _catalogLoading = false);
@@ -1881,7 +2059,10 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
 
   void _setFreq(String f) {
     final opt = _freqOptions.firstWhere((x) => x.$1 == f);
-    setState(() { _freq = f; _times = List<String>.from(opt.$3); });
+    setState(() {
+      _freq = f;
+      _times = List<String>.from(opt.$3);
+    });
   }
 
   bool get _canProceed {
@@ -1903,10 +2084,10 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
     setState(() => _saving = true);
     try {
       await ref.read(medicinesProvider.notifier).addMedicine(
-        medicineId: _selected!.id,
-      );
+            medicineId: _selected!.id,
+          );
       if (!mounted) return;
-      Navigator.pop(context);
+      context.pop();
       AppSnackbar.success(context, 'Medicine saved successfully.');
     } on Exception catch (e) {
       if (!mounted) return;
@@ -1936,11 +2117,15 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.96,
       builder: (_, ctrl) => Container(
-        decoration: BoxDecoration(color: bg, borderRadius: AppBorderRadius.topXxl),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: AppBorderRadius.topXxl),
         child: Column(children: [
           const SizedBox(height: 12),
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: border, borderRadius: AppBorderRadius.pill)),
+          Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: border, borderRadius: AppBorderRadius.pill)),
           const SizedBox(height: 16),
 
           // Title
@@ -1949,10 +2134,12 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
             child: Row(children: [
               Expanded(child: AppText.h3(AppStrings.addMedicine)),
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
                 child: Text(AppStrings.close,
                     style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
                     )),
               ),
             ]),
@@ -1974,7 +2161,8 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
                       child: Column(children: [
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 24, height: 24,
+                          width: 24,
+                          height: 24,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: done
@@ -1989,12 +2177,15 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
                           ),
                           child: Center(
                             child: done
-                                ? const Icon(Icons.check_rounded, size: 12, color: Colors.black)
+                                ? const Icon(Icons.check_rounded,
+                                    size: 12, color: Colors.black)
                                 : Text('${i + 1}',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
-                                      color: active ? AppColors.teal : AppColors.textHint,
+                                      color: active
+                                          ? AppColors.teal
+                                          : AppColors.textHint,
                                       letterSpacing: 0,
                                     )),
                           ),
@@ -2004,13 +2195,17 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w600,
-                              color: active || done ? AppColors.teal : AppColors.textHint,
+                              color: active || done
+                                  ? AppColors.teal
+                                  : AppColors.textHint,
                               letterSpacing: 0,
                             )),
                       ]),
                     ),
                     if (i < _steps.length - 1)
-                      Container(width: 20, height: 1,
+                      Container(
+                          width: 20,
+                          height: 1,
                           color: i < _step ? AppColors.teal : border),
                   ]),
                 );
@@ -2037,11 +2232,13 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
 
           // Bottom nav
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+            padding: EdgeInsets.fromLTRB(
+                20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 24),
             child: Row(children: [
               if (_step > 0)
                 Expanded(
-                  child: AppButton.secondary(
+                  child: AppButton(
+                    variant: AppButtonVariant.secondary,
                     label: AppStrings.back,
                     isFullWidth: true,
                     onPressed: () => setState(() => _step--),
@@ -2050,8 +2247,13 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
               if (_step > 0) const SizedBox(width: 12),
               Expanded(
                 flex: 2,
-                child: AppButton.primary(
-                  label: _saving ? AppStrings.saving : (_step == _steps.length - 1 ? AppStrings.save : AppStrings.next),
+                child: AppButton(
+                  variant: AppButtonVariant.primary,
+                  label: _saving
+                      ? AppStrings.saving
+                      : (_step == _steps.length - 1
+                          ? AppStrings.save
+                          : AppStrings.next),
                   isFullWidth: true,
                   isLoading: _saving,
                   onPressed: (_canProceed && !_saving) ? _next : null,
@@ -2074,34 +2276,44 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
         backgroundColor: isDark ? context.cardBg : AppColors.light200,
         borderColor: border,
         onChanged: (v) {
-          setState(() { _medSearch = v; _showRequest = false; });
+          setState(() {
+            _medSearch = v;
+            _showRequest = false;
+          });
           _loadCatalog(v);
         },
         onClear: () {
-          setState(() { _medSearch = ''; _showRequest = false; });
+          setState(() {
+            _medSearch = '';
+            _showRequest = false;
+          });
         },
       ),
 
       const SizedBox(height: 16),
 
       if (_catalogLoading)
-        const Center(child: Padding(
+        const Center(
+            child: Padding(
           padding: EdgeInsets.symmetric(vertical: 16),
-          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
+          child:
+              CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
         ))
       else ...[
         Text(
-          _catalogItems.isEmpty ? AppStrings.noMatchesLabel
-              : _medSearch.isEmpty ? AppStrings.popularLabel
+          _catalogItems.isEmpty
+              ? AppStrings.noMatchesLabel
+              : _medSearch.isEmpty
+                  ? AppStrings.popularLabel
                   : AppStrings.resultsLabel,
           style: const TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w600,
-            color: AppColors.textHint, letterSpacing: 1,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textHint,
+            letterSpacing: 1,
           ),
         ),
-
         const SizedBox(height: 10),
-
         ..._catalogItems.map((item) {
           final active = _selected?.id == item.id;
           return Padding(
@@ -2112,30 +2324,44 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
                 duration: const Duration(milliseconds: 150),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: active ? AppColors.teal.withValues(alpha: 0.08) : cardBg,
+                  color:
+                      active ? AppColors.teal.withValues(alpha: 0.08) : cardBg,
                   borderRadius: AppBorderRadius.lgAll,
                   border: Border.all(
-                    color: active ? AppColors.teal.withValues(alpha: 0.4) : border,
+                    color:
+                        active ? AppColors.teal.withValues(alpha: 0.4) : border,
                   ),
                 ),
                 child: Row(children: [
                   Container(
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: active ? AppColors.teal.withValues(alpha: 0.15) : (isDark ? context.borderCol : AppColors.light200),
+                      color: active
+                          ? AppColors.teal.withValues(alpha: 0.15)
+                          : (isDark ? context.borderCol : AppColors.light200),
                       borderRadius: AppBorderRadius.smAll,
                     ),
-                    child: Icon(Icons.medication_rounded, size: 18,
-                        color: active ? AppColors.teal : AppColors.textSecondary),
+                    child: Icon(Icons.medication_rounded,
+                        size: 18,
+                        color:
+                            active ? AppColors.teal : AppColors.textSecondary),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    AppText.labelMd(item.name),
-                    AppText.bodySm([item.genericName, item.strength, item.dosageForm].join(' · '),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ])),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        AppText.labelMd(item.name),
+                        AppText.bodySm(
+                            [item.genericName, item.strength, item.dosageForm]
+                                .join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ])),
                   if (active)
-                    const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 20),
+                    const Icon(Icons.check_circle_rounded,
+                        color: AppColors.teal, size: 20),
                 ]),
               ),
             ),
@@ -2148,7 +2374,10 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
       if (!_showRequest)
         Center(
           child: TextButton(
-            onPressed: () => setState(() { _showRequest = true; _reqNameCtrl.text = _medSearch; }),
+            onPressed: () => setState(() {
+              _showRequest = true;
+              _reqNameCtrl.text = _medSearch;
+            }),
             child: AppText.bodySm(AppStrings.cantFindIt, color: AppColors.teal),
           ),
         )
@@ -2160,12 +2389,14 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
             borderRadius: AppBorderRadius.lgAll,
             border: Border.all(color: border),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: AppText.labelMd(AppStrings.requestMedicine)),
               GestureDetector(
                 onTap: () => setState(() => _showRequest = false),
-                child: AppText.bodySm(AppStrings.cancel, color: AppColors.textSecondary),
+                child: AppText.bodySm(AppStrings.cancel,
+                    color: AppColors.textSecondary),
               ),
             ]),
             const SizedBox(height: 6),
@@ -2177,10 +2408,11 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
               hint: 'e.g. 3 Mix Cream',
             ),
             const SizedBox(height: 12),
-            AppButton.primary(
+            AppButton(
+              variant: AppButtonVariant.primary,
               label: AppStrings.submitRequest,
               isFullWidth: true,
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => context.pop(),
             ),
           ]),
         ),
@@ -2189,11 +2421,30 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
 
   Widget _buildStep1(bool isDark, Color border) {
     final options = [
-      ('self', Icons.person_rounded, AppStrings.whoForYou, AppStrings.whoForYouDesc, AppColors.teal),
-      ('patient', Icons.people_rounded, AppStrings.whoForPatient, AppStrings.whoForPatientDesc, AppColors.blue),
-      ('shared', Icons.share_rounded, AppStrings.whoShared, AppStrings.whoSharedDesc, AppColors.purple),
+      (
+        'self',
+        Icons.person_rounded,
+        AppStrings.whoForYou,
+        AppStrings.whoForYouDesc,
+        AppColors.teal
+      ),
+      (
+        'patient',
+        Icons.people_rounded,
+        AppStrings.whoForPatient,
+        AppStrings.whoForPatientDesc,
+        AppColors.blue
+      ),
+      (
+        'shared',
+        Icons.share_rounded,
+        AppStrings.whoShared,
+        AppStrings.whoSharedDesc,
+        AppColors.purple
+      ),
     ];
-    return Column(children: options.map((opt) {
+    return Column(
+        children: options.map((opt) {
       final active = _whoMode == opt.$1;
       return Padding(
         padding: const EdgeInsets.only(bottom: 12),
@@ -2203,32 +2454,46 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: active ? opt.$5.withValues(alpha: 0.07) : Colors.transparent,
+              color:
+                  active ? opt.$5.withValues(alpha: 0.07) : Colors.transparent,
               borderRadius: AppBorderRadius.lgAll,
-              border: Border.all(color: active ? opt.$5.withValues(alpha: 0.4) : border),
+              border: Border.all(
+                  color: active ? opt.$5.withValues(alpha: 0.4) : border),
             ),
             child: Row(children: [
               Container(
-                width: 40, height: 40,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: active ? opt.$5.withValues(alpha: 0.15) : (isDark ? context.inputBg : AppColors.light200),
+                  color: active
+                      ? opt.$5.withValues(alpha: 0.15)
+                      : (isDark ? context.inputBg : AppColors.light200),
                   borderRadius: AppBorderRadius.mdAll,
                 ),
-                child: Icon(opt.$2, color: active ? opt.$5 : AppColors.textSecondary, size: 20),
+                child: Icon(opt.$2,
+                    color: active ? opt.$5 : AppColors.textSecondary, size: 20),
               ),
               const SizedBox(width: 14),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                AppText.labelMd(opt.$3, color: active ? opt.$5 : context.primaryText),
-                AppText.bodySm(opt.$4),
-              ])),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    AppText.labelMd(opt.$3,
+                        color: active ? opt.$5 : context.primaryText),
+                    AppText.bodySm(opt.$4),
+                  ])),
               Container(
-                width: 18, height: 18,
+                width: 18,
+                height: 18,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: active ? opt.$5 : Colors.transparent,
                   border: Border.all(color: active ? opt.$5 : border, width: 2),
                 ),
-                child: active ? const Icon(Icons.check_rounded, size: 11, color: Colors.black) : null,
+                child: active
+                    ? const Icon(Icons.check_rounded,
+                        size: 11, color: Colors.black)
+                    : null,
               ),
             ]),
           ),
@@ -2239,13 +2504,17 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
 
   Widget _buildStep2(bool isDark, Color border) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Frequency', style: const TextStyle(
-        fontSize: 10, fontWeight: FontWeight.w600,
-        color: AppColors.textHint, letterSpacing: 1,
-      )),
+      Text('Frequency',
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textHint,
+            letterSpacing: 1,
+          )),
       const SizedBox(height: 10),
       Wrap(
-        spacing: 8, runSpacing: 8,
+        spacing: 8,
+        runSpacing: 8,
         children: _freqOptions.map((f) {
           final active = _freq == f.$1;
           return GestureDetector(
@@ -2254,61 +2523,68 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
               duration: const Duration(milliseconds: 150),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
-                color: active ? AppColors.teal.withValues(alpha: 0.12) : Colors.transparent,
+                color: active
+                    ? AppColors.teal.withValues(alpha: 0.12)
+                    : Colors.transparent,
                 borderRadius: AppBorderRadius.pill,
                 border: Border.all(color: active ? AppColors.teal : border),
               ),
-              child: Text(f.$2, style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w600,
-                color: active ? AppColors.teal : AppColors.textSecondary,
-                letterSpacing: 0,
-              )),
+              child: Text(f.$2,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: active ? AppColors.teal : AppColors.textSecondary,
+                    letterSpacing: 0,
+                  )),
             ),
           );
         }).toList(),
       ),
-
       const SizedBox(height: 20),
-
       if (_freq != 'prn') ...[
-        Text('Dose times', style: const TextStyle(
-          fontSize: 10, fontWeight: FontWeight.w600,
-          color: AppColors.textHint, letterSpacing: 1,
-        )),
+        Text('Dose times',
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textHint,
+              letterSpacing: 1,
+            )),
         const SizedBox(height: 10),
         ..._times.asMap().entries.map((e) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? context.inputBg : AppColors.light100,
-              borderRadius: AppBorderRadius.mdAll,
-              border: Border.all(color: border),
-            ),
-            child: Row(children: [
-              const Icon(Icons.schedule_rounded, size: 16, color: AppColors.teal),
-              const SizedBox(width: 10),
-              AppText.labelMd(e.value, color: AppColors.teal),
-            ]),
-          ),
-        )),
-
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? context.inputBg : AppColors.light100,
+                  borderRadius: AppBorderRadius.mdAll,
+                  border: Border.all(color: border),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.schedule_rounded,
+                      size: 16, color: AppColors.teal),
+                  const SizedBox(width: 10),
+                  AppText.labelMd(e.value, color: AppColors.teal),
+                ]),
+              ),
+            )),
         const SizedBox(height: 20),
-
         AppTextField(
           label: AppStrings.doseAmount,
           controller: _doseCtrl,
           hint: AppStrings.doseAmountHint,
         ),
-
         const SizedBox(height: 16),
-
-        Text(AppStrings.foodRelation, style: const TextStyle(
-          fontSize: 10, fontWeight: FontWeight.w600,
-          color: AppColors.textHint, letterSpacing: 1,
-        )),
+        Text(AppStrings.foodRelation,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textHint,
+              letterSpacing: 1,
+            )),
         const SizedBox(height: 10),
-        Row(children: _foodOptions.map((f) {
+        Row(
+            children: _foodOptions.map((f) {
           final active = _food == f.$1;
           return Expanded(
             child: Padding(
@@ -2319,16 +2595,21 @@ class _AddMedicineSheetState extends ConsumerState<_AddMedicineSheet> {
                   duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                    color: active ? AppColors.teal.withValues(alpha: 0.12) : Colors.transparent,
+                    color: active
+                        ? AppColors.teal.withValues(alpha: 0.12)
+                        : Colors.transparent,
                     borderRadius: AppBorderRadius.mdAll,
                     border: Border.all(color: active ? AppColors.teal : border),
                   ),
                   child: Center(
-                    child: Text(f.$2, style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600,
-                      color: active ? AppColors.teal : AppColors.textSecondary,
-                      letterSpacing: 0,
-                    )),
+                    child: Text(f.$2,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color:
+                              active ? AppColors.teal : AppColors.textSecondary,
+                          letterSpacing: 0,
+                        )),
                   ),
                 ),
               ),

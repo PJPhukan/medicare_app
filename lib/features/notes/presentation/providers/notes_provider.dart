@@ -59,6 +59,7 @@ class _NotesNotifier extends StateNotifier<_NotesState> {
       final list = await _fetch();
       state = state.copyWith(notes: list, isLoading: false);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -110,6 +111,7 @@ class _NotesNotifier extends StateNotifier<_NotesState> {
       AppLogger.i('Note deleted ✓', tag: 'Notes');
     } catch (e, s) {
       AppLogger.e('Note delete failed', tag: 'Notes', error: e, stack: s as StackTrace?);
+            if (!mounted) return;
       state = state.copyWith(notes: prev, error: e.toString());
     }
   }

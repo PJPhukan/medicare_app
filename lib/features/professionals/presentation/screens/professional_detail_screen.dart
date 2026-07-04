@@ -8,8 +8,11 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
-import 'professionals_screen.dart' show ProData, ProConnState, ProPlanType, ProConnectSheet;
-import '../../../connections/presentation/screens/chat_screen.dart';
+import 'professionals_screen.dart'
+    show ProData, ProConnState, ProPlanType, ProConnectSheet;
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/router/route_args.dart';
 
 // ─── Mock review model ────────────────────────────────────────────────────────
 
@@ -35,7 +38,14 @@ class _Review {
 
 List<_Review> _generateReviews(String proId) {
   final rng = math.Random(proId.hashCode);
-  final names = ['Anjali S.', 'Rajesh K.', 'Priya M.', 'Suresh P.', 'Nita R.', 'Vikas T.'];
+  final names = [
+    'Anjali S.',
+    'Rajesh K.',
+    'Priya M.',
+    'Suresh P.',
+    'Nita R.',
+    'Vikas T.'
+  ];
   final comments = [
     'Extremely professional and caring. Made me feel comfortable throughout the process.',
     'Very knowledgeable and takes time to explain everything clearly. Highly recommend.',
@@ -48,9 +58,12 @@ List<_Review> _generateReviews(String proId) {
     return _Review(
       reviewer: names[i % names.length],
       overall: double.parse(o.toStringAsFixed(1)),
-      communication: double.parse((3.5 + rng.nextDouble() * 1.5).toStringAsFixed(1)),
-      expertise: double.parse((3.5 + rng.nextDouble() * 1.5).toStringAsFixed(1)),
-      availability: double.parse((3.5 + rng.nextDouble() * 1.5).toStringAsFixed(1)),
+      communication:
+          double.parse((3.5 + rng.nextDouble() * 1.5).toStringAsFixed(1)),
+      expertise:
+          double.parse((3.5 + rng.nextDouble() * 1.5).toStringAsFixed(1)),
+      availability:
+          double.parse((3.5 + rng.nextDouble() * 1.5).toStringAsFixed(1)),
       comment: comments[i % comments.length],
       date: DateTime.now().subtract(Duration(days: 10 + rng.nextInt(120))),
     );
@@ -64,10 +77,12 @@ class ProfessionalDetailScreen extends ConsumerStatefulWidget {
   const ProfessionalDetailScreen({super.key, required this.pro});
 
   @override
-  ConsumerState<ProfessionalDetailScreen> createState() => _ProfessionalDetailScreenState();
+  ConsumerState<ProfessionalDetailScreen> createState() =>
+      _ProfessionalDetailScreenState();
 }
 
-class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScreen> {
+class _ProfessionalDetailScreenState
+    extends ConsumerState<ProfessionalDetailScreen> {
   late final List<_Review> _reviews;
   late final double _overallAvg;
   late final double _communicationAvg;
@@ -78,22 +93,26 @@ class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScr
   void initState() {
     super.initState();
     _reviews = _generateReviews(widget.pro.id);
-    _overallAvg = _reviews.map((r) => r.overall).reduce((a, b) => a + b) / _reviews.length;
-    _communicationAvg = _reviews.map((r) => r.communication).reduce((a, b) => a + b) / _reviews.length;
-    _expertiseAvg = _reviews.map((r) => r.expertise).reduce((a, b) => a + b) / _reviews.length;
-    _availabilityAvg = _reviews.map((r) => r.availability).reduce((a, b) => a + b) / _reviews.length;
+    _overallAvg = _reviews.map((r) => r.overall).reduce((a, b) => a + b) /
+        _reviews.length;
+    _communicationAvg =
+        _reviews.map((r) => r.communication).reduce((a, b) => a + b) /
+            _reviews.length;
+    _expertiseAvg = _reviews.map((r) => r.expertise).reduce((a, b) => a + b) /
+        _reviews.length;
+    _availabilityAvg =
+        _reviews.map((r) => r.availability).reduce((a, b) => a + b) /
+            _reviews.length;
   }
 
   void _showConnect([ProPlanType? initial]) {
     if (widget.pro.connectionState == ProConnState.connected) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChatScreen(
-            connectionId: 'conn_${widget.pro.id}',
-            professionalName: widget.pro.name,
-            professionalSpecialty: widget.pro.categoryName,
-          ),
+      context.push(
+        AppRoutes.chat,
+        extra: ChatArgs(
+          connectionId: 'conn_${widget.pro.id}',
+          professionalName: widget.pro.name,
+          professionalSpecialty: widget.pro.categoryName,
         ),
       );
       return;
@@ -125,14 +144,15 @@ class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScr
               backgroundColor: context.bg,
               surfaceTintColor: Colors.transparent,
               leading: GestureDetector(
-                onTap: () => Navigator.pop(context),
+                onTap: () => context.pop(),
                 child: Container(
                   margin: const EdgeInsets.only(left: 12, top: 8, bottom: 8),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.45),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      color: Colors.white, size: 20),
                 ),
               ),
               flexibleSpace: FlexibleSpaceBar(
@@ -141,7 +161,11 @@ class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScr
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF4D9EFF), Color(0xFF00E5C3), Color(0xFFA855F7)],
+                      colors: [
+                        Color(0xFF4D9EFF),
+                        Color(0xFF00E5C3),
+                        Color(0xFFA855F7)
+                      ],
                     ),
                   ),
                   child: Stack(
@@ -150,7 +174,8 @@ class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScr
                         opacity: 0.07,
                         child: GridView.builder(
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 20,
                             childAspectRatio: 1,
                           ),
@@ -176,17 +201,16 @@ class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScr
                   children: [
                     _IdentitySection(pro: pro),
                     const SizedBox(height: 20),
-
                     if (pro.bio.isNotEmpty) ...[
                       _SectionLabel(AppStrings.bio),
                       const SizedBox(height: 8),
                       AppCard(
                         padding: const EdgeInsets.all(16),
-                        child: AppText.bodyMd(pro.bio, color: context.secondaryText),
+                        child: AppText.bodyMd(pro.bio,
+                            color: context.secondaryText),
                       ),
                       const SizedBox(height: 16),
                     ],
-
                     if (pro.certifications.isNotEmpty) ...[
                       _SectionLabel(AppStrings.certifications),
                       const SizedBox(height: 8),
@@ -195,17 +219,17 @@ class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScr
                         child: Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: pro.certifications.map((c) => _CertBadge(label: c)).toList(),
+                          children: pro.certifications
+                              .map((c) => _CertBadge(label: c))
+                              .toList(),
                         ),
                       ),
                       const SizedBox(height: 16),
                     ],
-
                     _SectionLabel(AppStrings.selectPlanTitle),
                     const SizedBox(height: 8),
                     _PlanCards(pro: pro, onSelect: _showConnect),
                     const SizedBox(height: 16),
-
                     _SectionLabel('${AppStrings.reviews} (${_reviews.length})'),
                     const SizedBox(height: 8),
                     _ReviewsCard(
@@ -221,8 +245,8 @@ class _ProfessionalDetailScreenState extends ConsumerState<ProfessionalDetailScr
             ),
           ],
         ),
-
-        bottomNavigationBar: _BottomConnectBar(pro: pro, onConnect: _showConnect),
+        bottomNavigationBar:
+            _BottomConnectBar(pro: pro, onConnect: _showConnect),
       ),
     );
   }
@@ -258,7 +282,8 @@ class _IdentitySection extends StatelessWidget {
                   AppText.h2(pro.name, textAlign: TextAlign.center),
                   if (pro.isVerified) ...[
                     const SizedBox(width: 6),
-                    const Icon(Icons.verified_rounded, size: 20, color: AppColors.teal),
+                    const Icon(Icons.verified_rounded,
+                        size: 20, color: AppColors.teal),
                   ],
                 ],
               ),
@@ -272,7 +297,8 @@ class _IdentitySection extends StatelessWidget {
                   _Badge(label: pro.categoryName, color: pro.categoryColor),
                   _Badge(
                     icon: Icons.star_rounded,
-                    label: '${pro.averageRating.toStringAsFixed(1)} (${pro.ratingCount})',
+                    label:
+                        '${pro.averageRating.toStringAsFixed(1)} (${pro.ratingCount})',
                     color: AppColors.amber,
                   ),
                   _Badge(
@@ -331,9 +357,30 @@ class _PlanCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final plans = [
-      (type: ProPlanType.hourly,  label: AppStrings.hourlyPlan,  desc: AppStrings.perHour,  rate: pro.hourlyRate,  color: AppColors.teal,   icon: Icons.schedule_rounded),
-      (type: ProPlanType.daily,   label: AppStrings.dailyPlan,   desc: AppStrings.perDay,   rate: pro.dailyRate,   color: AppColors.blue,   icon: Icons.calendar_today_rounded),
-      (type: ProPlanType.monthly, label: AppStrings.monthlyPlan, desc: AppStrings.perMonth, rate: pro.monthlyRate, color: AppColors.purple, icon: Icons.date_range_rounded),
+      (
+        type: ProPlanType.hourly,
+        label: AppStrings.hourlyPlan,
+        desc: AppStrings.perHour,
+        rate: pro.hourlyRate,
+        color: AppColors.teal,
+        icon: Icons.schedule_rounded
+      ),
+      (
+        type: ProPlanType.daily,
+        label: AppStrings.dailyPlan,
+        desc: AppStrings.perDay,
+        rate: pro.dailyRate,
+        color: AppColors.blue,
+        icon: Icons.calendar_today_rounded
+      ),
+      (
+        type: ProPlanType.monthly,
+        label: AppStrings.monthlyPlan,
+        desc: AppStrings.perMonth,
+        rate: pro.monthlyRate,
+        color: AppColors.purple,
+        icon: Icons.date_range_rounded
+      ),
     ];
 
     return Row(
@@ -341,26 +388,34 @@ class _PlanCards extends StatelessWidget {
         final available = p.rate != null;
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: p.type == ProPlanType.monthly ? 0 : 8),
+            padding:
+                EdgeInsets.only(right: p.type == ProPlanType.monthly ? 0 : 8),
             child: GestureDetector(
               onTap: available ? () => onSelect(p.type) : null,
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: available ? p.color.withValues(alpha: 0.08) : context.cardBg,
+                  color: available
+                      ? p.color.withValues(alpha: 0.08)
+                      : context.cardBg,
                   borderRadius: AppBorderRadius.lgAll,
                   border: Border.all(
-                    color: available ? p.color.withValues(alpha: 0.3) : context.borderCol,
+                    color: available
+                        ? p.color.withValues(alpha: 0.3)
+                        : context.borderCol,
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(p.icon, size: 18, color: available ? p.color : AppColors.textHint),
+                    Icon(p.icon,
+                        size: 18,
+                        color: available ? p.color : AppColors.textHint),
                     const SizedBox(height: 8),
                     AppText.labelSm(
                       p.label,
-                      color: available ? context.primaryText : AppColors.textHint,
+                      color:
+                          available ? context.primaryText : AppColors.textHint,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -424,20 +479,21 @@ class _ReviewsCard extends StatelessWidget {
                     children: List.generate(
                       5,
                       (i) => Icon(
-                        i < overall.round() ? Icons.star_rounded : Icons.star_outline_rounded,
+                        i < overall.round()
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
                         size: 16,
                         color: AppColors.amber,
                       ),
                     ),
                   ),
-                  AppText.bodyXs('${reviews.length} ${AppStrings.reviews}', color: AppColors.textHint),
+                  AppText.bodyXs('${reviews.length} ${AppStrings.reviews}',
+                      color: AppColors.textHint),
                 ],
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
           _StarBar(label: AppStrings.overallRatingLabel, value: overall),
           const SizedBox(height: 8),
           _StarBar(label: AppStrings.communicationRating, value: communication),
@@ -445,12 +501,10 @@ class _ReviewsCard extends StatelessWidget {
           _StarBar(label: AppStrings.expertiseRating, value: expertise),
           const SizedBox(height: 8),
           _StarBar(label: AppStrings.availabilityRating, value: availability),
-
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: context.borderCol, height: 1),
           ),
-
           ...reviews.map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: _ReviewItem(review: r),
@@ -497,7 +551,20 @@ class _ReviewItem extends StatelessWidget {
   const _ReviewItem({required this.review});
 
   String _fmtDate(DateTime d) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${months[d.month - 1]} ${d.day}, ${d.year}';
   }
 
@@ -515,15 +582,18 @@ class _ReviewItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.labelSm(review.reviewer),
-                  AppText.bodyXs(_fmtDate(review.date), color: AppColors.textHint),
+                  AppText.bodyXs(_fmtDate(review.date),
+                      color: AppColors.textHint),
                 ],
               ),
             ),
             Row(
               children: [
-                const Icon(Icons.star_rounded, size: 13, color: AppColors.amber),
+                const Icon(Icons.star_rounded,
+                    size: 13, color: AppColors.amber),
                 const SizedBox(width: 3),
-                AppText.labelXs(review.overall.toStringAsFixed(1), color: AppColors.amber),
+                AppText.labelXs(review.overall.toStringAsFixed(1),
+                    color: AppColors.amber),
               ],
             ),
           ],
@@ -554,28 +624,34 @@ class _BottomConnectBar extends StatelessWidget {
       child: switch (pro.connectionState) {
         ProConnState.connected => Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
+              const Icon(Icons.check_circle_rounded,
+                  color: AppColors.teal, size: 18),
               const SizedBox(width: 8),
               AppText.labelMd(AppStrings.connected, color: AppColors.teal),
               const Spacer(),
-              AppButton.primary(
+              AppButton(
+                variant: AppButtonVariant.primary,
                 label: AppStrings.openChat,
-                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                leading:
+                    const Icon(Icons.chat_bubble_outline_rounded, size: 16),
                 onPressed: onConnect,
               ),
             ],
           ),
         ProConnState.pending => Row(
             children: [
-              const Icon(Icons.hourglass_top_rounded, color: AppColors.amber, size: 18),
+              const Icon(Icons.hourglass_top_rounded,
+                  color: AppColors.amber, size: 18),
               const SizedBox(width: 8),
               AppText.labelMd(AppStrings.pending, color: AppColors.amber),
               const Spacer(),
               AppContainer.tinted(
                 color: AppColors.amber,
                 borderRadius: AppBorderRadius.lgAll,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: AppText.labelSm(AppStrings.cancelRequest, color: AppColors.amber, fontWeight: FontWeight.w600),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: AppText.labelSm(AppStrings.cancelRequest,
+                    color: AppColors.amber, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -593,9 +669,11 @@ class _BottomConnectBar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    const Icon(Icons.add_rounded,
+                        size: 16, color: Colors.white),
                     const SizedBox(width: 6),
-                    AppText.labelMd(AppStrings.connect, color: Colors.white, fontWeight: FontWeight.w700),
+                    AppText.labelMd(AppStrings.connect,
+                        color: Colors.white, fontWeight: FontWeight.w700),
                   ],
                 ),
               ),

@@ -1,8 +1,9 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
-import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// Single-select dropdown backed by a bottom sheet option list.
 class AppDropdownInput<T> extends StatefulWidget {
@@ -18,7 +19,10 @@ class AppDropdownInput<T> extends StatefulWidget {
     this.helper,
     this.enabled = true,
     this.leadingIcons,
-  });
+  })  : assert(
+          options.length == labels.length,
+          'options and labels must have the same length',
+        );
 
   final List<T> options;
   final List<String> labels;
@@ -46,6 +50,14 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
     _selected = widget.value;
   }
 
+  @override
+  void didUpdateWidget(AppDropdownInput<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      setState(() => _selected = widget.value);
+    }
+  }
+
   String get _displayLabel {
     if (_selected == null) return widget.hint ?? 'Select…';
     final idx = widget.options.indexOf(_selected as T);
@@ -57,7 +69,7 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _DropdownSheet<T>(
+      builder: (context) => _DropdownSheet<T>(
         options: widget.options,
         labels: widget.labels,
         selected: _selected,
@@ -79,39 +91,40 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
-        GestureDetector(
-          onTap: widget.enabled ? _openSheet : null,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              color: context.inputBg,
-              borderRadius: AppBorderRadius.mdAll,
-              border: Border.all(color: borderCol),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _displayLabel,
-                    style: AppTypography.bodyMd.copyWith(
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.enabled ? _openSheet : null,
+            borderRadius: AppBorderRadius.mdAll,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: context.inputBg,
+                borderRadius: AppBorderRadius.mdAll,
+                border: Border.all(color: borderCol),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppText.bodyMd(
+                      _displayLabel,
                       color: _selected != null
                           ? context.primaryText
                           : AppColors.textHint,
                     ),
                   ),
-                ),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: widget.enabled
-                      ? AppColors.textSecondary
-                      : AppColors.textHint,
-                ),
-              ],
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: widget.enabled
+                        ? AppColors.textSecondary
+                        : AppColors.textHint,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -121,13 +134,11 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
             const Icon(Icons.error_outline_rounded,
                 size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(child: Text(widget.error!,
-                style: AppTypography.bodyXs.copyWith(color: AppColors.error))),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(widget.helper!,
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(widget.helper!),
         ],
       ],
     );
@@ -151,9 +162,9 @@ class _DropdownSheet<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg      = context.cardBg;
-    final border  = context.borderCol;
-    final bottom  = MediaQuery.paddingOf(context).bottom;
+    final bg     = context.cardBg;
+    final border = context.borderCol;
+    final bottom = MediaQuery.paddingOf(context).bottom;
 
     return Container(
       decoration: BoxDecoration(
@@ -165,7 +176,8 @@ class _DropdownSheet<T> extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
               color: border,
@@ -182,7 +194,7 @@ class _DropdownSheet<T> extends StatelessWidget {
               return ListTile(
                 onTap: () {
                   onSelect(options[i]);
-                  Navigator.pop(context);
+                  context.pop();
                 },
                 leading: leadingIcons != null && leadingIcons![i] != null
                     ? Icon(leadingIcons![i],
@@ -191,12 +203,12 @@ class _DropdownSheet<T> extends StatelessWidget {
                             ? AppColors.teal
                             : AppColors.textSecondary)
                     : null,
-                title: Text(labels[i],
-                    style: AppTypography.bodyMd.copyWith(
-                      color: isSelected ? AppColors.teal : context.primaryText,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                    )),
+                title: AppText.bodyMd(
+                  labels[i],
+                  color: isSelected ? AppColors.teal : context.primaryText,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
                 trailing: isSelected
                     ? const Icon(Icons.check_rounded,
                         size: 18, color: AppColors.teal)

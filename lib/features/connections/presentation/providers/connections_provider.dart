@@ -9,6 +9,7 @@ import '../../domain/usecases/accept_request_usecase.dart';
 import '../../domain/usecases/confirm_payment_usecase.dart';
 import '../../domain/usecases/decline_request_usecase.dart';
 import '../../domain/usecases/fetch_connections_usecase.dart';
+import '../../domain/usecases/fetch_connections_as_professional_usecase.dart';
 import '../../domain/usecases/fetch_incoming_requests_usecase.dart';
 import '../../domain/usecases/get_my_requests_usecase.dart';
 import '../../domain/usecases/pay_for_request_usecase.dart';
@@ -48,6 +49,7 @@ final confirmPaymentProvider = Provider<ConfirmPaymentUseCase>(
 class _ConnectionsState {
   const _ConnectionsState({
     this.connections = const [],
+    this.professionalConnections = const [],
     this.myRequests = const [],
     this.incomingRequests = const [],
     this.isLoading = false,
@@ -55,6 +57,7 @@ class _ConnectionsState {
   });
 
   final List<ConnectionEntity> connections;
+  final List<ConnectionEntity> professionalConnections;
   final List<ConnectionRequestEntity> myRequests;
   final List<ConnectionRequestEntity> incomingRequests;
   final bool isLoading;
@@ -62,6 +65,7 @@ class _ConnectionsState {
 
   _ConnectionsState copyWith({
     List<ConnectionEntity>? connections,
+    List<ConnectionEntity>? professionalConnections,
     List<ConnectionRequestEntity>? myRequests,
     List<ConnectionRequestEntity>? incomingRequests,
     bool? isLoading,
@@ -69,6 +73,7 @@ class _ConnectionsState {
   }) =>
       _ConnectionsState(
         connections: connections ?? this.connections,
+        professionalConnections: professionalConnections ?? this.professionalConnections,
         myRequests: myRequests ?? this.myRequests,
         incomingRequests: incomingRequests ?? this.incomingRequests,
         isLoading: isLoading ?? this.isLoading,
@@ -79,6 +84,7 @@ class _ConnectionsState {
 class _ConnectionsNotifier extends StateNotifier<_ConnectionsState> {
   _ConnectionsNotifier(
     this._fetch,
+    this._fetchAsProfessional,
     this._fetchMyRequests,
     this._fetchRequests,
     this._accept,
@@ -88,6 +94,7 @@ class _ConnectionsNotifier extends StateNotifier<_ConnectionsState> {
   }
 
   final FetchConnectionsUseCase _fetch;
+  final FetchConnectionsAsProfessionalUseCase _fetchAsProfessional;
   final GetMyRequestsUseCase _fetchMyRequests;
   final FetchIncomingRequestsUseCase _fetchRequests;
   final AcceptRequestUseCase _accept;
@@ -98,13 +105,15 @@ class _ConnectionsNotifier extends StateNotifier<_ConnectionsState> {
     try {
       final results = await Future.wait([
         _fetch(),
+        _fetchAsProfessional(),
         _fetchMyRequests(),
         _fetchRequests(),
       ]);
       state = state.copyWith(
         connections: results[0] as List<ConnectionEntity>,
-        myRequests: results[1] as List<ConnectionRequestEntity>,
-        incomingRequests: results[2] as List<ConnectionRequestEntity>,
+        professionalConnections: results[1] as List<ConnectionEntity>,
+        myRequests: results[2] as List<ConnectionRequestEntity>,
+        incomingRequests: results[3] as List<ConnectionRequestEntity>,
         isLoading: false,
       );
     } catch (e) {
@@ -150,6 +159,7 @@ final connectionsProvider =
   final repo = ref.read(connectionsRepositoryProvider);
   return _ConnectionsNotifier(
     FetchConnectionsUseCase(repo),
+    FetchConnectionsAsProfessionalUseCase(repo),
     GetMyRequestsUseCase(repo),
     FetchIncomingRequestsUseCase(repo),
     AcceptRequestUseCase(repo),

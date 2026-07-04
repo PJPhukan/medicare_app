@@ -14,7 +14,15 @@ class ConnectionsRemoteDataSource {
 
   Future<List<Connection>> getConnections() async {
     final res = await _dio.get<Map<String, dynamic>>('$_base/connections');
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
+    return list
+        .map((e) => Connection.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Connection>> getConnectionsAsProfessional() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/connections?as=professional');
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Connection.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -23,7 +31,7 @@ class ConnectionsRemoteDataSource {
   /// Requests the patient has sent (GET /requests/mine → data: [...]).
   Future<List<ConnectionRequest>> getMyRequests() async {
     final res = await _dio.get<Map<String, dynamic>>('$_base/requests/mine');
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => ConnectionRequest.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -95,7 +103,7 @@ class ConnectionsRemoteDataSource {
     final res = await _dio.get<Map<String, dynamic>>(
       '$_base/connections/$connectionId/messages',
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
         .toList();

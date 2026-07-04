@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import '../../../../core/services/app_shell_service.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
@@ -263,36 +262,25 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         child: CustomScrollView(
         slivers: [
           // ── App bar ───────────────────────────────────────────────────────
-          SliverAppBar(
-            backgroundColor: bgPage,
-            pinned: true,
-            floating: false,
-            toolbarHeight: 60,
-            leading: Navigator.of(context).canPop()
-                ? IconButton(
-                    icon: Icon(Icons.arrow_back_rounded, size: 22, color: textColor),
-                    onPressed: () => Navigator.pop(context),
-                    tooltip: 'Back',
-                  )
-                : IconButton(
-                    icon: Icon(Icons.menu_rounded, size: 22, color: textColor),
-                    onPressed: openAppSidebar,
-                    tooltip: 'Menu',
-                  ),
-            title: Text(AppStrings.doseSchedule,
-                style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w800,
-                  color: textColor, letterSpacing: -0.3,
-                )),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.add_rounded),
-                color: AppColors.teal,
-                onPressed: _openAddDose,
-                tooltip: 'Add dose',
-              ),
-              const SizedBox(width: 4),
-            ],
+          AppSliverAppBar(
+            config: AppBarConfig(
+              title: AppStrings.doseSchedule,
+              subtitle: 'Track and manage your daily doses',
+              backgroundColor: bgPage,
+              actions: [
+                AppIconButton(
+                  icon: const Icon(Icons.add_rounded),
+                  iconSize: 20,
+                  color: AppColors.teal,
+                  size: 36,
+                  borderColor: context.borderCol,
+                  backgroundColor: context.cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  onPressed: _openAddDose,
+                  tooltip: 'Add dose',
+                ),
+              ],
+            ),
           ),
 
           SliverToBoxAdapter(

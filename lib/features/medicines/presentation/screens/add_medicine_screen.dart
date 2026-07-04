@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,7 +110,7 @@ class _AddMedicineScreenState extends ConsumerState<AddMedicineScreen> {
             patientProfileId: _whoMode == 'patient' ? null : null,
           );
       if (mounted) {
-        Navigator.pop(context);
+        context.pop();
         AppSnackbar.success(context, 'Medicine added successfully.');
       }
     } on Exception catch (e) {
@@ -141,7 +142,7 @@ class _AddMedicineScreenState extends ConsumerState<AddMedicineScreen> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => context.pop(),
             child: Padding(
               padding: const EdgeInsets.only(left: 8),
               child: Icon(Icons.close_rounded, color: context.primaryText),
@@ -471,7 +472,7 @@ class _AddMedicineScreenState extends ConsumerState<AddMedicineScreen> {
                 const SizedBox(height: 12),
                 FilledButton(
                   onPressed: () {
-                    Navigator.pop(context);
+                    context.pop();
                     AppSnackbar.success(context, AppStrings.requestSubmitted);
                   },
                   style:

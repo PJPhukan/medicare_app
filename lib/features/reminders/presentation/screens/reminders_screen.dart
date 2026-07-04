@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
@@ -193,10 +194,10 @@ class RemindersScreen extends ConsumerWidget {
             color: AppColors.textSecondary),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
+              onPressed: () => ctx.pop(false),
               child: AppText.bodySm(AppStrings.cancel)),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => ctx.pop(true),
             child: AppText.bodySm(AppStrings.delete, color: AppColors.red),
           ),
         ],
@@ -488,8 +489,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
     final title = _titleCtrl.text.trim();
     final unit = _unitCtrl.text.trim();
     if (title.isEmpty) return;
-    Navigator.pop(
-      context,
+    context.pop(
       _ReminderInput(
         title: title,
         time: _timeString,
@@ -555,7 +555,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                       style: TextStyle(
                           fontSize: 17, fontWeight: FontWeight.w600)),
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => context.pop(),
                     child: const Icon(Icons.close_rounded,
                         color: AppColors.textHint, size: 20),
                   ),

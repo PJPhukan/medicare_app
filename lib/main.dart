@@ -1,83 +1,35 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/utils/logger.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/constants/app_strings.dart';
 import 'core/local_db/local_cache.dart';
-import 'core/sync/sync_engine.dart';
-import 'core/services/biometric_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/firebase_messaging_service.dart';
 import 'core/services/event_log_service.dart';
 import 'core/api/client.dart';
+import 'core/router/app_router.dart';
+import 'core/sync/sync_engine.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
-import 'features/splash/presentation/screens/splash_screen.dart';
-import 'features/onboarding/presentation/screens/onboarding_screen.dart';
-import 'features/auth/presentation/screens/auth_flow.dart';
-import 'features/shell/presentation/screens/app_shell.dart';
 import 'features/professionals/presentation/providers/location_provider.dart';
 import 'firebase_options.dart';
 
 void main() async {
-  print('MAIN: Starting app initialization');
   WidgetsFlutterBinding.ensureInitialized();
-  print('MAIN: Flutter binding initialized');
 
-  await AppLogger.init();
-  print('MAIN: AppLogger initialized');
-
-  // Initialize Firebase with explicit options so it works on iOS even when
-  // GoogleService-Info.plist isn't bundled into the Xcode target.
-  print('MAIN: About to initialize Firebase');
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  print('MAIN: Firebase initialized');
-
-  print('MAIN: Getting shared preferences');
-  final prefs = await SharedPreferences.getInstance();
-  print('MAIN: SharedPreferences ready');
-
-  print('MAIN: Initializing NotificationService');
-  await NotificationService.init();
-  print('MAIN: NotificationService initialized');
-
-  // Initialize Firebase Messaging (push notifications)
-  print('MAIN: About to initialize FCM');
-  try {
-    await FirebaseMessagingService.initialize();
-    print('MAIN: FCM initialization completed successfully');
-  } catch (e) {
-    print('MAIN: FCM initialization ERROR: $e');
-  }
-
-  // Get and register FCM token with backend
-  print('MAIN: Getting FCM token...');
-  try {
-    final fcmToken = await FirebaseMessaging.instance.getToken();
-    print('MAIN: FCM Token: $fcmToken');
-    if (fcmToken != null) {
-      AppLogger.i('FCM Token obtained: $fcmToken', tag: 'FCM');
-      print('MAIN: Registering FCM token with backend...');
-      // Will be registered after auth provider is ready in the app
-    } else {
-      print('MAIN: FCM token is NULL');
-    }
-  } catch (e) {
-    print('MAIN: Failed to get FCM token: $e');
-  }
-
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+  await Future.wait([
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge),
   ]);
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarBrightness: Brightness.dark,
@@ -85,89 +37,48 @@ void main() async {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
   ));
+
+  final results = await Future.wait([
+    AppLogger.init(),
+    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+    SharedPreferences.getInstance(),
+  ]);
+  final prefs = results[2] as SharedPreferences;
+
   runApp(
     ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
       child: const MediForzeApp(),
     ),
   );
-}
 
-// ── Route observer ────────────────────────────────────────────────────────────
-
-final _routeObserver = _AppRouteObserver();
-
-class _AppRouteObserver extends NavigatorObserver {
-  @override
-  void didPush(Route route, Route? previousRoute) {
-    final name = route.settings.name ?? route.runtimeType.toString();
-    AppLogger.i('→ $name', tag: 'Nav');
-  }
-
-  @override
-  void didPop(Route route, Route? previousRoute) {
-    final prev = previousRoute?.settings.name ?? previousRoute?.runtimeType.toString() ?? '?';
-    AppLogger.i('← back to $prev', tag: 'Nav');
-  }
-
-  @override
-  void didReplace({Route? newRoute, Route? oldRoute}) {
-    final name = newRoute?.settings.name ?? newRoute?.runtimeType.toString() ?? '?';
-    AppLogger.i('⇒ $name', tag: 'Nav');
+  await NotificationService.init();
+  try {
+    await FirebaseMessagingService.initialize();
+  } catch (e) {
+    AppLogger.e('FCM initialization failed: $e', tag: 'FCM');
   }
 }
 
 // ── App root ──────────────────────────────────────────────────────────────────
 
-class MediForzeApp extends ConsumerWidget {
+class MediForzeApp extends ConsumerStatefulWidget {
   const MediForzeApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(syncEngineProvider);
-    final themeMode = ref.watch(themeModeProvider);
-
-    // Wire EventLogService → AppLogger once so AppLogger.track() reaches the backend.
-    AppLogger.setRemoteTracker(ref.read(eventLogServiceProvider).track);
-
-    // Keep logger in sync with auth state — log only the user ID (UUID), never PII.
-    ref.listen(authProvider, (prev, next) {
-      if (next.user?.id != prev?.user?.id) {
-        AppLogger.setUser(next.user?.id);
-      }
-    });
-
-    return MaterialApp(
-      title: AppStrings.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeMode,
-      navigatorObservers: [_routeObserver],
-      home: const _AppEntry(),
-    );
-  }
+  ConsumerState<MediForzeApp> createState() => _MediForzeAppState();
 }
 
-class _AppEntry extends ConsumerStatefulWidget {
-  const _AppEntry();
-
-  @override
-  ConsumerState<_AppEntry> createState() => _AppEntryState();
-}
-
-class _AppEntryState extends ConsumerState<_AppEntry>
+class _MediForzeAppState extends ConsumerState<MediForzeApp>
     with WidgetsBindingObserver {
-  Widget _current = const SizedBox.shrink();
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _current = SplashScreen(onDone: _afterSplash);
     AppLogger.i('App launched', tag: 'Lifecycle');
+    // Pre-warm auth so secure-storage reads run during the splash animation.
+    ref.read(authProvider.notifier).initialized;
+    AppLogger.setRemoteTracker(ref.read(eventLogServiceProvider).track);
   }
 
   @override
@@ -185,8 +96,6 @@ class _AppEntryState extends ConsumerState<_AppEntry>
         AppLogger.i('App backgrounded', tag: 'Lifecycle');
       case AppLifecycleState.detached:
         AppLogger.i('App detached', tag: 'Lifecycle');
-        // App is being terminated ("closed completely") — drop the saved
-        // location so the professionals page starts fresh on next launch.
         ref.read(locationProvider.notifier).clear();
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
@@ -194,101 +103,45 @@ class _AppEntryState extends ConsumerState<_AppEntry>
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // React to logout: when auth drops to unauthenticated while showing the
-    // main shell, redirect to login without waiting for a callback.
-    ref.listen<bool>(
-      authProvider.select((s) => s.isAuthenticated),
-      (previous, next) {
-        if (previous == true && !next && _current is AppShell) {
-          setState(() => _current = AuthFlow(onAuthenticated: _afterAuth));
-        }
-        // Register FCM token when user authenticates
-        if (previous != true && next) {
-          _registerFcmToken(ref);
-        }
-      },
-    );
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
-      child: KeyedSubtree(
-        key: ValueKey(_current.runtimeType),
-        child: _current,
-      ),
-    );
-  }
-
-  Future<void> _afterSplash() async {
-    final seen = await hasSeenOnboarding();
-    if (!mounted) return;
-
-    if (!seen) {
-      setState(() => _current = OnboardingScreen(onDone: _afterOnboarding));
-      return;
-    }
-
-    // Wait for secure-storage token load to finish before reading auth state.
-    await ref.read(authProvider.notifier).initialized;
-    if (!mounted) return;
-
-    final auth = ref.read(authProvider);
-    if (auth.isAuthenticated) {
-      final biometric = ref.read(biometricServiceProvider);
-      if (biometric.isEnabled) {
-        final ok = await biometric.authenticate(
-          reason: 'Unlock MediForze to continue',
-        );
-        if (!mounted) return;
-        if (ok) {
-          setState(() => _current = const AppShell());
-        } else {
-          // Biometric failed/cancelled — fall back to login
-          setState(() => _current = AuthFlow(onAuthenticated: _afterAuth));
-        }
-      } else {
-        // Token valid, biometric not set up — go straight to app
-        setState(() => _current = const AppShell());
-      }
-      return;
-    }
-
-    // No valid token — require login
-    setState(() => _current = AuthFlow(onAuthenticated: _afterAuth));
-  }
-
-  void _afterOnboarding() {
-    if (!mounted) return;
-    setState(() => _current = AuthFlow(onAuthenticated: _afterAuth));
-  }
-
-  void _afterAuth() {
-    if (!mounted) return;
-    setState(() => _current = const AppShell());
-  }
-
-  Future<void> _registerFcmToken(WidgetRef ref) async {
+  Future<void> _registerFcmToken() async {
     try {
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null && mounted) {
-        // Get the dio client and register the token
         final dio = ref.read(dioProvider);
         final platform = Platform.isAndroid ? 'ANDROID' : 'IOS';
         await dio.post(
           '/api/notifications/tokens',
           data: {'token': fcmToken, 'platform': platform},
         );
-        AppLogger.i('FCM token registered ($platform): $fcmToken', tag: 'FCM');
+        AppLogger.i('FCM token registered ($platform)', tag: 'FCM');
       }
     } catch (e) {
       AppLogger.e('Failed to register FCM token: $e', tag: 'FCM');
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    ref.watch(syncEngineProvider);
+    final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
+
+    ref.listen(authProvider, (prev, next) {
+      if (next.user?.id != prev?.user?.id) {
+        AppLogger.setUser(next.user?.id);
+      }
+      if (prev?.isAuthenticated != true && next.isAuthenticated) {
+        _registerFcmToken();
+      }
+    });
+
+    return MaterialApp.router(
+      title: AppStrings.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeMode,
+      routerConfig: router,
+    );
+  }
 }

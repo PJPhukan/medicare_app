@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -119,7 +120,7 @@ class _ServiceAreasScreenState extends ConsumerState<ServiceAreasScreen> {
           elevation: 0,
           leading: IconButton(
             icon: Icon(Icons.arrow_back_rounded, color: context.primaryText),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
           ),
           title: AppText.h3('Service Areas'),
           actions: [
@@ -836,7 +837,7 @@ class _RateSheetState extends State<_RateSheet> {
     setState(() => _saving = true);
     try {
       await widget.onSave(_parse(_h), _parse(_d), _parse(_m));
-      if (mounted) Navigator.pop(context);
+      if (mounted) context.pop();
     } catch (_) {
       if (mounted) AppSnackbar.error(context, 'Could not save rates');
     } finally {
@@ -912,7 +913,7 @@ class _DistrictSheetState extends State<_DistrictSheet> {
         _parse(_d),
         _parse(_m),
       );
-      if (mounted) Navigator.pop(context);
+      if (mounted) context.pop();
     } catch (_) {
       if (mounted) {
         AppSnackbar.error(context, 'District not found in our system');
@@ -997,7 +998,8 @@ class _SheetScaffold extends StatelessWidget {
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
-              child: AppButton.primary(
+              child: AppButton(
+                variant: AppButtonVariant.primary,
                 label: saveLabel,
                 onPressed: saving ? null : onSave,
                 isLoading: saving,
@@ -1168,7 +1170,7 @@ class _AddAreaSheetState extends State<_AddAreaSheet> {
         _custom ? _parse(_d) : null,
         _custom ? _parse(_m) : null,
       );
-      if (mounted) Navigator.pop(context);
+      if (mounted) context.pop();
     } catch (_) {
       if (mounted) AppSnackbar.error(context, 'Could not add area');
     } finally {

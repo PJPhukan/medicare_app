@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -134,7 +135,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     pinned: true,
                     leading: AppIconButton(
                       icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.pop(),
                     ),
                     title: AppText.h3(AppStrings.community),
                     actions: [

@@ -3,7 +3,7 @@ import '../../domain/repositories/dashboard_repository.dart';
 import '../datasources/dashboard_remote_datasource.dart';
 import '../../../schedule/domain/entities/appointment_entity.dart';
 import '../../../vitals/domain/entities/vital_reading_entity.dart';
-import '../../../notifications/domain/entities/notification_entity.dart';
+import '../models/banner_config.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
   const DashboardRepositoryImpl(this._ds);
@@ -15,18 +15,14 @@ class DashboardRepositoryImpl implements DashboardRepository {
     DashboardStatsEntity stats,
     List<DoseEntity> doses,
     List<VitalReadingEntity> recentVitals,
-    List<NotificationEntity> notifications,
+    List<DashboardBanner> banners,
   })> getDashboardData() async {
     final data = await _ds.getDashboardData();
-    final DashboardStatsEntity stats = data.stats;
-    final List<DoseEntity> doses = data.doses;
-    final List<VitalReadingEntity> recentVitals = data.recentVitals;
-    final List<NotificationEntity> notifications = data.notifications;
     return (
-      stats: stats,
-      doses: doses,
-      recentVitals: recentVitals,
-      notifications: notifications,
+      stats: data.stats,
+      doses: data.doses,
+      recentVitals: data.recentVitals,
+      banners: data.banners,
     );
   }
 }

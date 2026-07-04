@@ -31,8 +31,7 @@ class AppEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null)
-              Icon(icon, size: 48, color: AppColors.textHint),
+            if (icon != null) Icon(icon, size: 48, color: AppColors.textHint),
             const SizedBox(height: 16),
             Text(
               title,
@@ -49,7 +48,10 @@ class AppEmptyState extends StatelessWidget {
             ],
             if (action != null && actionLabel != null) ...[
               const SizedBox(height: 20),
-              AppButton.outline(label: actionLabel!, onPressed: action),
+              AppButton(
+                  variant: AppButtonVariant.outline,
+                  label: actionLabel!,
+                  onPressed: action),
             ],
           ],
         ),
@@ -78,7 +80,8 @@ class AppErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.error),
+            const Icon(Icons.error_outline_rounded,
+                size: 48, color: AppColors.error),
             const SizedBox(height: 16),
             Text(
               AppStrings.somethingWentWrong,
@@ -87,11 +90,15 @@ class AppErrorState extends StatelessWidget {
             ),
             if (message != null) ...[
               const SizedBox(height: 6),
-              Text(message!, style: AppTypography.bodySm, textAlign: TextAlign.center),
+              Text(message!,
+                  style: AppTypography.bodySm, textAlign: TextAlign.center),
             ],
             if (onRetry != null) ...[
               const SizedBox(height: 20),
-              AppButton.primary(label: AppStrings.retry, onPressed: onRetry),
+              AppButton(
+                  variant: AppButtonVariant.primary,
+                  label: AppStrings.retry,
+                  onPressed: onRetry),
             ],
           ],
         ),

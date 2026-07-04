@@ -14,6 +14,9 @@ abstract class AppSpacing {
   static const double x5l = 48;
   static const double x6l = 64;
 
+  // ─── Component heights ───────────────────────────────────────────────────────
+  static const double appBarHeight = 68;
+
   // ─── Page padding ────────────────────────────────────────────────────────────
   static const EdgeInsets pagePadding   = EdgeInsets.symmetric(horizontal: lg, vertical: lg);
   static const EdgeInsets pageHPadding  = EdgeInsets.symmetric(horizontal: lg);

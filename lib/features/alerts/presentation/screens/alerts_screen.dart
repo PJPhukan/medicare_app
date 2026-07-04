@@ -260,7 +260,8 @@ class _AlertCard extends StatelessWidget {
                     AppText.bodyXs(_timeAgo(alert.createdAt)),
                     const Spacer(),
 
-                    AppButton.ghost(
+                    AppButton(
+                      variant: AppButtonVariant.ghost,
                       label: AppStrings.viewDetails,
                       size: AppButtonSize.sm,
                       color: meta.color,
@@ -269,7 +270,8 @@ class _AlertCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
 
-                    AppButton.ghost(
+                    AppButton(
+                      variant: AppButtonVariant.ghost,
                       label: AppStrings.dismiss,
                       size: AppButtonSize.sm,
                       color: AppColors.textHint,

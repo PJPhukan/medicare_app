@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
@@ -68,7 +69,7 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
       isDanger: true,
     );
     if (confirmed != true || !mounted) return;
-    Navigator.pop(context);
+    context.pop();
   }
 
   @override
@@ -86,7 +87,7 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => context.pop(),
             child: Padding(
               padding: const EdgeInsets.only(left: 8),
               child: Icon(Icons.arrow_back_rounded, color: context.primaryText),
@@ -98,8 +99,10 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
               onPressed: () => AppSnackbar.info(context, 'Edit coming soon'),
               child: Text(AppStrings.edit,
                   style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600,
-                    color: AppColors.teal, letterSpacing: 0,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.teal,
+                    letterSpacing: 0,
                   )),
             ),
           ],
@@ -146,11 +149,15 @@ class _MedicineDetailScreenState extends State<MedicineDetailScreen>
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 labelStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600,
-                    color: AppColors.teal, letterSpacing: 0),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.teal,
+                    letterSpacing: 0),
                 unselectedLabelStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary, letterSpacing: 0),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                    letterSpacing: 0),
                 indicatorColor: AppColors.teal,
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: context.borderCol,
@@ -203,8 +210,10 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(label,
           style: TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w600,
-              color: color, letterSpacing: 0.4)),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
+              letterSpacing: 0.4)),
     );
   }
 }
@@ -263,10 +272,8 @@ class _OverviewTab extends StatelessWidget {
         _Section(
           label: AppStrings.adherenceLabel,
           child: Row(
-            children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-                .asMap()
-                .entries
-                .map((e) {
+            children:
+                ['M', 'T', 'W', 'T', 'F', 'S', 'S'].asMap().entries.map((e) {
               final i = e.key;
               final todayIdx = DateTime.now().weekday - 1;
               final isFuture = i > todayIdx;
@@ -282,9 +289,8 @@ class _OverviewTab extends StatelessWidget {
                             ? AppColors.teal.withValues(alpha: 0.15)
                             : AppColors.teal.withValues(alpha: 0.08),
                     borderRadius: AppBorderRadius.smAll,
-                    border: isFuture
-                        ? Border.all(color: context.borderCol)
-                        : null,
+                    border:
+                        isFuture ? Border.all(color: context.borderCol) : null,
                   ),
                   child: Center(
                     child: Text(
@@ -320,16 +326,18 @@ class _OverviewTab extends StatelessWidget {
           children: [
             if (med.status != MedStatus.prn) ...[
               Expanded(
-                child: AppButton.primary(
+                child: AppButton(
+                  variant: AppButtonVariant.primary,
                   label: AppStrings.markTaken,
                   isFullWidth: true,
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => context.pop(),
                 ),
               ),
               const SizedBox(width: 10),
             ],
             Expanded(
-              child: AppButton.outline(
+              child: AppButton(
+                variant: AppButtonVariant.outline,
                 label: AppStrings.restock,
                 isFullWidth: true,
                 onPressed: () {},
@@ -341,8 +349,8 @@ class _OverviewTab extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.error,
                 side: const BorderSide(color: AppColors.error),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               ),
               child: const Icon(Icons.delete_outline_rounded, size: 18),
             ),
@@ -366,8 +374,10 @@ class _ScheduleTab extends StatelessWidget {
       children: [
         Text(AppStrings.fullScheduleLabel,
             style: const TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w600,
-              color: AppColors.textHint, letterSpacing: 1,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textHint,
+              letterSpacing: 1,
             )),
         const SizedBox(height: 12),
         if (med.status == MedStatus.prn || med.times.isEmpty)
@@ -396,8 +406,7 @@ class _ScheduleTab extends StatelessWidget {
               3: ['Morning', 'Afternoon', 'Evening'],
               4: ['Morning', 'Noon', 'Evening', 'Night'],
             };
-            final label =
-                (slotNames[med.times.length] ?? [])[e.key];
+            final label = (slotNames[med.times.length] ?? [])[e.key];
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Container(
@@ -425,7 +434,8 @@ class _ScheduleTab extends StatelessWidget {
                         children: [
                           Text(label,
                               style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                   letterSpacing: 0)),
                           AppText.bodySm('1 dose · ${med.food}'),
                         ],
@@ -467,7 +477,8 @@ class _StockTab extends StatelessWidget {
                 children: [
                   Text('${med.stock}',
                       style: TextStyle(
-                        fontSize: 42, fontWeight: FontWeight.w800,
+                        fontSize: 42,
+                        fontWeight: FontWeight.w800,
                         color: context.primaryText,
                       )),
                   AppText.bodySm(AppStrings.unitsRemaining),
@@ -502,8 +513,10 @@ class _StockTab extends StatelessWidget {
         const SizedBox(height: 20),
         Text(AppStrings.stockHistoryLabel,
             style: const TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w600,
-              color: AppColors.textHint, letterSpacing: 1,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textHint,
+              letterSpacing: 1,
             )),
         const SizedBox(height: 12),
         ...[
@@ -531,7 +544,8 @@ class _StockTab extends StatelessWidget {
                     ),
                     child: Center(
                       child: AppText.labelMd(h.$1,
-                          color: h.$1 == '+' ? AppColors.teal : AppColors.error),
+                          color:
+                              h.$1 == '+' ? AppColors.teal : AppColors.error),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -549,10 +563,11 @@ class _StockTab extends StatelessWidget {
               ),
             )),
         const SizedBox(height: 20),
-        AppButton.outline(
+        AppButton(
           label: AppStrings.addStock,
-          icon: const Icon(Icons.add_rounded, size: 18),
+          leading: const Icon(Icons.add_rounded, size: 18),
           isFullWidth: true,
+          variant: AppButtonVariant.outline,
           onPressed: () {},
         ),
       ],
@@ -575,11 +590,13 @@ class _InfoTab extends StatelessWidget {
         _AccordionItem(title: 'How to take', body: med.description),
         _AccordionItem(
           title: 'Side effects',
-          body: 'Common side effects may include nausea, dizziness, or stomach upset. Contact your doctor if symptoms persist.',
+          body:
+              'Common side effects may include nausea, dizziness, or stomach upset. Contact your doctor if symptoms persist.',
         ),
         _AccordionItem(
           title: 'Precautions',
-          body: 'Inform your doctor of all medications you are taking. Do not stop without consulting your healthcare provider.',
+          body:
+              'Inform your doctor of all medications you are taking. Do not stop without consulting your healthcare provider.',
         ),
         const SizedBox(height: 16),
         Container(
@@ -587,8 +604,7 @@ class _InfoTab extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.warning.withValues(alpha: 0.08),
             borderRadius: AppBorderRadius.mdAll,
-            border:
-                Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
+            border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
           ),
           child: Text(
             AppStrings.infoDisclaimer,
@@ -671,8 +687,10 @@ class _Section extends StatelessWidget {
         children: [
           Text(label,
               style: const TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w600,
-                color: AppColors.textHint, letterSpacing: 1,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textHint,
+                letterSpacing: 1,
               )),
           const SizedBox(height: 8),
           child,

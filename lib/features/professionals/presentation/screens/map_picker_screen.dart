@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -126,7 +127,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
 
     final state = ref.read(locationProvider);
     if (state.hasLocation) {
-      Navigator.pop(context, true);
+      context.pop(true);
     } else {
       AppSnackbar.error(context, state.error ?? 'Could not resolve that location');
     }
@@ -164,7 +165,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
         .read(locationProvider.notifier)
         .selectArea(area, pincode: _searchedPincode);
     if (!mounted) return;
-    Navigator.pop(context, true);
+    context.pop(true);
   }
 
   @override
@@ -179,7 +180,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
           elevation: 0,
           leading: IconButton(
             icon: Icon(Icons.arrow_back_rounded, color: context.primaryText),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
           ),
           title: AppText.h3('Select on map'),
         ),

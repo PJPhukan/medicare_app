@@ -159,7 +159,8 @@ class AppProfessionalCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: AppButton.secondary(
+                      child: AppButton(
+                        variant: AppButtonVariant.secondary,
                         label: AppStrings.viewProfile,
                         size: AppButtonSize.sm,
                         onPressed: onView,
@@ -173,7 +174,7 @@ class AppProfessionalCard extends StatelessWidget {
                           variant: AppButtonVariant.primary,
                           size: AppButtonSize.sm,
                           color: c,
-                          icon: const Icon(Icons.message_rounded),
+                          leading: const Icon(Icons.message_rounded),
                           onPressed: onMessage,
                         ),
                         ProConnectionState.pending => DecoratedBox(
@@ -196,7 +197,7 @@ class AppProfessionalCard extends StatelessWidget {
                           variant: AppButtonVariant.primary,
                           size: AppButtonSize.sm,
                           color: c,
-                          icon: const Icon(Icons.person_add_rounded),
+                          leading: const Icon(Icons.person_add_rounded),
                           onPressed: onConnect,
                         ),
                       },

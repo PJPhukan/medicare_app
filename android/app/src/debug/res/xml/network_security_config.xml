@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only network security config. Allows plain HTTP to any host so
+  development builds work regardless of which LAN IP the dev machine has.
+  This file is merged over the main config only for debug builds — release
+  and profile builds use android/app/src/main/res/xml/network_security_config.xml.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -11,7 +11,7 @@ class NotesRemoteDataSource {
     final res = await _dio.get<Map<String, dynamic>>(
       '${ApiConstants.users}/notes',
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Note.fromJson(e as Map<String, dynamic>))
         .toList();

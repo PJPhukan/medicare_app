@@ -23,8 +23,7 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
     final EmergencyContactEntity contact = await _ds.addContact(
       name: name,
       phone: phone,
-      relationship: relationship,
-      isPrimary: isPrimary,
+      relation: relationship,
     );
     return contact;
   }

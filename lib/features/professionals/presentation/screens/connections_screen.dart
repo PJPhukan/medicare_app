@@ -8,13 +8,28 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../connections/domain/entities/connection_entity.dart';
 import '../../../connections/presentation/providers/connections_provider.dart';
-import '../../../connections/presentation/screens/chat_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/router/route_args.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 
 String _fmtDate(String isoStr) {
   final dt = DateTime.tryParse(isoStr);
   if (dt == null) return '';
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
   return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
 }
 
@@ -31,14 +46,12 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
   bool _asPatient = true;
 
   void _openChat(ConnectionEntity conn) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          connectionId: conn.id,
-          professionalName: conn.connectedUser.name,
-          professionalSpecialty: '',
-        ),
+    context.push(
+      AppRoutes.chat,
+      extra: ChatArgs(
+        connectionId: conn.id,
+        professionalName: conn.connectedUser.name,
+        professionalSpecialty: '',
       ),
     );
   }
@@ -57,17 +70,12 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
         backgroundColor: context.bg,
         body: CustomScrollView(
           slivers: [
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: context.bg,
-              surfaceTintColor: Colors.transparent,
-              expandedHeight: 96,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 16, bottom: 14),
-                title: AppText.h3(AppStrings.myConnections),
+            AppSliverAppBar(
+              config: AppBarConfig(
+                title: AppStrings.myConnections,
+                subtitle: 'Your healthcare professionals',
               ),
             ),
-
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -77,11 +85,11 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                 ),
               ),
             ),
-
             if (isLoading)
               const SliverFillRemaining(
                 child: Center(
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.teal),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.teal),
                 ),
               )
             else if (connections.isEmpty)
@@ -111,7 +119,8 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen> {
                     const SizedBox(height: 10),
                     ...connections.map((c) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: _ConnectionCard(conn: c, onChat: () => _openChat(c)),
+                          child: _ConnectionCard(
+                              conn: c, onChat: () => _openChat(c)),
                         )),
                   ]),
                 ),
@@ -141,8 +150,14 @@ class _TabToggle extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _Tab(label: AppStrings.asPatient, isActive: asPatient, onTap: () => onToggle(true)),
-          _Tab(label: AppStrings.asProfessionalTab, isActive: !asPatient, onTap: () => onToggle(false)),
+          _Tab(
+              label: AppStrings.asPatient,
+              isActive: asPatient,
+              onTap: () => onToggle(true)),
+          _Tab(
+              label: AppStrings.asProfessionalTab,
+              isActive: !asPatient,
+              onTap: () => onToggle(false)),
         ],
       ),
     );
@@ -153,7 +168,8 @@ class _Tab extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
-  const _Tab({required this.label, required this.isActive, required this.onTap});
+  const _Tab(
+      {required this.label, required this.isActive, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -218,14 +234,18 @@ class _ConnectionCard extends StatelessWidget {
                         AppContainer.tinted(
                           color: AppColors.teal,
                           borderRadius: AppBorderRadius.pill,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          child: AppText.labelXs('ACTIVE', color: AppColors.teal, fontWeight: FontWeight.w700),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          child: AppText.labelXs('ACTIVE',
+                              color: AppColors.teal,
+                              fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
                     if (since.isNotEmpty) ...[
                       const SizedBox(height: 3),
-                      AppText.bodySm('${AppStrings.connectionStarted} $since', color: context.secondaryText),
+                      AppText.bodySm('${AppStrings.connectionStarted} $since',
+                          color: context.secondaryText),
                     ],
                   ],
                 ),
@@ -233,9 +253,11 @@ class _ConnectionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          AppButton.primary(
+          AppButton(
+            variant: AppButtonVariant.primary,
             label: AppStrings.openChat,
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
+            leading:
+                const Icon(Icons.chat_bubble_outline_rounded, size: 14),
             isFullWidth: true,
             onPressed: onChat,
           ),

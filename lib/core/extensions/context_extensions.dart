@@ -8,7 +8,7 @@ extension ThemeX on BuildContext {
   // ── Backgrounds ─────────────────────────────────────────────────────────────
   Color get bg         => isDark ? AppColors.dark900  : AppColors.light100;
   Color get cardBg     => isDark ? AppColors.dark800  : Colors.white;
-  Color get inputBg    => isDark ? AppColors.dark700  : AppColors.light200;
+  Color get inputBg    => isDark ? AppColors.dark800  : AppColors.light100;
   Color get borderCol  => isDark ? AppColors.dark600  : AppColors.light300;
   Color get dividerCol => isDark ? AppColors.dark500  : AppColors.light300;
 

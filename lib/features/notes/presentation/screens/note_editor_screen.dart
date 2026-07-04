@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
@@ -70,7 +71,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     widget.note.content = _contentCtrl.text.trim();
     widget.note.colour = _selectedColour;
     widget.note.updatedAt = DateTime.now();
-    Navigator.pop(context);
+    context.pop();
   }
 
   @override

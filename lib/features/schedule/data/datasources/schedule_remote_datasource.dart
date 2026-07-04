@@ -12,7 +12,7 @@ class ScheduleRemoteDataSource {
       ApiConstants.todayDoses,
       queryParameters: date != null ? {'date': date} : null,
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => TodayDose.fromJson(e as Map<String, dynamic>))
         .toList();

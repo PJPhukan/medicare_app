@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
@@ -42,12 +43,14 @@ class AppDialog extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 16),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: (iconColor ?? AppColors.teal).withValues(alpha: 0.12),
+                    color:
+                        (iconColor ?? AppColors.teal).withValues(alpha: 0.12),
                     borderRadius: AppBorderRadius.lgAll,
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Icon(icon, color: iconColor ?? AppColors.teal, size: 24),
+                    child: Icon(icon,
+                        color: iconColor ?? AppColors.teal, size: 24),
                   ),
                 ),
               ),
@@ -86,23 +89,29 @@ class AppDialog extends StatelessWidget {
     return showDialog<bool>(
       context: context,
       builder: (_) => AppDialog(
-        icon: isDanger ? Icons.warning_amber_rounded : Icons.help_outline_rounded,
+        icon:
+            isDanger ? Icons.warning_amber_rounded : Icons.help_outline_rounded,
         iconColor: isDanger ? AppColors.error : AppColors.amber,
         title: title,
-        content: Text(message, style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary)),
+        content: Text(message,
+            style:
+                AppTypography.bodyMd.copyWith(color: AppColors.textSecondary)),
         actions: [
-          AppButton.secondary(
+          AppButton(
+            variant: AppButtonVariant.secondary,
             label: cancelLabel ?? AppStrings.cancel,
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => context.pop(false),
           ),
           isDanger
-              ? AppButton.danger(
+              ? AppButton(
+                  variant: AppButtonVariant.danger,
                   label: confirmLabel ?? AppStrings.confirm,
-                  onPressed: () => Navigator.of(context).pop(true),
+                  onPressed: () => context.pop(true),
                 )
-              : AppButton.primary(
+              : AppButton(
+                  variant: AppButtonVariant.primary,
                   label: confirmLabel ?? AppStrings.confirm,
-                  onPressed: () => Navigator.of(context).pop(true),
+                  onPressed: () => context.pop(true),
                 ),
         ],
       ),
@@ -125,11 +134,14 @@ class AppDialog extends StatelessWidget {
         icon: icon ?? Icons.info_outline_rounded,
         iconColor: iconColor ?? AppColors.blue,
         title: title,
-        content: Text(message, style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary)),
+        content: Text(message,
+            style:
+                AppTypography.bodyMd.copyWith(color: AppColors.textSecondary)),
         actions: [
-          AppButton.primary(
+          AppButton(
+            variant: AppButtonVariant.primary,
             label: okLabel ?? AppStrings.ok,
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             isFullWidth: true,
           ),
         ],

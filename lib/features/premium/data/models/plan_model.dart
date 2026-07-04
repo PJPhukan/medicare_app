@@ -18,7 +18,7 @@ class PlanModel extends PlanEntity {
   factory PlanModel.fromJson(Map<String, dynamic> json) => PlanModel(
         id: json['id'] as String,
         name: json['name'] as String,
-        code: json['code'] as String,
+        code: json['code'] as String? ?? '',
         description: json['description'] as String? ?? '',
         maxPatients: json['maxPatients'] as int? ?? 1,
         maxCaretakers: json['maxCaretakers'] as int? ?? 0,

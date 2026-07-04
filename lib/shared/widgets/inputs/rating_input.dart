@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../texts/app_text.dart';
 
 /// Star rating input. Supports half-star and full-star modes.
 class AppRatingInput extends StatefulWidget {
@@ -64,22 +64,21 @@ class _AppRatingInputState extends State<AppRatingInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 8),
         ],
         Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(widget.maxStars, (i) {
-            return GestureDetector(
+            final radius = BorderRadius.circular(widget.starSize / 2);
+            return InkWell(
               onTapDown: (d) =>
                   _onTap(i, d.localPosition.dx, widget.starSize),
+              borderRadius: radius,
               child: Icon(
                 _iconFor(i),
                 size: widget.starSize,
-                color: _value > i
-                    ? color
-                    : color.withValues(alpha: 0.3),
+                color: _value > i ? color : color.withValues(alpha: 0.3),
               ),
             );
           }),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/data/country_codes.dart';
 import '../../../../core/utils/validators.dart';
@@ -9,6 +8,7 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/widgets/inputs/email_phone_input.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_shell.dart';
+import '../widgets/auth_social_buttons.dart';
 import 'auth_flow.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -17,12 +17,14 @@ class LoginScreen extends ConsumerStatefulWidget {
   final VoidCallback onRegister;
   final VoidCallback? onLoggedIn;
   final VoidCallback? onForgotPassword;
+  final void Function(AuthDraft) onDraftChanged;
 
- const LoginScreen({
+  const LoginScreen({
     super.key,
     required this.draft,
     required this.onSentOtp,
     required this.onRegister,
+    required this.onDraftChanged,
     this.onLoggedIn,
     this.onForgotPassword,
   });
@@ -76,9 +78,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_validate()) return;
     final id   = _identifier;
     final pass = _passCtrl.text;
-    widget.draft.identifier = id;
-    widget.draft.password   = pass;
-    widget.draft.useOtp     = _useOtp;
+    widget.onDraftChanged(widget.draft.copyWith(
+      identifier: id,
+      password: pass,
+      useOtp: _useOtp,
+    ));
     try {
       if (_useOtp) {
         await ref.read(authProvider.notifier).sendOtp(identifier: id, purpose: 'LOGIN');
@@ -99,7 +103,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isLoading = authState.isLoading;
 
     return AuthShell(
-      showBack: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -149,14 +152,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              AppButton.ghost(
+              AppButton(
+                variant: AppButtonVariant.ghost,
                 label: _useOtp ? AppStrings.usePasswordInstead : AppStrings.useOtpInstead,
                 size: AppButtonSize.sm,
                 color: AppColors.teal,
                 onPressed: () => setState(() { _useOtp = !_useOtp; _passError = null; }),
               ),
               if (!_useOtp)
-                AppButton.ghost(
+                AppButton(
+                  variant: AppButtonVariant.ghost,
                   label: AppStrings.forgotPassword,
                   size: AppButtonSize.sm,
                   color: AppColors.textSecondary,
@@ -180,25 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           AuthDivider(label: AppStrings.orContinueWith),
           const SizedBox(height: 20),
 
-          Row(
-            children: [
-              Expanded(
-                child: AppButton.social(
-                  label: 'Google',
-                  logo: const AuthGoogleIcon(),
-                  onPressed: () {},
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppButton.social(
-                  label: 'Apple',
-                  logo: const AuthAppleIcon(),
-                  onPressed: () {},
-                ),
-              ),
-            ],
-          ),
+          const AuthSocialButtons(),
           const SizedBox(height: 32),
 
           Row(

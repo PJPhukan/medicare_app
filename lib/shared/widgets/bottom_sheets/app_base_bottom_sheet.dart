@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
@@ -171,7 +172,7 @@ class AppBaseBottomSheet extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.close_rounded, size: 20),
                       color: AppColors.textSecondary,
-                      onPressed: onClose ?? () => Navigator.pop(context),
+                      onPressed: onClose ?? () => context.pop(),
                       visualDensity: VisualDensity.compact,
                     ),
                 ],

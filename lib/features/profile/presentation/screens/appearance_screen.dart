@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/extensions/context_extensions.dart';
@@ -45,7 +46,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
               expandedHeight: 100,
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),

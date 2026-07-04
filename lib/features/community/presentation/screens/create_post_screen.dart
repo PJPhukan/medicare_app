@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +12,14 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../core/utils/logger.dart';
 
-const _kCategories = ['General', 'Diabetes', 'Hypertension', 'Mental Health', 'Nutrition', 'Fitness'];
+const _kCategories = [
+  'General',
+  'Diabetes',
+  'Hypertension',
+  'Mental Health',
+  'Nutrition',
+  'Fitness'
+];
 
 class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key});
@@ -37,12 +45,12 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     setState(() => _posting = true);
     try {
       await ref.read(createPostProvider).call(
-        title: _category,
-        body: _contentCtrl.text.trim(),
-      );
+            title: _category,
+            body: _contentCtrl.text.trim(),
+          );
       AppLogger.i('Post created ✓', tag: 'Community');
       if (!mounted) return;
-      Navigator.pop(context, true);
+      context.pop(true);
     } on Exception catch (e) {
       AppLogger.e('Post create failed', tag: 'Community', error: e);
       if (!mounted) return;
@@ -68,8 +76,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               pinned: true,
               expandedHeight: 100,
               leading: AppIconButton(
-                icon: Icon(Icons.close_rounded, color: context.primaryText, size: 22),
-                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.close_rounded,
+                    color: context.primaryText, size: 22),
+                onPressed: () => context.pop(),
               ),
               actions: [
                 Padding(
@@ -78,7 +87,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     valueListenable: _contentCtrl,
                     builder: (_, val, __) {
                       final canPost = val.text.trim().isNotEmpty && !_posting;
-                      return AppButton.primary(
+                      return AppButton(
+                        variant: AppButtonVariant.primary,
                         label: AppStrings.createPost,
                         size: AppButtonSize.sm,
                         isLoading: _posting,
@@ -94,7 +104,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 background: Container(color: context.bg),
               ),
             ),
-
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
               sliver: SliverList(
@@ -111,7 +120,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             AppText.bodyMd(name, fontWeight: FontWeight.w600),
-                            AppText.bodyXs('Posting to Community', color: context.secondaryText),
+                            AppText.bodyXs('Posting to Community',
+                                color: context.secondaryText),
                           ],
                         ),
                       ],
@@ -128,7 +138,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  AppText.labelXs('CATEGORY', color: AppColors.textHint, fontWeight: FontWeight.w600),
+                  AppText.labelXs('CATEGORY',
+                      color: AppColors.textHint, fontWeight: FontWeight.w600),
                   const SizedBox(height: 10),
 
                   Wrap(
@@ -140,12 +151,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                         onTap: () => setState(() => _category = c),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 160),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: sel ? AppColors.teal.withValues(alpha: 0.12) : context.cardBg,
+                            color: sel
+                                ? AppColors.teal.withValues(alpha: 0.12)
+                                : context.cardBg,
                             borderRadius: AppBorderRadius.pill,
                             border: Border.all(
-                              color: sel ? AppColors.teal.withValues(alpha: 0.4) : context.borderCol,
+                              color: sel
+                                  ? AppColors.teal.withValues(alpha: 0.4)
+                                  : context.borderCol,
                             ),
                           ),
                           child: AppText.labelSm(
@@ -169,10 +185,12 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.blue),
+                            const Icon(Icons.info_outline_rounded,
+                                size: 14, color: AppColors.blue),
                             const SizedBox(width: 6),
                             AppText.labelSm('Community Guidelines',
-                                color: AppColors.blue, fontWeight: FontWeight.w700),
+                                color: AppColors.blue,
+                                fontWeight: FontWeight.w700),
                           ],
                         ),
                         const SizedBox(height: 8),

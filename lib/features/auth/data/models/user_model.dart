@@ -12,16 +12,25 @@ class UserModel extends UserEntity {
     super.avatarUrl,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: json['id'] as String,
-        name: json['name'] as String?,
-        phone: json['phone'] as String?,
-        email: json['email'] as String?,
-        avatarUrl: json['avatarUrl'] as String?,
-        isActive: json['isActive'] as bool? ?? true,
-        theme: json['theme'] as String? ?? 'SYSTEM',
-        createdAt: json['createdAt'] as String? ?? '',
-      );
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    if (id is! String) throw const FormatException('Invalid user id');
+    final rawTheme = (json['theme'] as String? ?? 'SYSTEM').toLowerCase();
+    final createdAtStr = json['createdAt'] as String?;
+    return UserModel(
+      id: id,
+      name: json['name'] as String?,
+      phone: json['phone'] as String?,
+      email: json['email'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+      isActive: json['isActive'] as bool? ?? true,
+      theme: UserTheme.values.firstWhere(
+        (t) => t.name == rawTheme,
+        orElse: () => UserTheme.system,
+      ),
+      createdAt: createdAtStr != null ? DateTime.tryParse(createdAtStr) : null,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -30,7 +39,7 @@ class UserModel extends UserEntity {
         'email': email,
         'avatarUrl': avatarUrl,
         'isActive': isActive,
-        'theme': theme,
-        'createdAt': createdAt,
+        'theme': theme.name.toUpperCase(),
+        'createdAt': createdAt?.toIso8601String(),
       };
 }

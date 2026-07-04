@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// Text input that converts entries into removable chips on submit / comma.
 class AppChipTagInput extends StatefulWidget {
@@ -45,19 +46,31 @@ class _AppChipTagInputState extends State<AppChipTagInput> {
   }
 
   @override
+  void didUpdateWidget(AppChipTagInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTags != widget.initialTags) {
+      setState(() => _tags = List.from(widget.initialTags));
+    }
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
   }
 
+  bool get _atMax => widget.maxTags != null && _tags.length >= widget.maxTags!;
+
   void _add(String raw) {
-    final trimmed = raw.trim().replaceAll(',', '');
+    // Strip only the trailing comma that triggered the add, not commas mid-text.
+    final trimmed = raw.trim().endsWith(',')
+        ? raw.trim().substring(0, raw.trim().length - 1).trim()
+        : raw.trim();
     if (trimmed.isEmpty) return;
-    if (_tags.contains(trimmed)) {
+    if (_tags.contains(trimmed) || _atMax) {
       _ctrl.clear();
       return;
     }
-    if (widget.maxTags != null && _tags.length >= widget.maxTags!) return;
     setState(() => _tags.add(trimmed));
     _ctrl.clear();
     widget.onChanged?.call(List.from(_tags));
@@ -78,8 +91,7 @@ class _AppChipTagInputState extends State<AppChipTagInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
         Container(
@@ -109,15 +121,18 @@ class _AppChipTagInputState extends State<AppChipTagInput> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(tag,
-                              style: AppTypography.bodySm.copyWith(
-                                  color: chipColor,
-                                  fontWeight: FontWeight.w500)),
-                          const SizedBox(width: 4),
-                          GestureDetector(
+                          AppText.bodySm(tag,
+                              color: chipColor,
+                              fontWeight: FontWeight.w500),
+                          const SizedBox(width: 2),
+                          InkWell(
                             onTap: widget.enabled ? () => _remove(tag) : null,
-                            child: Icon(Icons.close_rounded,
-                                size: 14, color: chipColor),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Icon(Icons.close_rounded,
+                                  size: 14, color: chipColor),
+                            ),
                           ),
                         ],
                       ),
@@ -127,7 +142,7 @@ class _AppChipTagInputState extends State<AppChipTagInput> {
               if (_tags.isNotEmpty) const SizedBox(height: 8),
               TextField(
                 controller: _ctrl,
-                enabled: widget.enabled,
+                enabled: widget.enabled && !_atMax,
                 onSubmitted: _add,
                 onChanged: (v) {
                   if (v.endsWith(',')) _add(v);
@@ -155,13 +170,11 @@ class _AppChipTagInputState extends State<AppChipTagInput> {
             const Icon(Icons.error_outline_rounded,
                 size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(child: Text(widget.error!,
-                style: AppTypography.bodyXs.copyWith(color: AppColors.error))),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(widget.helper!,
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(widget.helper!),
         ],
       ],
     );

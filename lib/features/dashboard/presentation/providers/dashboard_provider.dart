@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/client.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 import '../../data/datasources/dashboard_remote_datasource.dart';
+import '../../data/models/banner_config.dart';
 import '../../data/models/dashboard_stats_model.dart';
 import '../../data/repositories/dashboard_repository_impl.dart';
 import '../../domain/repositories/dashboard_repository.dart';
@@ -10,7 +11,6 @@ import '../../../schedule/data/models/appointment_model.dart';
 import '../../../schedule/presentation/providers/schedule_provider.dart';
 import '../../../schedule/domain/usecases/add_appointment_usecase.dart';
 import '../../../vitals/data/models/vital_reading_model.dart';
-import '../../../notifications/data/models/notification_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/utils/logger.dart';
 
@@ -19,7 +19,7 @@ class DashboardState {
     this.stats,
     this.doses = const [],
     this.recentVitals = const [],
-    this.notifications = const [],
+    this.banners = const [],
     this.isLoading = false,
     this.error,
     this.isOffline = false,
@@ -28,7 +28,7 @@ class DashboardState {
   final DashboardStats? stats;
   final List<TodayDose> doses;
   final List<VitalReading> recentVitals;
-  final List<AppNotification> notifications;
+  final List<DashboardBanner> banners;
   final bool isLoading;
   final String? error;
   final bool isOffline;
@@ -37,7 +37,7 @@ class DashboardState {
     DashboardStats? stats,
     List<TodayDose>? doses,
     List<VitalReading>? recentVitals,
-    List<AppNotification>? notifications,
+    List<DashboardBanner>? banners,
     bool? isLoading,
     String? error,
     bool? isOffline,
@@ -47,7 +47,7 @@ class DashboardState {
         stats: stats ?? this.stats,
         doses: doses ?? this.doses,
         recentVitals: recentVitals ?? this.recentVitals,
-        notifications: notifications ?? this.notifications,
+        banners: banners ?? this.banners,
         isLoading: isLoading ?? this.isLoading,
         error: clearError ? null : (error ?? this.error),
         isOffline: isOffline ?? this.isOffline,
@@ -75,11 +75,11 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         stats: data.stats as DashboardStats,
         doses: data.doses.whereType<TodayDose>().toList(),
         recentVitals: data.recentVitals.whereType<VitalReading>().toList(),
-        notifications: data.notifications.whereType<AppNotification>().toList(),
+        banners: data.banners,
         isLoading: false,
         isOffline: !_ref.read(isOnlineProvider),
       );
-    } on Exception catch (e) {
+    } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -105,7 +105,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       await _markDose(doseTimeId: doseTimeId, status: status);
       AppLogger.i('Dose marked ✓', tag: 'Dashboard');
       AppLogger.track('dose.marked', meta: {'status': status});
-    } on Exception catch (e, s) {
+    } catch (e, s) {
       AppLogger.e('Dose mark failed', tag: 'Dashboard', error: e, stack: s);
       await load();
       rethrow;

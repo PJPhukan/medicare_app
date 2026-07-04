@@ -9,7 +9,7 @@ class RemindersRemoteDataSource {
 
   Future<List<ReminderScheduleModel>> getSchedules() async {
     final res = await _dio.get<Map<String, dynamic>>(ApiConstants.reminderSchedules);
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => ReminderScheduleModel.fromJson(e as Map<String, dynamic>))
         .toList();

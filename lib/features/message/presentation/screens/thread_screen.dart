@@ -130,16 +130,19 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
         backgroundColor: context.bg,
         resizeToAvoidBottomInset: true,
         appBar: AppAppBar(
-          titleWidget: Row(
-            children: [
-              AppAvatar(name: widget.contactName, size: AppAvatarSize.sm),
-              const SizedBox(width: 10),
-              AppText.labelMd(widget.contactName),
-            ],
-          ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: Container(height: 1, color: context.borderCol),
+          config: AppBarConfig(
+            leading: AppBarLeading.back,
+            titleWidget: Row(
+              children: [
+                AppAvatar(name: widget.contactName, size: AppAvatarSize.sm),
+                const SizedBox(width: 10),
+                AppText.labelMd(widget.contactName),
+              ],
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(height: 1, color: context.borderCol),
+            ),
           ),
         ),
         body: Column(

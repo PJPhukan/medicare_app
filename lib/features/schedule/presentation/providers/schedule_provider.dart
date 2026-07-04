@@ -82,7 +82,8 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
         isLoading: false,
         isOffline: !_ref.read(isOnlineProvider),
       );
-    } on Exception catch (e) {
+    } catch (e, s) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

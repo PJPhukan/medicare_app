@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/logger.dart';
 
 /// Transparent read-through cache for GET responses.
 ///
@@ -21,7 +22,18 @@ class CacheInterceptor extends Interceptor {
 
   /// Pre-compute the cache key for a given path without making a request.
   /// Used by SyncService to invalidate stale entries after a mutation syncs.
-  static String keyFor(String baseUrl, String path) => '$_prefix$baseUrl$path';
+  /// Pass [queryParameters] to match a specific paginated/filtered response.
+  static String keyFor(
+    String baseUrl,
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) {
+    final uri = Uri.parse('$baseUrl$path');
+    final full = queryParameters != null
+        ? uri.replace(queryParameters: queryParameters.map((k, v) => MapEntry(k, '$v')))
+        : uri;
+    return '$_prefix$full';
+  }
 
   // ── Response: save to cache ──────────────────────────────────────────────────
 
@@ -30,7 +42,9 @@ class CacheInterceptor extends Interceptor {
     if (_isGet(response.requestOptions) && response.statusCode == 200) {
       try {
         _prefs.setString(_key(response.requestOptions), jsonEncode(response.data));
-      } catch (_) {}
+      } catch (e, s) {
+        AppLogger.w('Cache write failed', error: e, stack: s);
+      }
     }
     handler.next(response);
   }

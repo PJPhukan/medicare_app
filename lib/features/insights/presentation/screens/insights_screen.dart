@@ -89,14 +89,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         backgroundColor: context.bg,
         body: CustomScrollView(
           slivers: [
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: context.bg,
-              surfaceTintColor: Colors.transparent,
-              expandedHeight: 96,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 16, bottom: 14),
-                title: AppText.h3(AppStrings.insights),
+            AppSliverAppBar(
+              config: AppBarConfig(
+                title: AppStrings.insights,
+                subtitle: 'Your medication adherence at a glance',
               ),
             ),
 

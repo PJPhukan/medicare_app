@@ -1,9 +1,9 @@
+import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import '../../../../core/services/app_shell_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -160,7 +160,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       builder: (_) => _ReportDetailSheet(
         report: report,
         onDelete: () {
-          Navigator.pop(context);
+          context.pop();
           ref.read(reportsProvider.notifier).deleteReport(report.id);
           AppSnackbar.info(context, AppStrings.reportDeleted);
         },
@@ -197,38 +197,28 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           child: CustomScrollView(
             slivers: [
               // ── App bar ────────────────────────────────────────────────────
-              SliverAppBar(
-                pinned: true,
-                backgroundColor: context.bg,
-                surfaceTintColor: Colors.transparent,
-                expandedHeight: 96,
-                leading: AppIconButton(
-                  icon: const Icon(Icons.menu_rounded, size: 22),
-                  onPressed: openAppSidebar,
-                ),
-                flexibleSpace: FlexibleSpaceBar(
-                  titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-                  title: AppText.h3(AppStrings.myReports),
-                ),
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: AppButton.outline(
+              AppSliverAppBar(
+                config: AppBarConfig(
+                  title: AppStrings.myReports,
+                  subtitle: 'All your medical documents in one place',
+                  actions: [
+                    AppButton(
+                      variant: AppButtonVariant.outline,
                       label: AppStrings.uploadReport,
-                      icon: const Icon(Icons.upload_rounded, size: 15),
+                      leading: const Icon(Icons.upload_rounded, size: 15),
                       size: AppButtonSize.sm,
                       color: AppColors.teal,
                       onPressed: _openUpload,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
               // ── Search bar ─────────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                  child: AppSearchField(
+                  child: AppSearchTextInput(
                     controller: _searchCtrl,
                     hint: AppStrings.searchReports,
                     onClear: _searchCtrl.clear,
@@ -536,26 +526,28 @@ class _ReportDetailSheet extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: AppButton.outline(
+                child: AppButton(
                   label: 'View',
-                  icon: const Icon(Icons.visibility_outlined, size: 15),
+                  variant: AppButtonVariant.outline,
+                  leading: const Icon(Icons.visibility_outlined, size: 15),
                   color: AppColors.teal,
                   isFullWidth: true,
                   onPressed: () {
-                    Navigator.pop(context);
+                    context.pop();
                     AppSnackbar.info(context, 'Opening ${report.title}…');
                   },
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: AppButton.outline(
+                child: AppButton(
                   label: AppStrings.download,
-                  icon: const Icon(Icons.download_rounded, size: 15),
+                  variant: AppButtonVariant.outline,
+                  leading: const Icon(Icons.download_rounded, size: 15),
                   color: AppColors.blue,
                   isFullWidth: true,
                   onPressed: () {
-                    Navigator.pop(context);
+                    context.pop();
                     AppSnackbar.info(context, 'Downloading ${report.title}…');
                   },
                 ),
@@ -648,7 +640,7 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
       );
       if (!mounted) return;
       widget.onUploaded();
-      Navigator.pop(context);
+      context.pop();
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _uploading = false);
@@ -689,7 +681,7 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
                   AppText.h3(AppStrings.uploadReport),
                   AppIconButton(
                     icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textHint),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => context.pop(),
                   ),
                 ],
               ),
@@ -778,10 +770,11 @@ class _UploadSheetState extends ConsumerState<_UploadSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: AppButton.secondary(
+                    child: AppButton(
+                      variant: AppButtonVariant.secondary,
                       label: AppStrings.cancel,
                       isFullWidth: true,
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => context.pop(),
                     ),
                   ),
                   const SizedBox(width: 10),

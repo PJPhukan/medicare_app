@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -83,7 +84,10 @@ class _VoiceSearchDialogState extends State<_VoiceSearchDialog>
     final available = await _speech.initialize(
       onError: (e) {
         if (!mounted) return;
-        setState(() { _isListening = false; _liveAmplitude = 0; });
+        setState(() {
+          _isListening = false;
+          _liveAmplitude = 0;
+        });
         if (_keepListening) {
           Future.delayed(const Duration(milliseconds: 400), _listen);
         }
@@ -91,7 +95,10 @@ class _VoiceSearchDialogState extends State<_VoiceSearchDialog>
       onStatus: (s) {
         if (!mounted) return;
         if (s == 'done' || s == 'notListening') {
-          setState(() { _isListening = false; _liveAmplitude = 0; });
+          setState(() {
+            _isListening = false;
+            _liveAmplitude = 0;
+          });
           // Small delay lets the engine fully release before we restart.
           // Without this, _speech.isListening may still be true and _listen() exits early.
           if (_keepListening) {
@@ -157,7 +164,7 @@ class _VoiceSearchDialogState extends State<_VoiceSearchDialog>
     HapticFeedback.mediumImpact();
     _keepListening = false;
     _speech.cancel();
-    Navigator.of(context).pop();
+    context.pop();
     if (_text.trim().isNotEmpty) widget.onSearch(_text.trim());
   }
 
@@ -165,7 +172,7 @@ class _VoiceSearchDialogState extends State<_VoiceSearchDialog>
     HapticFeedback.selectionClick();
     _keepListening = false;
     _speech.cancel();
-    Navigator.of(context).pop();
+    context.pop();
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────────
@@ -210,7 +217,10 @@ class _VoiceSearchDialogState extends State<_VoiceSearchDialog>
                         end: Alignment.bottomCenter,
                         colors: isDark
                             ? [AppColors.teal, const Color(0xFF7C3AED)]
-                            : [const Color(0xFF9B59B6), const Color(0xFFF5A623)],
+                            : [
+                                const Color(0xFF9B59B6),
+                                const Color(0xFFF5A623)
+                              ],
                       ).createShader(bounds),
                       child: const Icon(Icons.mic_rounded, size: 36),
                     ),
@@ -248,9 +258,16 @@ class _VoiceSearchDialogState extends State<_VoiceSearchDialog>
         ],
       ),
       actions: [
-        AppButton.secondary(label: 'Cancel', onPressed: _cancel),
-        AppButton.outline(label: 'Retake', onPressed: _retake),
-        AppButton.primary(
+        AppButton(
+            variant: AppButtonVariant.secondary,
+            label: 'Cancel',
+            onPressed: _cancel),
+        AppButton(
+            variant: AppButtonVariant.outline,
+            label: 'Retake',
+            onPressed: _retake),
+        AppButton(
+          variant: AppButtonVariant.primary,
           label: 'Search',
           onPressed: _text.trim().isNotEmpty ? _search : null,
         ),
@@ -271,8 +288,8 @@ class _VoiceWavePainter extends CustomPainter {
     required this.isDark,
   });
 
-  final double phase;      // 0.0–1.0 from the 12-second rotation controller
-  final double amplitude;  // 0.0–1.0 real mic level (smoothed)
+  final double phase; // 0.0–1.0 from the 12-second rotation controller
+  final double amplitude; // 0.0–1.0 real mic level (smoothed)
   final bool isDark;
 
   // Per-line colors — opacity is set per-paint, no shader complications
@@ -300,48 +317,49 @@ class _VoiceWavePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center     = Offset(size.width / 2, size.height / 2);
+    final center = Offset(size.width / 2, size.height / 2);
     final baseRadius = size.width * 0.39;
-    final idleColor  = isDark ? AppColors.teal : const Color(0xFF9B59B6);
+    final idleColor = isDark ? AppColors.teal : const Color(0xFF9B59B6);
 
     // ── Always draw the base circle ──────────────────────────────────────────
     canvas.drawCircle(
       center,
       baseRadius,
       Paint()
-        ..color       = idleColor.withValues(alpha: 0.45)
+        ..color = idleColor.withValues(alpha: 0.45)
         ..strokeWidth = 2.0
-        ..style       = PaintingStyle.stroke,
+        ..style = PaintingStyle.stroke,
     );
 
     // ── Nothing to animate yet ───────────────────────────────────────────────
     if (amplitude < 0.02) return;
 
     // ── Wave lines ───────────────────────────────────────────────────────────
-    final colors    = isDark ? _darkColors : _lightColors;
+    final colors = isDark ? _darkColors : _lightColors;
     final animPhase = phase * 2 * math.pi;
-    final waveAmp   = size.width * 0.10 * amplitude;
+    final waveAmp = size.width * 0.10 * amplitude;
     const lineCount = 8;
     const frequency = 6;
-    const steps     = 300;
+    const steps = 300;
 
     for (int i = 0; i < lineCount; i++) {
       final rotOffset = (i / lineCount) * 2 * math.pi;
-      final color     = colors[i % colors.length];
+      final color = colors[i % colors.length];
 
       final paint = Paint()
-        ..color       = color.withValues(alpha: 0.50)
+        ..color = color.withValues(alpha: 0.50)
         ..strokeWidth = 1.5
-        ..style       = PaintingStyle.stroke
-        ..strokeCap   = StrokeCap.round;
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
 
       final path = Path();
       for (int j = 0; j <= steps; j++) {
-        final t     = j / steps;
+        final t = j / steps;
         final theta = t * 2 * math.pi + rotOffset;
-        final r     = baseRadius + waveAmp * math.sin(frequency * theta + animPhase);
-        final x     = center.dx + r * math.cos(theta);
-        final y     = center.dy + r * math.sin(theta);
+        final r =
+            baseRadius + waveAmp * math.sin(frequency * theta + animPhase);
+        final x = center.dx + r * math.cos(theta);
+        final y = center.dy + r * math.sin(theta);
         j == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
       }
       canvas.drawPath(path, paint);
@@ -350,7 +368,5 @@ class _VoiceWavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_VoiceWavePainter old) =>
-      old.phase != phase ||
-      old.amplitude != amplitude ||
-      old.isDark != isDark;
+      old.phase != phase || old.amplitude != amplitude || old.isDark != isDark;
 }

@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 /// URL input with inline format validation indicator.
 class AppUrlInput extends StatefulWidget {
@@ -40,7 +41,13 @@ class AppUrlInput extends StatefulWidget {
 }
 
 class _AppUrlInputState extends State<AppUrlInput> {
-  String _value = '';
+  late String _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.controller?.text ?? '';
+  }
 
   static final _urlRx = RegExp(
     r'^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$',
@@ -57,7 +64,7 @@ class _AppUrlInputState extends State<AppUrlInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
         Container(
@@ -108,13 +115,11 @@ class _AppUrlInputState extends State<AppUrlInput> {
           Row(children: [
             const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(child: Text(widget.error!,
-                style: AppTypography.bodyXs.copyWith(color: AppColors.error))),
+            Expanded(child: AppText.error(widget.error!)),
           ]),
         ] else if (widget.helper != null) ...[
           const SizedBox(height: 5),
-          Text(widget.helper!,
-              style: AppTypography.bodyXs.copyWith(color: AppColors.textHint)),
+          AppText.hint(widget.helper!),
         ],
       ],
     );

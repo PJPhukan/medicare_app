@@ -8,9 +8,8 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/widgets/skeleton/skeleton_base.dart';
 import '../providers/pro_profile_provider.dart';
-import 'become_professional_screen.dart';
-import 'service_areas_screen.dart';
-import 'payout_details_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 
 // ─── Model ────────────────────────────────────────────────────────────────────
@@ -117,21 +116,13 @@ class ProHubScreen extends ConsumerWidget {
     );
   }
 
-  void _openApply(BuildContext context) => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen()),
-      );
+  void _openApply(BuildContext context) => context.push(AppRoutes.settingsPro);
 
-  void _openEdit(BuildContext context) => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const BecomeProfessionalScreen(isEditing: true)),
-      );
+  void _openEdit(BuildContext context) => context.push(AppRoutes.settingsPro, extra: {'isEditing': true});
 
-  void _openServiceAreas(BuildContext context) => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ServiceAreasScreen()),
-      );
+  void _openServiceAreas(BuildContext context) => context.push(AppRoutes.settingsProHubAreas);
 
-  void _openPayoutDetails(BuildContext context) => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const PayoutDetailsScreen()),
-      );
+  void _openPayoutDetails(BuildContext context) => context.push(AppRoutes.settingsProHubPayout);
 }
 
 // ─── Payout details card ──────────────────────────────────────────────────────

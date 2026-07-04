@@ -11,7 +11,7 @@ class VitalsRemoteDataSource {
   Future<List<VitalConfig>> getConfigs() async {
     final res =
         await _dio.get<Map<String, dynamic>>(ApiConstants.vitalConfigs);
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => VitalConfig.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -19,7 +19,7 @@ class VitalsRemoteDataSource {
 
   Future<List<VitalReading>> getMyVitals() async {
     final res = await _dio.get<Map<String, dynamic>>(ApiConstants.myVitals);
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => VitalReading.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -41,6 +41,27 @@ class VitalsRemoteDataSource {
       },
     );
     return VitalReading.fromJson(res.data!['data'] as Map<String, dynamic>);
+  }
+
+  Future<({List<VitalReading> readings, String? nextCursor})> getVitalHistory({
+    required String configId,
+    required String filter,
+    String? cursor,
+    int limit = 20,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      ApiConstants.vitalHistory(configId),
+      queryParameters: {
+        'filter': filter,
+        'limit': limit,
+        if (cursor != null) 'cursor': cursor,
+      },
+    );
+    final data = res.data!['data'] as Map<String, dynamic>;
+    final readings = (data['readings'] as List<dynamic>)
+        .map((e) => VitalReading.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return (readings: readings, nextCursor: data['nextCursor'] as String?);
   }
 
   Future<VitalReading> updateReading({

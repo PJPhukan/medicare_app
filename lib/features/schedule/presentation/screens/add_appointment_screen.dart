@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
@@ -103,8 +104,7 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
     final name = _nameCtrl.text.trim();
     final unit = _unitCtrl.text.trim();
     if (name.isEmpty || unit.isEmpty) return;
-    Navigator.pop(
-      context,
+    context.pop(
       DoseInput(
         name: name,
         time: _timeString,
@@ -147,7 +147,7 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                 children: [
                   const Text(AppStrings.addDose, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => context.pop(),
                     child: const Icon(Icons.close_rounded, color: AppColors.textHint, size: 20),
                   ),
                 ],

@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,7 +67,7 @@ class ReportViewerScreen extends ConsumerWidget {
     );
     if (ok == true && context.mounted) {
       AppSnackbar.info(context, AppStrings.reportDeleted);
-      Navigator.pop(context);
+      context.pop();
     }
   }
 
@@ -91,7 +92,7 @@ class ReportViewerScreen extends ConsumerWidget {
               expandedHeight: 100,
               leading: AppIconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
               ),
               actions: [
                 AppIconButton(
@@ -222,9 +223,10 @@ class ReportViewerScreen extends ConsumerWidget {
                         AppText.bodyXs('Download the file to view its contents',
                             color: AppColors.textHint),
                         const SizedBox(height: 20),
-                        AppButton.outline(
+                        AppButton(
+                          variant: AppButtonVariant.outline,
                           label: AppStrings.download,
-                          icon: const Icon(Icons.download_rounded, size: 16),
+                          leading: const Icon(Icons.download_rounded, size: 16),
                           color: AppColors.teal,
                           size: AppButtonSize.sm,
                           onPressed: () => AppSnackbar.info(context, 'Downloading…'),
@@ -239,9 +241,10 @@ class ReportViewerScreen extends ConsumerWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: AppButton.outline(
+                        child: AppButton(
+                          variant: AppButtonVariant.outline,
                           label: AppStrings.share,
-                          icon: const Icon(Icons.share_rounded, size: 16),
+                          leading: const Icon(Icons.share_rounded, size: 16),
                           color: AppColors.blue,
                           isFullWidth: true,
                           onPressed: () => AppSnackbar.info(context, 'Sharing report…'),
@@ -249,9 +252,10 @@ class ReportViewerScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: AppButton.outline(
+                        child: AppButton(
+                          variant: AppButtonVariant.outline,
                           label: AppStrings.download,
-                          icon: const Icon(Icons.download_rounded, size: 16),
+                          leading: const Icon(Icons.download_rounded, size: 16),
                           color: AppColors.teal,
                           isFullWidth: true,
                           onPressed: () => AppSnackbar.info(context, 'Downloading…'),
@@ -259,9 +263,10 @@ class ReportViewerScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: AppButton.danger(
+                        child: AppButton(
+                          variant: AppButtonVariant.danger,
                           label: AppStrings.delete,
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                          leading: const Icon(Icons.delete_outline_rounded, size: 16),
                           isFullWidth: true,
                           onPressed: () => _confirmDelete(context),
                         ),

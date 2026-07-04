@@ -7,11 +7,24 @@ class EmergencyRemoteDataSource {
 
   final Dio _dio;
 
-  Future<List<EmergencyContact>> getContacts() async {
-    final res = await _dio.get<Map<String, dynamic>>(
-      ApiConstants.emergencyContacts,
+  Future<void> updateProfile({
+    String? bloodGroup,
+    List<String>? allergies,
+    List<String>? conditions,
+  }) async {
+    await _dio.patch<void>(
+      ApiConstants.emergencyProfile,
+      data: {
+        if (bloodGroup != null) 'bloodGroup': bloodGroup,
+        if (allergies != null) 'allergies': allergies,
+        if (conditions != null) 'conditions': conditions,
+      },
     );
-    final list = res.data!['data'] as List<dynamic>;
+  }
+
+  Future<List<EmergencyContact>> getContacts() async {
+    final res = await _dio.get<Map<String, dynamic>>(ApiConstants.emergencyContacts);
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => EmergencyContact.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -20,20 +33,17 @@ class EmergencyRemoteDataSource {
   Future<EmergencyContact> addContact({
     required String name,
     required String phone,
-    String? relationship,
-    bool isPrimary = false,
+    String? relation,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       ApiConstants.emergencyContacts,
       data: {
         'name': name,
         'phone': phone,
-        'isPrimary': isPrimary,
-        if (relationship != null) 'relationship': relationship,
+        if (relation != null) 'relation': relation,
       },
     );
-    return EmergencyContact.fromJson(
-        res.data!['data'] as Map<String, dynamic>);
+    return EmergencyContact.fromJson(res.data!['data'] as Map<String, dynamic>);
   }
 
   Future<void> deleteContact(String id) async {

@@ -9,7 +9,7 @@ class ReportsRemoteDataSource {
 
   Future<List<MedicalReport>> getMyReports() async {
     final res = await _dio.get<Map<String, dynamic>>(ApiConstants.reports);
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => MedicalReport.fromJson(e as Map<String, dynamic>))
         .toList();

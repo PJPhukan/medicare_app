@@ -1,12 +1,10 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
-import '../buttons/primary_button.dart';
-import '../buttons/outline_button.dart';
-import '../buttons/danger_button.dart';
-import '../buttons/ghost_button.dart';
+import '../buttons/app_button.dart';
 
 // ─── Confirm button style ─────────────────────────────────────────────────────
 
@@ -198,7 +196,7 @@ class AppBaseDialog extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.close_rounded, size: 20),
                           color: AppColors.textSecondary,
-                          onPressed: onClose ?? () => Navigator.pop(context),
+                          onPressed: onClose ?? () => context.pop(),
                           visualDensity: VisualDensity.compact,
                         ),
                     ],
@@ -242,9 +240,11 @@ class AppBaseDialog extends StatelessWidget {
       return Row(
         children: [
           Expanded(
-            child: AppOutlineButton(
+            child: AppButton(
               label: cancelLabel!,
-              onPressed: onCancel ?? () => Navigator.pop(context),
+              variant: AppButtonVariant.outline,
+              isFullWidth: true,
+              onPressed: onCancel ?? () => context.pop(),
             ),
           ),
           const SizedBox(width: 12),
@@ -257,24 +257,27 @@ class AppBaseDialog extends StatelessWidget {
       return _confirmButton(context);
     }
 
-    return AppGhostButton(
+    return AppButton(
       label: cancelLabel!,
-      onPressed: onCancel ?? () => Navigator.pop(context),
+      variant: AppButtonVariant.ghost,
+      isFullWidth: true,
+      onPressed: onCancel ?? () => context.pop(),
     );
   }
 
   Widget _confirmButton(BuildContext context) {
     if (confirmStyle == AppDialogAction.danger) {
-      return AppDangerButton(
+      return AppButton(
         label: confirmLabel!,
-        onPressed: onConfirm,
+        variant: AppButtonVariant.danger,
         isFullWidth: true,
+        onPressed: onConfirm,
       );
     }
-    return AppPrimaryButton(
+    return AppButton(
       label: confirmLabel!,
-      onPressed: onConfirm,
       isFullWidth: true,
+      onPressed: onConfirm,
     );
   }
 }

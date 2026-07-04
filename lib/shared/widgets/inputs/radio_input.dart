@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../texts/app_text.dart';
 
 /// A group of radio buttons from a list of options.
 class AppRadioInput<T> extends StatelessWidget {
@@ -61,14 +61,15 @@ class AppRadioInput<T> extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(labels[i],
-                      style: AppTypography.bodyMd.copyWith(
-                        color: enabled ? null : AppColors.textHint,
-                      )),
+                  AppText.bodyMd(
+                    labels[i],
+                    color: enabled ? null : AppColors.textHint,
+                  ),
                   if (descriptions != null && i < descriptions!.length)
-                    Text(descriptions![i],
-                        style: AppTypography.bodyXs
-                            .copyWith(color: AppColors.textSecondary)),
+                    AppText.bodyXs(
+                      descriptions![i],
+                      color: AppColors.textSecondary,
+                    ),
                 ],
               ),
             ),
@@ -84,8 +85,7 @@ class AppRadioInput<T> extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
-          Text(label!,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          AppText.labelMd(label!),
           const SizedBox(height: 8),
         ],
         if (direction == Axis.vertical)
@@ -99,10 +99,7 @@ class AppRadioInput<T> extends StatelessWidget {
             const Icon(Icons.error_outline_rounded,
                 size: 12, color: AppColors.error),
             const SizedBox(width: 4),
-            Expanded(
-              child: Text(error!,
-                  style: AppTypography.bodyXs.copyWith(color: AppColors.error)),
-            ),
+            Expanded(child: AppText.error(error!)),
           ]),
         ],
       ],

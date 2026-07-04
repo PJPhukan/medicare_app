@@ -7,395 +7,253 @@ import '../../../core/theme/app_shadows.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../feedback/app_loading.dart';
 
-enum AppButtonVariant { primary, secondary, outline, ghost, danger, gradient }
+part '_pressable.dart';
+part 'app_icon_button.dart';
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AppButtonVariant {
+  primary,
+  secondary,
+  outline,
+  ghost,
+  text,
+  danger,
+  gradient,
+}
 
 enum AppButtonSize { sm, md, lg }
 
-class AppButton extends StatefulWidget {
+// ─── Size extension ───────────────────────────────────────────────────────────
+
+extension AppButtonSizeX on AppButtonSize {
+  double get spinnerSize => switch (this) {
+        AppButtonSize.sm => 14.0,
+        AppButtonSize.md => 16.0,
+        AppButtonSize.lg => 18.0,
+      };
+
+  double get badgeFontSize => switch (this) {
+        AppButtonSize.sm => 9.0,
+        AppButtonSize.md => 10.0,
+        AppButtonSize.lg => 11.0,
+      };
+
+  EdgeInsets get padding => switch (this) {
+        AppButtonSize.sm => const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        AppButtonSize.md => const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        AppButtonSize.lg => const EdgeInsets.symmetric(horizontal: 26, vertical: 15),
+      };
+
+  TextStyle get textStyle => switch (this) {
+        AppButtonSize.sm => AppTypography.buttonSm,
+        AppButtonSize.md => AppTypography.buttonMd,
+        AppButtonSize.lg => AppTypography.buttonLg,
+      };
+}
+
+// ─── AppButton ────────────────────────────────────────────────────────────────
+
+class AppButton extends StatelessWidget {
   const AppButton({
     super.key,
     required this.label,
     this.onPressed,
-    this.variant = AppButtonVariant.primary,
-    this.size = AppButtonSize.md,
-    this.icon,
+    this.variant     = AppButtonVariant.primary,
+    this.size        = AppButtonSize.md,
+    this.leading,
     this.trailing,
-    this.isLoading = false,
+    this.badge,
+    this.badgeColor,
+    this.isLoading   = false,
     this.isFullWidth = false,
     this.color,
     this.borderRadius,
   });
 
-  const AppButton.primary({
-    super.key,
-    required this.label,
-    this.onPressed,
-    this.size = AppButtonSize.md,
-    this.icon,
-    this.trailing,
-    this.isLoading = false,
-    this.isFullWidth = false,
-    this.color,
-    this.borderRadius,
-  }) : variant = AppButtonVariant.primary;
-
-  const AppButton.secondary({
-    super.key,
-    required this.label,
-    this.onPressed,
-    this.size = AppButtonSize.md,
-    this.icon,
-    this.trailing,
-    this.isLoading = false,
-    this.isFullWidth = false,
-    this.color,
-    this.borderRadius,
-  }) : variant = AppButtonVariant.secondary;
-
-  const AppButton.outline({
-    super.key,
-    required this.label,
-    this.onPressed,
-    this.size = AppButtonSize.md,
-    this.icon,
-    this.trailing,
-    this.isLoading = false,
-    this.isFullWidth = false,
-    this.color,
-    this.borderRadius,
-  }) : variant = AppButtonVariant.outline;
-
-  const AppButton.ghost({
-    super.key,
-    required this.label,
-    this.onPressed,
-    this.size = AppButtonSize.md,
-    this.icon,
-    this.trailing,
-    this.isLoading = false,
-    this.isFullWidth = false,
-    this.color,
-    this.borderRadius,
-  }) : variant = AppButtonVariant.ghost;
-
-  const AppButton.danger({
-    super.key,
-    required this.label,
-    this.onPressed,
-    this.size = AppButtonSize.md,
-    this.icon,
-    this.trailing,
-    this.isLoading = false,
-    this.isFullWidth = false,
-    this.color,
-    this.borderRadius,
-  }) : variant = AppButtonVariant.danger;
-
-  const AppButton.gradient({
-    super.key,
-    required this.label,
-    this.onPressed,
-    this.size = AppButtonSize.md,
-    this.icon,
-    this.trailing,
-    this.isLoading = false,
-    this.isFullWidth = false,
-    this.color,
-    this.borderRadius,
-  }) : variant = AppButtonVariant.gradient;
-
-  /// Social login button — secondary style, full width, logo constrained to 20×20.
-  factory AppButton.social({
-    Key? key,
-    required String label,
-    required Widget logo,
-    VoidCallback? onPressed,
-    bool isLoading = false,
-  }) =>
-      AppButton(
-        key: key,
-        label: label,
-        variant: AppButtonVariant.secondary,
-        isFullWidth: true,
-        isLoading: isLoading,
-        onPressed: onPressed,
-        icon: SizedBox(width: 20, height: 20, child: logo),
-      );
-
-  final String label;
-  final VoidCallback? onPressed;
+  /// Button label — required. For icon-only use AppIconButton.
+  final String           label;
+  final VoidCallback?    onPressed;
   final AppButtonVariant variant;
-  final AppButtonSize size;
-  final Widget? icon;
-  final Widget? trailing;
-  final bool isLoading;
-  final bool isFullWidth;
-  final Color? color;
-  final BorderRadius? borderRadius;
+  final AppButtonSize    size;
 
-  @override
-  State<AppButton> createState() => _AppButtonState();
-}
+  /// Widget shown to the left of the label (icon, avatar, image, etc.).
+  final Widget?          leading;
 
-class _AppButtonState extends State<AppButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
+  /// Widget shown to the right of the label, before badge.
+  final Widget?          trailing;
 
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: AppAnimations.fast);
-    _scale = Tween<double>(begin: 1, end: AppAnimations.pressScale)
-        .animate(CurvedAnimation(parent: _ctrl, curve: AppAnimations.decelerate));
-  }
+  /// Badge count shown as a pill after trailing.
+  final int?             badge;
 
-  @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  /// Badge pill color — defaults to [AppColors.error].
+  final Color?           badgeColor;
 
-  void _onTapDown(_)  => _ctrl.forward();
-  void _onTapUp(_)    { _ctrl.reverse(); widget.onPressed?.call(); }
-  void _onTapCancel() => _ctrl.reverse();
+  final bool             isLoading;
+
+  /// Stretches to parent width when true; wraps content by default.
+  final bool             isFullWidth;
+
+  final Color?           color;
+  final BorderRadius?    borderRadius;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = widget.onPressed == null || widget.isLoading;
-    Widget btn = GestureDetector(
-      onTapDown:   disabled ? null : _onTapDown,
-      onTapUp:     disabled ? null : _onTapUp,
-      onTapCancel: disabled ? null : _onTapCancel,
-      child: AnimatedBuilder(
-        animation: _scale,
-        builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
-        child: _buildInner(disabled),
-      ),
+    final disabled = onPressed == null || isLoading;
+
+    Widget btn = _Pressable(
+      onPressed: disabled ? null : onPressed,
+      child: _buildInner(context, disabled),
     );
-    if (widget.isFullWidth) return SizedBox(width: double.infinity, child: btn);
+
+    if (isFullWidth) return SizedBox(width: double.infinity, child: btn);
     return btn;
   }
 
-  Widget _buildInner(bool disabled) {
-    final br = widget.borderRadius ?? AppBorderRadius.lgAll;
-    final EdgeInsets padding = switch (widget.size) {
-      AppButtonSize.sm => const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      AppButtonSize.md => const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
-      AppButtonSize.lg => const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-    };
-    final TextStyle textStyle = switch (widget.size) {
-      AppButtonSize.sm => AppTypography.buttonSm,
-      AppButtonSize.md => AppTypography.buttonMd,
-      AppButtonSize.lg => AppTypography.buttonLg,
-    };
-    final iconSize = switch (widget.size) {
-      AppButtonSize.sm => 14.0,
-      AppButtonSize.md => 16.0,
-      AppButtonSize.lg => 18.0,
-    };
-    final fg = _fgColor();
+  Widget _buildInner(BuildContext context, bool disabled) {
+    final br = borderRadius ?? AppBorderRadius.lgAll;
+    final fg = _fgColor(context);
+
+    final resolvedPadding = variant == AppButtonVariant.text
+        ? EdgeInsets.symmetric(
+            horizontal: size.padding.horizontal / 4,
+            vertical: size.padding.vertical,
+          )
+        : size.padding;
 
     final content = Row(
-      mainAxisSize: widget.isFullWidth ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisSize:      isFullWidth ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (widget.isLoading)
-          AppLoadingSpinner(size: iconSize, color: fg)
+        if (isLoading)
+          AppLoadingSpinner(size: size.spinnerSize, color: fg)
         else ...[
-          if (widget.icon != null) ...[
-            IconTheme(data: IconThemeData(size: iconSize, color: fg), child: widget.icon!),
+          if (leading != null) ...[
+            leading!,
             const SizedBox(width: 8),
           ],
-          Text(widget.label, style: textStyle.copyWith(color: fg)),
-          if (widget.trailing != null) ...[
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: size.textStyle.copyWith(color: fg),
+            ),
+          ),
+          if (trailing != null) ...[
             const SizedBox(width: 8),
-            IconTheme(data: IconThemeData(size: iconSize, color: fg), child: widget.trailing!),
+            trailing!,
+          ],
+          if (badge != null) ...[
+            const SizedBox(width: 6),
+            _BadgePill(
+              count:    badge!,
+              color:    badgeColor ?? AppColors.error,
+              fontSize: size.badgeFontSize,
+            ),
           ],
         ],
       ],
     );
 
-    if (widget.variant == AppButtonVariant.gradient) {
+    if (variant == AppButtonVariant.gradient) {
       return Opacity(
         opacity: disabled ? 0.5 : 1,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [AppColors.teal, AppColors.blue]),
+            gradient:     const LinearGradient(colors: [AppColors.teal, AppColors.blue]),
             borderRadius: br,
-            boxShadow: disabled ? [] : AppShadows.button,
+            boxShadow:    disabled ? [] : AppShadows.button,
           ),
-          child: Padding(padding: padding, child: content),
+          child: Padding(padding: resolvedPadding, child: content),
         ),
       );
     }
 
     return AnimatedOpacity(
       duration: AppAnimations.fast,
-      opacity: disabled ? 0.45 : 1,
+      opacity:  disabled ? 0.45 : 1,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: _bgColor(),
-          border: _border(),
+          color:        _bgColor(context),
+          border:       _border(context),
           borderRadius: br,
-          boxShadow: (widget.variant == AppButtonVariant.primary && !disabled)
-              ? AppShadows.button : [],
+          boxShadow: (variant == AppButtonVariant.primary && !disabled)
+              ? AppShadows.button
+              : [],
         ),
-        child: Padding(padding: padding, child: content),
+        child: Padding(padding: resolvedPadding, child: content),
       ),
     );
   }
 
-  Color _bgColor() {
-    final c = widget.color ?? AppColors.teal;
-    return switch (widget.variant) {
+  Color _bgColor(BuildContext context) {
+    final c = color ?? AppColors.teal;
+    return switch (variant) {
       AppButtonVariant.primary   => c,
       AppButtonVariant.secondary => context.inputBg,
       AppButtonVariant.outline   => Colors.transparent,
       AppButtonVariant.ghost     => Colors.transparent,
-      AppButtonVariant.danger    => AppColors.errorBg,
+      AppButtonVariant.text      => Colors.transparent,
+      AppButtonVariant.danger    => AppColors.error,
       AppButtonVariant.gradient  => Colors.transparent,
     };
   }
 
-  Color _fgColor() {
-    final c = widget.color ?? AppColors.teal;
-    return switch (widget.variant) {
+  Color _fgColor(BuildContext context) {
+    final c = color ?? AppColors.teal;
+    return switch (variant) {
       AppButtonVariant.primary   => AppColors.textInverse,
       AppButtonVariant.secondary => context.primaryText,
       AppButtonVariant.outline   => c,
       AppButtonVariant.ghost     => c,
-      AppButtonVariant.danger    => AppColors.error,
+      AppButtonVariant.text      => c,
+      AppButtonVariant.danger    => Colors.white,
       AppButtonVariant.gradient  => AppColors.textInverse,
     };
   }
 
-  Border? _border() {
-    final c = widget.color ?? AppColors.teal;
-    return switch (widget.variant) {
-      AppButtonVariant.outline => Border.all(color: c),
-      AppButtonVariant.danger  => Border.all(color: AppColors.error.withValues(alpha: 0.4)),
-      _                        => null,
+  Border? _border(BuildContext context) {
+    final c = color ?? AppColors.teal;
+    return switch (variant) {
+      AppButtonVariant.secondary => Border.all(color: context.borderCol),
+      AppButtonVariant.outline   => Border.all(color: c),
+      AppButtonVariant.danger    => Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+      _                          => null,
     };
   }
 }
 
-// ─── Icon-only button ────────────────────────────────────────────────────────
+// ─── Badge pill ───────────────────────────────────────────────────────────────
 
-class AppIconButton extends StatefulWidget {
-  const AppIconButton({
-    super.key,
-    required this.icon,
-    this.onPressed,
-    this.color,
-    this.backgroundColor,
-    this.size = 40,
-    this.iconSize = 18,
-    this.borderRadius,
-    this.hasBorder = false,
-    this.tooltip,
+class _BadgePill extends StatelessWidget {
+  const _BadgePill({
+    required this.count,
+    required this.color,
+    required this.fontSize,
   });
 
-  final Widget icon;
-  final VoidCallback? onPressed;
-  final Color? color;
-  final Color? backgroundColor;
-  final double size;
-  final double iconSize;
-  final BorderRadius? borderRadius;
-  final bool hasBorder;
-  final String? tooltip;
-
-  @override
-  State<AppIconButton> createState() => _AppIconButtonState();
-}
-
-class _AppIconButtonState extends State<AppIconButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: AppAnimations.fast);
-    _scale = Tween<double>(begin: 1, end: 0.9)
-        .animate(CurvedAnimation(parent: _ctrl, curve: AppAnimations.decelerate));
-  }
-
-  @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  final int    count;
+  final Color  color;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {
-    final br  = widget.borderRadius ?? AppBorderRadius.mdAll;
-    final fg  = widget.color ?? AppColors.textSecondary;
-    final bg  = widget.backgroundColor ?? context.inputBg;
-
-    Widget btn = GestureDetector(
-      onTapDown:   widget.onPressed == null ? null : (_) => _ctrl.forward(),
-      onTapUp:     widget.onPressed == null ? null : (_) { _ctrl.reverse(); widget.onPressed!(); },
-      onTapCancel: widget.onPressed == null ? null : () => _ctrl.reverse(),
-      child: AnimatedBuilder(
-        animation: _scale,
-        builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: br,
-            border: widget.hasBorder ? Border.all(color: context.borderCol) : null,
-          ),
-          child: SizedBox(
-            width: widget.size, height: widget.size,
-            child: Center(
-              child: IconTheme(
-                data: IconThemeData(size: widget.iconSize, color: fg),
-                child: widget.icon,
-              ),
-            ),
-          ),
+    return Container(
+      padding:    const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color:        color,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        style: TextStyle(
+          fontSize:   fontSize,
+          fontWeight: FontWeight.w700,
+          color:      Colors.white,
+          height:     1,
         ),
       ),
-    );
-
-    return widget.tooltip != null
-        ? Tooltip(message: widget.tooltip!, child: btn)
-        : btn;
-  }
-}
-
-// ─── FAB ─────────────────────────────────────────────────────────────────────
-
-class AppFAB extends StatelessWidget {
-  const AppFAB({
-    super.key,
-    required this.icon,
-    required this.onPressed,
-    this.label,
-    this.color,
-  });
-
-  final Widget icon;
-  final VoidCallback onPressed;
-  final String? label;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = color ?? AppColors.teal;
-    if (label != null) {
-      return FloatingActionButton.extended(
-        onPressed: onPressed,
-        backgroundColor: c,
-        foregroundColor: AppColors.textInverse,
-        elevation: 0,
-        icon: icon,
-        label: Text(label!, style: AppTypography.buttonMd.copyWith(color: AppColors.textInverse)),
-        shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-      );
-    }
-    return FloatingActionButton(
-      onPressed: onPressed,
-      backgroundColor: c,
-      foregroundColor: AppColors.textInverse,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: AppBorderRadius.lgAll),
-      child: icon,
     );
   }
 }

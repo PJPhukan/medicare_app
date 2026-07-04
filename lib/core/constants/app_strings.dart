@@ -50,7 +50,9 @@ abstract class AppStrings {
   static const snooze = 'Snooze';
   static const markAsTaken = 'Mark as Taken';
   static const skip = 'Skip';
-
+  static const selectCountry = 'Select Country';
+  static const selectOptions = 'Select options';
+  static const noresults = 'No results';
   // ─── Onboarding ─────────────────────────────────────────────────────────────
   static const onboardingSkip = 'Skip';
   static const onboardingGetStarted = 'Get Started';
@@ -100,6 +102,8 @@ abstract class AppStrings {
   static const privacyPolicy = 'Privacy Policy';
   static const agreeToTerms = 'I agree to the';
   static const and = 'and';
+  static const google="Google";
+  static const apple="Apple";
 
   // ─── Auth — Login screen ─────────────────────────────────────────────────────
   static const loginSubtitle        = 'Sign in to your MediForze account';
@@ -129,8 +133,8 @@ abstract class AppStrings {
   // ─── Auth — Quiz screen ──────────────────────────────────────────────────────
   static const quizTitle            = 'Quick health setup';
   static const quizSubtitle         = 'Helps us personalise your experience. You can update anytime.';
-  static const yourAge              = 'Your age';
-  static const ageHint              = 'e.g. 28';
+  static const yourAge              = 'Enter Your age';
+  static const ageHint              = '28';
   static const bloodGroup           = 'Blood group';
 
   // ─── Auth — Biometric screen ─────────────────────────────────────────────────
@@ -152,15 +156,24 @@ abstract class AppStrings {
   static const biometricVerifying      = 'Verifying…';
 
   // ─── Auth — Emergency screen ─────────────────────────────────────────────────
-  static const emergencyBadge       = 'EMERGENCY';
-  static const emergencyTitle       = 'Emergency info';
-  static const emergencySubtitle    = 'Helps responders in critical situations.';
-  static const knownAllergies       = 'Known allergies';
-  static const allergiesHint        = 'e.g. Penicillin, Peanuts';
-  static const emergencyContact     = 'Emergency contact';
-  static const contactName          = 'Contact name';
-  static const saveAndContinue      = 'Save & Continue';
-  static const emergencyDataNote    = 'This data is stored securely and only used in emergencies.';
+  static const emergencyBadge              = 'EMERGENCY';
+  static const emergencyTitle              = 'Emergency info';
+  static const emergencySubtitle          = 'Helps responders in critical situations.';
+  static const emergencyInfoSection       = 'Emergency info';
+  static const knownAllergies             = 'Allergies';
+  static const selectAllergies            = 'Select allergies';
+  static const searchAllergiesHint        = 'Search or add custom allergy…';
+  static const chronicConditions          = 'Chronic medical conditions';
+  static const selectConditions           = 'Select conditions';
+  static const searchConditionsHint       = 'Search or add custom condition…';
+  static const allergiesHint              = 'Type an allergy and press +';
+  static const conditionsHint             = 'Type a condition and press +';
+  static const emergencyContact           = 'Emergency contact';
+  static const contactName               = 'Contact name';
+  static const contactPhone              = 'Contact phone';
+  static const addCustom                 = 'Add custom…';
+  static const saveAndContinue           = 'Save & Continue';
+  static const emergencyDataNote         = 'This data is stored securely and only used in emergencies.';
 
   // ─── Auth — Subscription screen ──────────────────────────────────────────────
   static const choosePlan           = 'Choose your plan';
@@ -175,6 +188,12 @@ abstract class AppStrings {
   static const startForFree         = 'Start for Free';
   static const getPremium           = 'Get Premium';
   static const noCreditCard         = 'No credit card required for free plan.';
+  static const planBillingYearly    = 'Yearly';
+  static const planPeriodYear       = '/ year';
+  static const planUnlimited        = 'Unlimited';
+  static const planSave             = 'Save';     // prefix: "Save 20%"
+  static const planDayTrial         = '-day trial'; // suffix: "7-day trial"
+  static const planEverythingIn     = 'Everything in'; // prefix: "Everything in Standard"
   static const planBasicFeature1    = 'Up to 3 medicines';
   static const planBasicFeature2    = 'Basic vitals tracking';
   static const planBasicFeature3    = 'Community access';
@@ -183,6 +202,18 @@ abstract class AppStrings {
   static const planPremiumFeature3  = 'Professional connect';
   static const planPremiumFeature4  = 'Priority support';
   static const planPremiumFeature5  = 'Offline mode';
+
+  // ─── Coupon ───────────────────────────────────────────────────────────────────
+  static const couponAdd            = 'Add coupon';
+  static const couponHint           = 'SAVE20';
+  static const couponApply          = 'Apply';
+  static const couponRemove         = 'Remove';
+  static const couponInvalid        = 'Invalid coupon';
+  static const couponApplied        = 'Coupon applied';
+  static const couponPctOff         = '% off applied';   // prefix with value: "20% off applied"
+  static const couponFlatOff        = ' off applied';    // prefix with amount: "₹160 off applied"
+  static const couponFreePrefix     = 'Free ';           // "Free Basic applied"
+  static const couponFreeSuffix     = ' applied';
 
   // ─── Auth — OTP screen ───────────────────────────────────────────────────────
   static const verifyIdentity       = 'Verify your identity';
@@ -208,11 +239,8 @@ abstract class AppStrings {
   static const resetPasswordBtn      = 'Reset Password';
   static const passwordsDoNotMatch2  = 'Passwords do not match';
   static const passwordResetSuccess  = 'Password reset! Please sign in.';
-
-  // ─── Country picker ──────────────────────────────────────────────────────────
-  static const selectCountry        = 'Select country';
-  static const searchCountryHint    = 'Search country or code…';
-
+static const searchCountryHint    = 'Search country or code…';
+static const noCountriesFound     = 'No countries found';
   // ─── Dashboard ──────────────────────────────────────────────────────────────
   static const dashboard = 'Dashboard';
   static const goodMorning = 'Good morning';
@@ -791,6 +819,7 @@ abstract class AppStrings {
   static const tabMedicines = 'Medicines';
   static const tabVitals = 'Vitals';
   static const tabProfessionals = 'Pros';
+  static const tabSettings = 'Settings';
   static const tabProfile = 'Profile';
   static const tabCommunity = 'Community';
   static const tabSchedule = 'Schedule';

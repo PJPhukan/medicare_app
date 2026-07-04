@@ -1,3 +1,4 @@
+import 'package:app_medicare/core/services/razorpay_checkout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +11,10 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/connection_entity.dart';
 import '../../domain/entities/connection_request_entity.dart';
 import '../providers/connections_provider.dart';
-import '../services/razorpay_checkout.dart';
-import 'chat_screen.dart';
+
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/router/route_args.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../core/network/connectivity_monitor.dart';
@@ -21,9 +24,24 @@ String _fmtTime(String? isoStr) {
   final dt = DateTime.tryParse(isoStr);
   if (dt == null) return '';
   final now = DateTime.now();
-  final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
-  if (isToday) return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final isToday =
+      dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  if (isToday)
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
   return '${dt.day} ${months[dt.month - 1]}';
 }
 
@@ -45,8 +63,9 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this);
-    _searchCtrl.addListener(() => setState(() => _query = _searchCtrl.text.trim().toLowerCase()));
+    _tabCtrl = TabController(length: 4, vsync: this);
+    _searchCtrl.addListener(
+        () => setState(() => _query = _searchCtrl.text.trim().toLowerCase()));
   }
 
   @override
@@ -57,14 +76,12 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
   }
 
   void _openChat(ConnectionEntity conn) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          connectionId: conn.id,
-          professionalName: conn.connectedUser.name,
-          professionalSpecialty: '',
-        ),
+    context.push(
+      AppRoutes.chat,
+      extra: ChatArgs(
+        connectionId: conn.id,
+        professionalName: conn.connectedUser.name,
+        professionalSpecialty: '',
       ),
     );
   }
@@ -104,7 +121,8 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
       AppLogger.i('Connection payment confirmed ✓', tag: 'Connections');
       await ref.read(connectionsProvider.notifier).load();
       if (!mounted) return;
-      AppSnackbar.success(context, 'Payment successful — connection is now active.');
+      AppSnackbar.success(
+          context, 'Payment successful — connection is now active.');
     } on RazorpayCheckoutException catch (e) {
       if (!mounted) return;
       AppSnackbar.error(context, e.message);
@@ -128,6 +146,12 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
             .where((c) => c.connectedUser.name.toLowerCase().contains(_query))
             .toList();
 
+    final filteredPatients = _query.isEmpty
+        ? st.professionalConnections
+        : st.professionalConnections
+            .where((c) => c.user.name.toLowerCase().contains(_query))
+            .toList();
+
     final filteredIncoming = _query.isEmpty
         ? st.incomingRequests
         : st.incomingRequests
@@ -137,7 +161,8 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
     final filteredSent = _query.isEmpty
         ? st.myRequests
         : st.myRequests
-            .where((r) => r.professional.displayName.toLowerCase().contains(_query))
+            .where((r) =>
+                r.professional.displayName.toLowerCase().contains(_query))
             .toList();
 
     final incomingCount = st.incomingRequests.length;
@@ -166,7 +191,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: AppSearchField(
+                child: AppSearchTextInput(
                   controller: _searchCtrl,
                   hint: AppStrings.searchConnections,
                   onClear: _searchCtrl.clear,
@@ -185,6 +210,7 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
                   dividerColor: context.borderCol,
                   tabs: [
                     const Tab(text: 'Active'),
+                    const Tab(text: 'Patients'),
                     const Tab(text: 'Sent'),
                     Tab(
                       child: Row(
@@ -211,7 +237,15 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
                 isLoading: st.isLoading,
                 emptyMessage: AppStrings.noConnectionsYet,
                 emptyIcon: Icons.people_outline_rounded,
-                itemBuilder: (conn) => _ActiveCard(conn: conn, onTap: () => _openChat(conn)),
+                itemBuilder: (conn) =>
+                    _ActiveCard(conn: conn, onTap: () => _openChat(conn)),
+              ),
+              _ListTab<ConnectionEntity>(
+                items: filteredPatients,
+                isLoading: st.isLoading,
+                emptyMessage: 'No active patients yet',
+                emptyIcon: Icons.supervised_user_circle_outlined,
+                itemBuilder: (conn) => _PatientCard(conn: conn),
               ),
               _ListTab<ConnectionRequestEntity>(
                 items: filteredSent,
@@ -220,7 +254,8 @@ class _ConnectionsScreenState extends ConsumerState<ConnectionsScreen>
                 emptyIcon: Icons.send_outlined,
                 itemBuilder: (req) => _SentCard(
                   req: req,
-                  onPay: req.status == 'AWAITING_PAYMENT' ? () => _pay(req) : null,
+                  onPay:
+                      req.status == 'AWAITING_PAYMENT' ? () => _pay(req) : null,
                 ),
               ),
               _ListTab<ConnectionRequestEntity>(
@@ -252,7 +287,8 @@ class _TabBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         width: 16,
         height: 16,
-        decoration: const BoxDecoration(color: AppColors.teal, shape: BoxShape.circle),
+        decoration:
+            const BoxDecoration(color: AppColors.teal, shape: BoxShape.circle),
         alignment: Alignment.center,
         child: Text(
           '$count',
@@ -272,7 +308,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   const _TabBarDelegate(this.tabBar);
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
+  Widget build(
+          BuildContext context, double shrinkOffset, bool overlapsContent) =>
       Container(color: context.bg, child: tabBar);
 
   @override
@@ -358,7 +395,57 @@ class _ActiveCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
+          const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textHint, size: 18),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Patient card (professional view) ────────────────────────────────────────
+
+class _PatientCard extends StatelessWidget {
+  final ConnectionEntity conn;
+  const _PatientCard({required this.conn});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = conn.user.name;
+    final timeStr = _fmtTime(conn.lastMessageAt ?? conn.createdAt);
+    final planLabel = switch (conn.planType) {
+      'HOURLY' => 'Hourly',
+      'DAILY' => 'Daily',
+      'MONTHLY' => 'Monthly',
+      _ => conn.planType,
+    };
+
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          AppAvatar(name: name, size: AppAvatarSize.md),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AppText.labelMd(name, fontWeight: FontWeight.w600),
+                    if (timeStr.isNotEmpty)
+                      AppText.bodyXs(timeStr, color: AppColors.textHint),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                AppText.bodySm('$planLabel · Active', color: AppColors.teal),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textHint, size: 18),
         ],
       ),
     );
@@ -371,7 +458,8 @@ class _IncomingCard extends StatelessWidget {
   final ConnectionRequestEntity req;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
-  const _IncomingCard({required this.req, required this.onAccept, required this.onDecline});
+  const _IncomingCard(
+      {required this.req, required this.onAccept, required this.onDecline});
 
   @override
   Widget build(BuildContext context) {
@@ -401,7 +489,8 @@ class _IncomingCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: AppButton.outline(
+                child: AppButton(
+                  variant: AppButtonVariant.outline,
                   label: AppStrings.declineRequest,
                   color: AppColors.error,
                   onPressed: onDecline,
@@ -409,7 +498,8 @@ class _IncomingCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: AppButton.primary(
+                child: AppButton(
+                  variant: AppButtonVariant.primary,
                   label: AppStrings.acceptRequest,
                   onPressed: onAccept,
                 ),
@@ -484,7 +574,8 @@ class _SentCard extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              child: AppButton.primary(
+              child: AppButton(
+                variant: AppButtonVariant.primary,
                 label: 'Pay ₹${req.amount} to start',
                 onPressed: onPay!,
               ),

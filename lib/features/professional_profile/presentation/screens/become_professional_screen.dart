@@ -12,7 +12,8 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../providers/pro_profile_provider.dart';
 import '../../../professionals/presentation/providers/professionals_provider.dart';
-import 'service_areas_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../domain/entities/pro_profile_entity.dart';
 
 // ─── Agreement bullets (matching web BecomeProfessionalPage.tsx exactly) ─────
@@ -205,23 +206,27 @@ class _BecomeProfessionalScreenState
       if (_displayNameCtrl.text.trim().isNotEmpty)
         'displayName': _displayNameCtrl.text.trim(),
       if (_bioCtrl.text.trim().isNotEmpty) 'bio': _bioCtrl.text.trim(),
-      if (_intOf(_experienceCtrl) != null) 'experienceYrs': _intOf(_experienceCtrl),
+      if (_intOf(_experienceCtrl) != null)
+        'experienceYrs': _intOf(_experienceCtrl),
       if (_intOf(_basePriceCtrl) != null) 'basePrice': _intOf(_basePriceCtrl),
       if (_intOf(_hourlyCtrl) != null) 'hourlyRate': _intOf(_hourlyCtrl),
       if (_intOf(_dailyCtrl) != null) 'dailyRate': _intOf(_dailyCtrl),
       if (_intOf(_monthlyCtrl) != null) 'monthlyRate': _intOf(_monthlyCtrl),
       'currency': _currency,
       if (phone.length == 10) 'phone': '+91$phone',
-      if (_addressCtrl.text.trim().isNotEmpty) 'address': _addressCtrl.text.trim(),
+      if (_addressCtrl.text.trim().isNotEmpty)
+        'address': _addressCtrl.text.trim(),
       // KYC numbers: only send when entered (blank in edit mode = leave as-is).
       if (_aadhaarCtrl.text.replaceAll(' ', '').isNotEmpty)
         'aadhaarNumber': _aadhaarCtrl.text.replaceAll(' ', ''),
-      if (_panCtrl.text.trim().isNotEmpty) 'panNumber': _panCtrl.text.toUpperCase().trim(),
+      if (_panCtrl.text.trim().isNotEmpty)
+        'panNumber': _panCtrl.text.toUpperCase().trim(),
       // Images: only send a newly picked one (dataUrl); never overwrite with null.
       if (_photo.dataUrl != null) 'profileImageUrl': _photo.dataUrl,
       if (_panFront.dataUrl != null) 'panFrontUrl': _panFront.dataUrl,
       if (_panBack.dataUrl != null) 'panBackUrl': _panBack.dataUrl,
-      if (_aadhaarFront.dataUrl != null) 'aadhaarFrontUrl': _aadhaarFront.dataUrl,
+      if (_aadhaarFront.dataUrl != null)
+        'aadhaarFrontUrl': _aadhaarFront.dataUrl,
       if (_aadhaarBack.dataUrl != null) 'aadhaarBackUrl': _aadhaarBack.dataUrl,
       if (_certs.isNotEmpty) 'certifications': _certs,
       // Only sent on create. Re-sending true on edit would re-trigger the
@@ -251,7 +256,7 @@ class _BecomeProfessionalScreenState
     if (_step > 0) {
       setState(() => _step--);
     } else {
-      Navigator.of(context).pop();
+      context.pop();
     }
   }
 
@@ -282,11 +287,11 @@ class _BecomeProfessionalScreenState
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => ctx.pop(),
             child: AppText.labelMd('Cancel', color: AppColors.textSecondary),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            onPressed: () => ctx.pop(ctrl.text.trim()),
             child: AppText.labelMd('Submit', color: AppColors.teal),
           ),
         ],
@@ -319,9 +324,7 @@ class _BecomeProfessionalScreenState
     _certCtrl.clear();
   }
 
-  void _openServiceAreas() => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ServiceAreasScreen()),
-      );
+  void _openServiceAreas() => context.push(AppRoutes.settingsProHubAreas);
 
   @override
   Widget build(BuildContext context) {
@@ -343,8 +346,10 @@ class _BecomeProfessionalScreenState
     // Apply mode but a profile already exists → show its status, not the form.
     final existingProfile = proState.profile;
     final showStatus = !_isEditing && !_submitted && existingProfile != null;
-    final loadingProfile =
-        !_isEditing && !_submitted && proState.isLoading && existingProfile == null;
+    final loadingProfile = !_isEditing &&
+        !_submitted &&
+        proState.isLoading &&
+        existingProfile == null;
 
     final Widget body;
     if (_submitted) {
@@ -455,16 +460,18 @@ class _BecomeProfessionalScreenState
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            AppButton.primary(
+            AppButton(
+              variant: AppButtonVariant.primary,
               label: 'Set up Service Areas',
               onPressed: _openServiceAreas,
               size: AppButtonSize.lg,
               isFullWidth: true,
             ),
             const SizedBox(height: 12),
-            AppButton.secondary(
+            AppButton(
+              variant: AppButtonVariant.secondary,
               label: AppStrings.back,
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => context.pop(),
               size: AppButtonSize.lg,
               isFullWidth: true,
             ),
@@ -511,16 +518,18 @@ class _BecomeProfessionalScreenState
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            AppButton.primary(
+            AppButton(
+              variant: AppButtonVariant.primary,
               label: 'Manage Service Areas',
               onPressed: _openServiceAreas,
               size: AppButtonSize.lg,
               isFullWidth: true,
             ),
             const SizedBox(height: 12),
-            AppButton.secondary(
+            AppButton(
+              variant: AppButtonVariant.secondary,
               label: AppStrings.back,
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => context.pop(),
               size: AppButtonSize.lg,
               isFullWidth: true,
             ),
@@ -834,10 +843,9 @@ class _BecomeProfessionalScreenState
       children: [
         const _SecurityBanner(),
         const SizedBox(height: 24),
-        AppPhoneField(
+        AppPhoneInput(
           controller: _phoneCtrl,
           label: AppStrings.phone,
-          hint: AppStrings.enterPhoneNumber,
         ),
         const SizedBox(height: 20),
         AppTextField(
@@ -896,7 +904,8 @@ class _BecomeProfessionalScreenState
               color: AppColors.purple,
               imageBytes: _aadhaarFront.bytes,
               onTap: () => _pickInto(_aadhaarFront),
-              onClear: _aadhaarFront.isSet ? () => _clearImage(_aadhaarFront) : null,
+              onClear:
+                  _aadhaarFront.isSet ? () => _clearImage(_aadhaarFront) : null,
             ),
           ),
           const SizedBox(width: 12),
@@ -907,7 +916,8 @@ class _BecomeProfessionalScreenState
               color: AppColors.purple,
               imageBytes: _aadhaarBack.bytes,
               onTap: () => _pickInto(_aadhaarBack),
-              onClear: _aadhaarBack.isSet ? () => _clearImage(_aadhaarBack) : null,
+              onClear:
+                  _aadhaarBack.isSet ? () => _clearImage(_aadhaarBack) : null,
             ),
           ),
         ]),
@@ -1046,7 +1056,8 @@ class _NavBar extends StatelessWidget {
       child: Row(children: [
         if (step > 0) ...[
           Expanded(
-            child: AppButton.secondary(
+            child: AppButton(
+              variant: AppButtonVariant.secondary,
               label: AppStrings.back,
               onPressed: onBack,
               size: AppButtonSize.lg,
@@ -1057,7 +1068,8 @@ class _NavBar extends StatelessWidget {
         ],
         Expanded(
           flex: step > 0 ? 2 : 1,
-          child: AppButton.primary(
+          child: AppButton(
+            variant: AppButtonVariant.primary,
             label: step < totalSteps - 1 ? AppStrings.next : submitLabel,
             onPressed: isBusy ? null : onAdvance,
             size: AppButtonSize.lg,
@@ -1185,7 +1197,8 @@ class _ImagePickerBox extends StatelessWidget {
                       ),
                       textAlign: TextAlign.center),
                   const SizedBox(height: 2),
-                  AppText.bodyXs(AppStrings.tapToSelect, color: AppColors.textHint),
+                  AppText.bodyXs(AppStrings.tapToSelect,
+                      color: AppColors.textHint),
                 ],
               ),
       ),
@@ -1347,8 +1360,10 @@ class _ProfilePhotoField extends StatelessWidget {
                 ),
                 child: _has
                     ? (bytes != null
-                        ? Image.memory(bytes!, fit: BoxFit.cover, width: size, height: size)
-                        : Image.network(imageUrl!, fit: BoxFit.cover, width: size, height: size))
+                        ? Image.memory(bytes!,
+                            fit: BoxFit.cover, width: size, height: size)
+                        : Image.network(imageUrl!,
+                            fit: BoxFit.cover, width: size, height: size))
                     : const Icon(Icons.camera_alt_rounded,
                         color: AppColors.textHint, size: 26),
               ),

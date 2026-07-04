@@ -12,7 +12,7 @@ class SupportRemoteDataSource {
     final res = await _dio.get<Map<String, dynamic>>(
       '${ApiConstants.users}/support/faqs',
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Faq.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -22,7 +22,7 @@ class SupportRemoteDataSource {
     final res = await _dio.get<Map<String, dynamic>>(
       '${ApiConstants.users}/support/tickets',
     );
-    final list = res.data!['data'] as List<dynamic>;
+    final list = (res.data?['data'] as List<dynamic>?) ?? [];
     return list
         .map((e) => Ticket.fromJson(e as Map<String, dynamic>))
         .toList();

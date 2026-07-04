@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -68,7 +69,7 @@ class _InviteCaretakerScreenState extends ConsumerState<InviteCaretakerScreen> {
       AppLogger.i('Caretaker invite sent ✓', tag: 'Caretakers');
       if (!mounted) return;
       AppSnackbar.success(context, AppStrings.inviteSent);
-      Navigator.pop(context, true);
+      context.pop(true);
     } on Exception catch (e) {
       AppLogger.e('Caretaker invite failed', tag: 'Caretakers', error: e);
       if (!mounted) return;
@@ -94,7 +95,7 @@ class _InviteCaretakerScreenState extends ConsumerState<InviteCaretakerScreen> {
               expandedHeight: 100,
               leading: AppIconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),
@@ -244,10 +245,11 @@ class _InviteCaretakerScreenState extends ConsumerState<InviteCaretakerScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  AppButton.primary(
+                  AppButton(
                     label: AppStrings.sendInvite,
                     isFullWidth: true,
                     isLoading: _sending,
+                    variant: AppButtonVariant.primary,
                     onPressed: (!_sending && hasPermission) ? _sendInvite : null,
                   ),
 

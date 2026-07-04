@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
+import '../texts/app_text.dart';
 
 // ─── Base text field ──────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ class AppTextField extends StatefulWidget {
     this.maxLines = 1,
     this.minLines,
     this.maxLength,
+    this.showCounter = false,
     this.keyboardType,
     this.textInputAction,
     this.inputFormatters,
@@ -33,6 +35,8 @@ class AppTextField extends StatefulWidget {
     this.focusNode,
     this.fillColor,
     this.borderRadius,
+    this.validator,
+    this.autofillHints,
   });
 
   final TextEditingController? controller;
@@ -49,6 +53,8 @@ class AppTextField extends StatefulWidget {
   final int maxLines;
   final int? minLines;
   final int? maxLength;
+  /// When true and [maxLength] is set, shows the character counter.
+  final bool showCounter;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final List<TextInputFormatter>? inputFormatters;
@@ -58,6 +64,8 @@ class AppTextField extends StatefulWidget {
   final FocusNode? focusNode;
   final Color? fillColor;
   final BorderRadius? borderRadius;
+  final String? Function(String?)? validator;
+  final Iterable<String>? autofillHints;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -73,12 +81,32 @@ class _AppTextFieldState extends State<AppTextField> {
   }
 
   @override
+  void didUpdateWidget(AppTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // setState is technically redundant here because Flutter always rebuilds
+    // after didUpdateWidget, but it makes the intent explicit for reviewers.
+    if (oldWidget.obscureText != widget.obscureText) {
+      setState(() => _obscure = widget.obscureText);
+    }
+  }
+
+  BorderRadius get _radius => widget.borderRadius ?? AppBorderRadius.lgAll;
+
+  // #5 — single helper instead of six identical OutlineInputBorder literals
+  OutlineInputBorder _border(BuildContext context, {Color? color, double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: _radius,
+        borderSide: BorderSide(color: color ?? context.borderCol, width: width),
+      );
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // #4 — use AppText instead of raw Text
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelMd),
+          AppText.labelMd(widget.label!),
           const SizedBox(height: 6),
         ],
         TextFormField(
@@ -93,6 +121,8 @@ class _AppTextFieldState extends State<AppTextField> {
           keyboardType: widget.keyboardType,
           textInputAction: widget.textInputAction,
           inputFormatters: widget.inputFormatters,
+          autofillHints: widget.autofillHints,
+          validator: widget.validator,
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onSubmitted,
           onTap: widget.onTap,
@@ -115,16 +145,16 @@ class _AppTextFieldState extends State<AppTextField> {
                   )
                 : null,
             prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            // #3 — IconButton for proper ripple + accessibility; #7 — tooltip on eye icon
             suffixIcon: widget.obscureText
-                ? GestureDetector(
-                    onTap: () => setState(() => _obscure = !_obscure),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Icon(
-                        _obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        size: 18,
-                        color: AppColors.textHint,
-                      ),
+                ? IconButton(
+                    // Tooltip describes what the button *will do*, not current state.
+                    tooltip: _obscure ? 'Show password' : 'Hide password',
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                    icon: Icon(
+                      _obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                      size: 18,
+                      color: AppColors.textHint,
                     ),
                   )
                 : widget.suffix != null
@@ -137,120 +167,18 @@ class _AppTextFieldState extends State<AppTextField> {
                       )
                     : null,
             suffixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            border: OutlineInputBorder(
-              borderRadius: widget.borderRadius ?? AppBorderRadius.lgAll,
-              borderSide: BorderSide(color: context.borderCol),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: widget.borderRadius ?? AppBorderRadius.lgAll,
-              borderSide: BorderSide(color: context.borderCol),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: widget.borderRadius ?? AppBorderRadius.lgAll,
-              borderSide: const BorderSide(color: AppColors.teal, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: widget.borderRadius ?? AppBorderRadius.lgAll,
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: widget.borderRadius ?? AppBorderRadius.lgAll,
-              borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: widget.borderRadius ?? AppBorderRadius.lgAll,
-              borderSide: BorderSide(color: context.borderCol.withValues(alpha: 0.5)),
-            ),
-            counterText: '',
+            // #5 — _border() helper
+            border:            _border(context),
+            enabledBorder:     _border(context),
+            focusedBorder:     _border(context, color: AppColors.teal, width: 1.5),
+            errorBorder:       _border(context, color: AppColors.error),
+            focusedErrorBorder: _border(context, color: AppColors.error, width: 1.5),
+            disabledBorder:    _border(context, color: context.borderCol.withValues(alpha: 0.5)),
+            // #8 — configurable counter
+            counterText: widget.showCounter ? null : '',
           ),
         ),
       ],
-    );
-  }
-}
-
-// ─── Password field ──────────────────────────────────────────────────────────
-
-class AppPasswordField extends StatelessWidget {
-  const AppPasswordField({
-    super.key,
-    this.controller,
-    this.label,
-    this.hint,
-    this.errorText,
-    this.onChanged,
-    this.onSubmitted,
-    this.textInputAction,
-    this.focusNode,
-  });
-
-  final TextEditingController? controller;
-  final String? label;
-  final String? hint;
-  final String? errorText;
-  final ValueChanged<String>? onChanged;
-  final ValueChanged<String>? onSubmitted;
-  final TextInputAction? textInputAction;
-  final FocusNode? focusNode;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppTextField(
-      controller: controller,
-      label: label,
-      hint: hint ?? '••••••••',
-      errorText: errorText,
-      obscureText: true,
-      keyboardType: TextInputType.visiblePassword,
-      textInputAction: textInputAction,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
-      focusNode: focusNode,
-      prefix: const Icon(Icons.lock_outline_rounded),
-    );
-  }
-}
-
-// ─── Search field ─────────────────────────────────────────────────────────────
-
-class AppSearchField extends StatelessWidget {
-  const AppSearchField({
-    super.key,
-    this.controller,
-    this.hint,
-    this.onChanged,
-    this.onSubmitted,
-    this.onClear,
-    this.autofocus = false,
-    this.focusNode,
-  });
-
-  final TextEditingController? controller;
-  final String? hint;
-  final ValueChanged<String>? onChanged;
-  final ValueChanged<String>? onSubmitted;
-  final VoidCallback? onClear;
-  final bool autofocus;
-  final FocusNode? focusNode;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppTextField(
-      controller: controller,
-      hint: hint ?? 'Search…',
-      autofocus: autofocus,
-      focusNode: focusNode,
-      keyboardType: TextInputType.text,
-      textInputAction: TextInputAction.search,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
-      prefix: const Icon(Icons.search_rounded),
-      suffix: onClear != null
-          ? GestureDetector(
-              onTap: onClear,
-              child: const Icon(Icons.close_rounded, size: 16),
-            )
-          : null,
     );
   }
 }
@@ -267,6 +195,7 @@ class AppTextArea extends StatelessWidget {
     this.maxLines = 5,
     this.minLines = 3,
     this.maxLength,
+    this.showCounter = false,
     this.onChanged,
     this.focusNode,
   });
@@ -278,6 +207,7 @@ class AppTextArea extends StatelessWidget {
   final int maxLines;
   final int minLines;
   final int? maxLength;
+  final bool showCounter;
   final ValueChanged<String>? onChanged;
   final FocusNode? focusNode;
 
@@ -291,50 +221,11 @@ class AppTextArea extends StatelessWidget {
       maxLines: maxLines,
       minLines: minLines,
       maxLength: maxLength,
+      showCounter: showCounter,
       keyboardType: TextInputType.multiline,
       textInputAction: TextInputAction.newline,
       onChanged: onChanged,
       focusNode: focusNode,
-    );
-  }
-}
-
-// ─── Phone field ──────────────────────────────────────────────────────────────
-
-class AppPhoneField extends StatelessWidget {
-  const AppPhoneField({
-    super.key,
-    this.controller,
-    this.label,
-    this.hint,
-    this.errorText,
-    this.onChanged,
-    this.onSubmitted,
-    this.focusNode,
-  });
-
-  final TextEditingController? controller;
-  final String? label;
-  final String? hint;
-  final String? errorText;
-  final ValueChanged<String>? onChanged;
-  final ValueChanged<String>? onSubmitted;
-  final FocusNode? focusNode;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppTextField(
-      controller: controller,
-      label: label ?? 'Phone Number',
-      hint: hint ?? '+91 00000 00000',
-      errorText: errorText,
-      keyboardType: TextInputType.phone,
-      textInputAction: TextInputAction.next,
-      onChanged: onChanged,
-      onSubmitted: onSubmitted,
-      focusNode: focusNode,
-      prefix: const Icon(Icons.phone_outlined),
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
     );
   }
 }

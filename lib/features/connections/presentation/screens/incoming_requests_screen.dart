@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,8 +44,9 @@ class IncomingRequestsScreen extends ConsumerWidget {
               pinned: true,
               expandedHeight: 100,
               leading: AppIconButton(
-                icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.primaryText, size: 20),
-                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.arrow_back_ios_new_rounded,
+                    color: context.primaryText, size: 20),
+                onPressed: () => context.pop(),
               ),
               flexibleSpace: FlexibleSpaceBar(
                 titlePadding: const EdgeInsets.only(left: 52, bottom: 14),
@@ -58,7 +60,8 @@ class IncomingRequestsScreen extends ConsumerWidget {
                   child: AppEmptyState(
                     icon: Icons.person_add_rounded,
                     title: 'No incoming requests',
-                    subtitle: 'When professionals send you connection requests, they\'ll appear here.',
+                    subtitle:
+                        'When professionals send you connection requests, they\'ll appear here.',
                   ),
                 ),
               )
@@ -91,7 +94,8 @@ class IncomingRequestsScreen extends ConsumerWidget {
     AppSnackbar.success(context, AppStrings.connectionAccepted);
   }
 
-  Future<void> _decline(BuildContext context, WidgetRef ref, ConnectionRequestEntity req) async {
+  Future<void> _decline(
+      BuildContext context, WidgetRef ref, ConnectionRequestEntity req) async {
     final ok = await AppDialog.confirm(
       context,
       title: AppStrings.declineRequest,
@@ -115,7 +119,8 @@ class _RequestCard extends StatelessWidget {
   final VoidCallback onAccept;
   final VoidCallback onDecline;
 
-  const _RequestCard({required this.request, required this.onAccept, required this.onDecline});
+  const _RequestCard(
+      {required this.request, required this.onAccept, required this.onDecline});
 
   @override
   Widget build(BuildContext context) {
@@ -143,16 +148,18 @@ class _RequestCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: AppButton.outline(
+                child: AppButton(
                   label: AppStrings.declineRequest,
+                  variant: AppButtonVariant.outline,
                   color: AppColors.error,
                   onPressed: onDecline,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: AppButton.primary(
+                child: AppButton(
                   label: AppStrings.acceptRequest,
+                  variant: AppButtonVariant.primary,
                   onPressed: onAccept,
                 ),
               ),

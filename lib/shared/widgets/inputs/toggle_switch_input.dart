@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../texts/app_text.dart';
 
 /// Toggle switch with optional label and description.
 class AppToggleSwitchInput extends StatelessWidget {
@@ -35,14 +35,15 @@ class AppToggleSwitchInput extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (label != null)
-                  Text(label!,
-                      style: AppTypography.bodyMd.copyWith(
-                        color: enabled ? null : AppColors.textHint,
-                      )),
+                  AppText.bodyMd(
+                    label!,
+                    color: enabled ? null : AppColors.textHint,
+                  ),
                 if (description != null)
-                  Text(description!,
-                      style: AppTypography.bodyXs
-                          .copyWith(color: AppColors.textSecondary)),
+                  AppText.bodyXs(
+                    description!,
+                    color: AppColors.textSecondary,
+                  ),
               ],
             ),
           ),
