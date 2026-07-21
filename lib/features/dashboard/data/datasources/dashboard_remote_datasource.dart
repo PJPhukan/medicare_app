@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/utils/logger.dart';
 import '../../../schedule/data/models/appointment_model.dart';
 import '../../../vitals/data/models/vital_reading_model.dart';
 import '../models/banner_config.dart';
@@ -63,9 +64,9 @@ class DashboardRemoteDataSource {
         .toList();
 
     if (kDebugMode) {
-      debugPrint('[Dashboard] banners from API: ${banners.length} '
+      AppLogger.d('banners from API: ${banners.length} '
           '(raw: ${rawBanners.length}) — '
-          '${banners.map((b) => b.imageUrl).join(', ')}');
+          '${banners.map((b) => b.imageUrl).join(', ')}', tag: 'Dashboard');
     }
 
     final takenCount = doses.where((d) => d.isTaken).length;

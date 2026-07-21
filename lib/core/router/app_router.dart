@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../services/biometric_service.dart';
 import '../local_db/local_cache.dart';
+import '../constants/prefs_keys.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/auth_flow.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
@@ -27,7 +28,7 @@ import '../../features/medicines/presentation/screens/add_medicine_screen.dart';
 import '../../features/medicines/presentation/screens/medicine_detail_screen.dart';
 import '../../features/professionals/presentation/screens/professionals_screen.dart' show ProData;
 import '../../features/professionals/presentation/screens/professional_detail_screen.dart';
-import '../../features/professionals/presentation/screens/connections_screen.dart' as pro_conn;
+import '../../features/professionals/presentation/screens/professional_connections_screen.dart' as pro_conn;
 import '../../features/professionals/presentation/screens/map_picker_screen.dart';
 import '../../features/message/presentation/screens/thread_screen.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart' show NoteData;
@@ -133,7 +134,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SplashScreen(
           onDone: () async {
             final prefs = ref.read(sharedPreferencesProvider);
-            final seen = prefs.getBool('onboarding_seen') ?? false;
+            final seen = prefs.getBool(PrefsKeys.onboardingSeen) ?? false;
             if (!context.mounted) return;
             if (!seen) {
               context.go(AppRoutes.onboarding);
@@ -296,7 +297,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.professionalsConnections,
-        builder: (context, state) => const pro_conn.ConnectionsScreen(),
+        builder: (context, state) => const pro_conn.ProfessionalConnectionsScreen(),
       ),
       GoRoute(
         path: AppRoutes.professionalsMapPicker,

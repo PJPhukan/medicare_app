@@ -5,7 +5,7 @@ import 'login_screen.dart';
 import 'otp_screen.dart';
 import 'register_screen.dart';
 import 'quiz_screen.dart';
-import 'emergency_screen.dart';
+import 'emergency_onboarding_screen.dart';
 import '../../../premium/presentation/screens/subscription_screen.dart';
 import 'forgot_password_screen.dart';
 import 'reset_password_screen.dart';
@@ -192,7 +192,7 @@ class _AuthFlowState extends ConsumerState<AuthFlow> {
           onDraftChanged: _updateDraft,
         );
       case _AuthStep.emergency:
-        return EmergencyScreen(
+        return EmergencyOnboardingScreen(
           draft: _draft,
           onContinue: () => _go(_AuthStep.subscription),
           onSkip: () => _go(_AuthStep.subscription),

@@ -3,10 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/widgets.dart';
-
-const _kSeenKey = 'onboarding_seen';
 const _kAutoAdvanceMs = 4000;
 
 abstract class _OnboardingDimens {
@@ -16,12 +15,12 @@ abstract class _OnboardingDimens {
 
 Future<bool> hasSeenOnboarding() async {
   final prefs = await SharedPreferences.getInstance();
-  return prefs.getBool(_kSeenKey) ?? false;
+  return prefs.getBool(PrefsKeys.onboardingSeen) ?? false;
 }
 
 Future<void> markOnboardingSeen() async {
   final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool(_kSeenKey, true);
+  await prefs.setBool(PrefsKeys.onboardingSeen, true);
 }
 
 // ─── Page model ───────────────────────────────────────────────────────────────
