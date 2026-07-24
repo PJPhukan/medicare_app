@@ -63,12 +63,6 @@ class AppImagePickerInput extends StatelessWidget {
           Icon(Icons.add_photo_alternate_rounded,
               size: 28, color: activeCol),
           const SizedBox(height: 6),
-          Text(
-            hint ?? 'Upload image',
-            style: AppTypography.bodyXs
-                .copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
         ],
       );
     }
@@ -78,7 +72,8 @@ class AppImagePickerInput extends StatelessWidget {
       children: [
         if (label != null) ...[
           Text(label!,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+              style: AppTypography.labelSm.copyWith(
+                  letterSpacing: 0.2, color: context.secondaryText)),
           const SizedBox(height: 8),
         ],
         Stack(
@@ -102,6 +97,23 @@ class AppImagePickerInput extends StatelessWidget {
                 child: _hasImage
                     ? preview
                     : Center(child: preview),
+              ),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: GestureDetector(
+                onTap: enabled ? onTap : null,
+                child: Container(
+                  width: size * 0.3,
+                  height: size * 0.3,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: context.bg, width: 2),
+                  ),
+                  child: const Icon(Icons.edit_rounded, size: 14, color: Colors.white),
+                ),
               ),
             ),
             if (_hasImage && onClear != null)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/extensions/context_extensions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
@@ -26,6 +27,8 @@ class AppSectionHeaderText extends StatelessWidget {
     this.padding,
     this.titleStyle,
     this.subtitleStyle,
+    this.leading,
+    this.trailing,
   });
 
   final String title;
@@ -45,6 +48,13 @@ class AppSectionHeaderText extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final TextStyle? titleStyle;
   final TextStyle? subtitleStyle;
+
+  /// Widget shown to the left of the title (e.g. icon, avatar).
+  final Widget? leading;
+
+  /// Custom widget shown on the right side of the header.
+  /// Takes precedence over [actionLabel] and [actionIcon].
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +76,12 @@ class AppSectionHeaderText extends StatelessWidget {
               ),
             ),
 
+          // ── Leading icon ─────────────────────────────────────────────────
+          if (leading != null) ...[
+            leading!,
+            const SizedBox(width: 10),
+          ],
+
           // ── Title + subtitle ─────────────────────────────────────────────
           Expanded(
             child: Column(
@@ -73,7 +89,8 @@ class AppSectionHeaderText extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: titleStyle ?? AppTypography.h3,
+                  style: titleStyle ??
+                      AppTypography.h3.copyWith(color: context.primaryText),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -91,8 +108,10 @@ class AppSectionHeaderText extends StatelessWidget {
             ),
           ),
 
-          // ── Action ───────────────────────────────────────────────────────
-          if (actionLabel != null && onAction != null)
+          // ── Trailing element ─────────────────────────────────────────────
+          if (trailing != null)
+            trailing!
+          else if (actionLabel != null && onAction != null)
             GestureDetector(
               onTap: onAction,
               child: Row(

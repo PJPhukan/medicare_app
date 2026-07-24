@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/data/country_codes.dart';
 import '../../../../core/utils/validators.dart';
@@ -127,7 +128,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 children: [
                   AppText.h1(AppStrings.createAccount, fontWeight: FontWeight.w800),
                   const SizedBox(height: 6),
-                  AppText.bodyMd(AppStrings.registerSubtitle, color: AppColors.textSecondary),
+                  AppText.bodyMd(AppStrings.registerSubtitle, color: context.secondaryText),
                 ],
               ),
             ),

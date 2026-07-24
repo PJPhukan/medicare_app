@@ -124,7 +124,9 @@ class _AppEmailPhoneInputState extends State<AppEmailPhoneInput> {
       children: [
         // ── Label ──────────────────────────────────────────────────────────────
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelSm),
+          Text(widget.label!,
+              style: AppTypography.labelSm
+                  .copyWith(color: context.secondaryText)),
           const SizedBox(height: 6),
         ],
 
@@ -167,7 +169,8 @@ class _AppEmailPhoneInputState extends State<AppEmailPhoneInput> {
                     AutofillHints.telephoneNumber,
                   ],
                   onChanged: _onChanged,
-                  style: AppTypography.bodyMd,
+                  style: AppTypography.bodyMd
+                      .copyWith(color: context.primaryText),
                   decoration: InputDecoration(
                     hintText: widget.hint ,
                     hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.textHint),
@@ -253,11 +256,12 @@ class _CountryPickerButton extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               selected.code,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0),
+              style: AppTypography.labelSm
+                  .copyWith(letterSpacing: 0, color: context.primaryText),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                size: 16, color: AppColors.textSecondary),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 16, color: context.secondaryText),
           ],
         ),
       ),
@@ -344,7 +348,8 @@ class _CountrySheetState extends State<_CountrySheet> {
               children: [
                 Expanded(
                   child: Text('Select Country',
-                      style: AppTypography.h3.copyWith(fontSize: 17)),
+                      style: AppTypography.h3.copyWith(
+                          fontSize: 17, color: context.primaryText)),
                 ),
                 GestureDetector(
                   onTap: () => context.pop(),
@@ -364,16 +369,17 @@ class _CountrySheetState extends State<_CountrySheet> {
               ),
               child: Row(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(left: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12),
                     child: Icon(Icons.search_rounded,
-                        size: 18, color: AppColors.textSecondary),
+                        size: 18, color: context.secondaryText),
                   ),
                   Expanded(
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (v) => setState(() => _query = v),
-                      style: AppTypography.bodyMd,
+                      style: AppTypography.bodyMd
+                          .copyWith(color: context.primaryText),
                       decoration: InputDecoration(
                         hintText: 'Search country or code…',
                         hintStyle: AppTypography.bodyMd
@@ -394,7 +400,7 @@ class _CountrySheetState extends State<_CountrySheet> {
                 ? Center(
                     child: Text('No countries found',
                         style: AppTypography.bodyMd
-                            .copyWith(color: AppColors.textSecondary)),
+                            .copyWith(color: context.secondaryText)),
                   )
                 : ListView.separated(
                     padding: EdgeInsets.only(bottom: bottomPad + 16),
@@ -421,13 +427,13 @@ class _CountrySheetState extends State<_CountrySheet> {
                         ),
                         subtitle: Text(c.region,
                             style: AppTypography.bodyXs
-                                .copyWith(color: AppColors.textSecondary)),
+                                .copyWith(color: context.secondaryText)),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(c.code,
                                 style: AppTypography.labelSm.copyWith(
-                                    color: AppColors.textSecondary,
+                                    color: context.secondaryText,
                                     letterSpacing: 0)),
                             if (isSelected) ...[
                               const SizedBox(width: 8),

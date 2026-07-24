@@ -42,7 +42,7 @@ class AppEmptyState extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 subtitle!,
-                style: AppTypography.bodySm,
+                style: AppTypography.bodySm.copyWith(color: context.secondaryText),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -85,13 +85,14 @@ class AppErrorState extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               AppStrings.somethingWentWrong,
-              style: AppTypography.labelLg,
+              style: AppTypography.labelLg.copyWith(color: context.primaryText),
               textAlign: TextAlign.center,
             ),
             if (message != null) ...[
               const SizedBox(height: 6),
               Text(message!,
-                  style: AppTypography.bodySm, textAlign: TextAlign.center),
+                  style: AppTypography.bodySm.copyWith(color: context.secondaryText),
+                  textAlign: TextAlign.center),
             ],
             if (onRetry != null) ...[
               const SizedBox(height: 20),

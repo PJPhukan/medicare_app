@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/widgets.dart';
@@ -71,7 +71,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 AppText.h1(AppStrings.quizTitle, fontWeight: FontWeight.w800),
                 const SizedBox(height: 6),
                 AppText.bodyMd(AppStrings.quizSubtitle,
-                    color: AppColors.textSecondary, textAlign: TextAlign.center),
+                    color: context.secondaryText, textAlign: TextAlign.center),
               ],
             ),
           ),
@@ -98,7 +98,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
           Row(
             children: [
-              AppText.labelSm(AppStrings.bloodGroup, color: AppColors.textSecondary),
+              AppText.labelSm(AppStrings.bloodGroup, color: context.secondaryText),
               const SizedBox(width: 8),
               AppText.bodyXs('(${AppStrings.optional})'),
             ],

@@ -125,14 +125,17 @@ Color _hexColor(String hex) {
 
 IconData _iconForVital(String name) {
   final n = name.toLowerCase();
-  if (n.contains('blood pressure') || n.contains(' bp'))
+  if (n.contains('blood pressure') || n.contains(' bp')) {
     return Icons.favorite_rounded;
+  }
   if (n.contains('heart')) return Icons.monitor_heart_rounded;
-  if (n.contains('sugar') || n.contains('glucose'))
+  if (n.contains('sugar') || n.contains('glucose')) {
     return Icons.water_drop_rounded;
+  }
   if (n.contains('weight')) return Icons.scale_rounded;
-  if (n.contains('spo2') || n.contains('oxygen') || n.contains('saturation'))
+  if (n.contains('spo2') || n.contains('oxygen') || n.contains('saturation')) {
     return Icons.air_rounded;
+  }
   return Icons.monitor_heart_outlined;
 }
 

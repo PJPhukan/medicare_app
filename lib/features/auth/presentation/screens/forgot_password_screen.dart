@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/extensions/context_extensions.dart';
 
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
@@ -80,7 +81,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 AppText.h1(AppStrings.forgotPasswordTitle, fontWeight: FontWeight.w800),
                 const SizedBox(height: 8),
                 AppText.bodyMd(AppStrings.forgotPasswordSubtitle,
-                    textAlign: TextAlign.center, color: AppColors.textSecondary),
+                    textAlign: TextAlign.center, color: context.secondaryText),
               ],
             ),
           ),

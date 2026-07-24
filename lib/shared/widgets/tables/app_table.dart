@@ -191,7 +191,7 @@ class _AppDataTableState<T> extends State<AppDataTable<T>> {
       child: Center(
         child: Text(
           widget.emptyMessage ?? AppStrings.nothingFound,
-          style: AppTypography.bodySm,
+          style: AppTypography.bodySm.copyWith(color: context.secondaryText),
         ),
       ),
     );
@@ -278,9 +278,11 @@ class AppReportCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTypography.labelMd),
+                  Text(title,
+                      style: AppTypography.labelMd.copyWith(color: context.primaryText)),
                   const SizedBox(height: 2),
-                  Text(dateRange, style: AppTypography.bodySm),
+                  Text(dateRange,
+                      style: AppTypography.bodySm.copyWith(color: context.secondaryText)),
                   if (subtitle != null)
                     Text(subtitle!, style: AppTypography.bodyXs),
                   if (status != null) ...[
@@ -362,7 +364,8 @@ class AppDetailRow extends StatelessWidget {
                 Icon(icon, size: 14, color: color ?? AppColors.textHint),
                 const SizedBox(width: 8),
               ],
-              Text(label, style: AppTypography.bodySm),
+              Text(label,
+                  style: AppTypography.bodySm.copyWith(color: context.secondaryText)),
               const Spacer(),
               Text(
                 value,

@@ -32,7 +32,8 @@ class AppDropdown<T> extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
-          Text(label!, style: AppTypography.labelMd),
+          Text(label!,
+              style: AppTypography.labelMd.copyWith(color: context.primaryText)),
           const SizedBox(height: 6),
         ],
         DropdownButtonFormField<T>(
@@ -42,7 +43,7 @@ class AppDropdown<T> extends StatelessWidget {
           hint: hint != null ? Text(hint!, style: AppTypography.bodyMd.copyWith(color: AppColors.textHint)) : null,
           icon: const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textHint),
           dropdownColor: context.inputBg,
-          style: AppTypography.bodyMd,
+          style: AppTypography.bodyMd.copyWith(color: context.primaryText),
           decoration: InputDecoration(
             filled: true,
             fillColor: context.inputBg,
@@ -96,11 +97,14 @@ class AppSwitchTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: AppTypography.labelMd),
+              Text(label,
+                  style: AppTypography.labelMd.copyWith(color: context.primaryText)),
               if (subtitle != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Text(subtitle!, style: AppTypography.bodySm),
+                  child: Text(subtitle!,
+                      style: AppTypography.bodySm
+                          .copyWith(color: context.secondaryText)),
                 ),
             ],
           ),
@@ -149,11 +153,15 @@ class AppCheckboxTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: AppTypography.labelMd),
+                    Text(label,
+                        style: AppTypography.labelMd
+                            .copyWith(color: context.primaryText)),
                     if (subtitle != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
-                        child: Text(subtitle!, style: AppTypography.bodySm),
+                        child: Text(subtitle!,
+                            style: AppTypography.bodySm
+                                .copyWith(color: context.secondaryText)),
                       ),
                   ],
                 ),
@@ -213,7 +221,8 @@ class AppDatePickerField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.labelMd),
+        Text(label,
+            style: AppTypography.labelMd.copyWith(color: context.primaryText)),
         const SizedBox(height: 6),
         GestureDetector(
           onTap: () => _pick(context),
@@ -291,7 +300,8 @@ class AppTimePickerField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.labelMd),
+        Text(label,
+            style: AppTypography.labelMd.copyWith(color: context.primaryText)),
         const SizedBox(height: 6),
         GestureDetector(
           onTap: () => _pick(context),

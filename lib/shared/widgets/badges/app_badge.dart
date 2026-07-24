@@ -4,6 +4,7 @@ import '../../../core/theme/app_border_radius.dart';
 import '../../../core/extensions/context_extensions.dart';
 
 enum AppBadgeVariant { teal, blue, purple, amber, red, green, neutral }
+enum AppBadgeSize { sm, md, lg }
 
 class AppBadge extends StatelessWidget {
   const AppBadge({
@@ -11,6 +12,9 @@ class AppBadge extends StatelessWidget {
     required this.label,
     this.variant = AppBadgeVariant.teal,
     this.icon,
+    this.leadingIcon,
+    this.trailingIcon,
+    this.size = AppBadgeSize.sm,
     this.dot = false,
     this.filled = false,
   });
@@ -18,6 +22,9 @@ class AppBadge extends StatelessWidget {
   final String label;
   final AppBadgeVariant variant;
   final Widget? icon;
+  final Widget? leadingIcon;
+  final Widget? trailingIcon;
+  final AppBadgeSize size;
   final bool dot;
   final bool filled;
 
@@ -31,9 +38,31 @@ class AppBadge extends StatelessWidget {
     AppBadgeVariant.neutral => AppColors.textHint,
   };
 
+  EdgeInsets _getPadding() => switch (size) {
+    AppBadgeSize.sm => const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    AppBadgeSize.md => const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    AppBadgeSize.lg => const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+  };
+
+  double _getFontSize() => switch (size) {
+    AppBadgeSize.sm => 11,
+    AppBadgeSize.md => 12,
+    AppBadgeSize.lg => 13,
+  };
+
+  double _getIconSize() => switch (size) {
+    AppBadgeSize.sm => 11,
+    AppBadgeSize.md => 12,
+    AppBadgeSize.lg => 14,
+  };
+
   @override
   Widget build(BuildContext context) {
     final c = _color(variant);
+    final fontSize = _getFontSize();
+    final iconSize = _getIconSize();
+    final padding = _getPadding();
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: filled ? c : c.withValues(alpha: 0.12),
@@ -41,7 +70,7 @@ class AppBadge extends StatelessWidget {
         border: filled ? null : Border.all(color: c.withValues(alpha: 0.3)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: padding,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -51,18 +80,26 @@ class AppBadge extends StatelessWidget {
                 margin: const EdgeInsets.only(right: 6),
                 decoration: BoxDecoration(color: c, shape: BoxShape.circle),
               ),
-            if (icon != null) ...[
-              IconTheme(data: IconThemeData(size: 11, color: filled ? AppColors.textInverse : c), child: icon!),
+            if (leadingIcon != null) ...[
+              IconTheme(data: IconThemeData(size: iconSize, color: filled ? AppColors.textInverse : c), child: leadingIcon!),
+              const SizedBox(width: 4),
+            ],
+            if (icon != null && leadingIcon == null) ...[
+              IconTheme(data: IconThemeData(size: iconSize, color: filled ? AppColors.textInverse : c), child: icon!),
               const SizedBox(width: 4),
             ],
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: fontSize,
                 fontWeight: FontWeight.w700,
                 color: filled ? AppColors.textInverse : c,
               ),
             ),
+            if (trailingIcon != null) ...[
+              const SizedBox(width: 4),
+              IconTheme(data: IconThemeData(size: iconSize, color: filled ? AppColors.textInverse : c), child: trailingIcon!),
+            ],
           ],
         ),
       ),

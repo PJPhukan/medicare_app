@@ -16,7 +16,7 @@ import '../../../../shared/widgets/widgets.dart';
 import '../providers/dashboard_provider.dart';
 import '../../../../core/services/firebase_messaging_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
+import '../../../professionals/presentation/providers/pro_profile_provider.dart';
 import '../../../schedule/data/models/appointment_model.dart' as dash_model;
 import '../../../vitals/data/models/vital_reading_model.dart' as vrm;
 

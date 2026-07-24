@@ -82,7 +82,7 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
         isLoading: false,
         isOffline: !_ref.read(isOnlineProvider),
       );
-    } catch (e, s) {
+    } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }

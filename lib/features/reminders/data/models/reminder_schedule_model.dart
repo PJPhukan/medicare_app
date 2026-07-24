@@ -44,18 +44,44 @@ class ReminderScheduleModel {
   final int preNotifyMinutes;
   final bool isActive;
 
-  factory ReminderScheduleModel.fromJson(Map<String, dynamic> json) =>
-      ReminderScheduleModel(
-        id: json['id'] as String,
-        medicineName: (json['medicineName'] ?? json['name'] ?? 'Medicine') as String,
-        reminderType: (json['reminderType'] ?? 'MEDICINE') as String,
-        scheduleType: (json['scheduleType'] ?? 'DAILY') as String,
-        doseTimes: (json['doseTimes'] as List<dynamic>? ?? [])
-            .map((e) => ReminderDoseTime.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        preNotifyMinutes: (json['preNotifyMinutes'] as int?) ?? 10,
-        isActive: (json['isActive'] as bool?) ?? true,
-      );
+  factory ReminderScheduleModel.fromJson(Map<String, dynamic> json) {
+    // Backend shape: the display name lives on the included userMedicine
+    // (customName, or the linked catalog medicine/product name).
+    final userMedicine = json['userMedicine'] as Map<String, dynamic>?;
+    final medicineName = (json['medicineName'] ??
+        userMedicine?['customName'] ??
+        (userMedicine?['medicine'] as Map<String, dynamic>?)?['name'] ??
+        (userMedicine?['product'] as Map<String, dynamic>?)?['name'] ??
+        'Medicine') as String;
+
+    // Backend WEEKLY + daysOfWeek maps back to the app's WEEKDAYS/WEEKENDS
+    // dialect; anything else falls through (_repeatLabel shows it as Custom).
+    final days = (json['daysOfWeek'] as List<dynamic>?)?.cast<int>();
+    final rawType = (json['scheduleType'] ?? 'DAILY') as String;
+    final scheduleType = switch ((rawType, days)) {
+      ('WEEKLY', [1, 2, 3, 4, 5]) => 'WEEKDAYS',
+      ('WEEKLY', [6, 7]) => 'WEEKENDS',
+      _ => rawType,
+    };
+
+    final rawDoseTimes =
+        (json['doseTimes'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+
+    return ReminderScheduleModel(
+      id: json['id'] as String,
+      medicineName: medicineName,
+      reminderType: (json['reminderType'] ?? 'MEDICINE') as String,
+      scheduleType: scheduleType,
+      doseTimes: rawDoseTimes.map(ReminderDoseTime.fromJson).toList(),
+      // Backend stores the lead time per dose time, not on the schedule.
+      preNotifyMinutes: (json['preNotifyMinutes'] ??
+          (rawDoseTimes.isNotEmpty
+              ? rawDoseTimes.first['preNotifyMinutes']
+              : null) ??
+          10) as int,
+      isActive: (json['isActive'] ?? json['active'] ?? true) as bool,
+    );
+  }
 
   ReminderScheduleModel copyWith({bool? isActive}) => ReminderScheduleModel(
         id: id,

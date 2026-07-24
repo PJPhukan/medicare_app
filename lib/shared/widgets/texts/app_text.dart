@@ -199,8 +199,12 @@ class AppText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Explicit colors go through _adaptColor too: callers all over the app
+    // pass the dark-theme semantic constants (AppColors.textSecondary etc.),
+    // which must swap to their light variants in light mode. Non-semantic
+    // colors (teal, red, ...) pass through _adaptColor unchanged.
     final resolved = style.copyWith(
-      color: color ?? _adaptColor(context, style.color),
+      color: _adaptColor(context, color ?? style.color),
       fontWeight: fontWeight,
     );
     return Text(

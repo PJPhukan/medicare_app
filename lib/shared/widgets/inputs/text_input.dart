@@ -60,7 +60,9 @@ class AppTextInput extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label != null) ...[
-          Text(label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          Text(label!,
+              style: AppTypography.labelSm.copyWith(
+                  letterSpacing: 0.2, color: context.secondaryText)),
           const SizedBox(height: 6),
         ],
         Container(

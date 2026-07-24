@@ -11,17 +11,23 @@ import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/shell/presentation/screens/app_shell.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
-import '../../features/profile/presentation/screens/profile_screen.dart';
-import '../../features/profile/presentation/screens/settings_screen.dart';
-import '../../features/profile/presentation/screens/edit_profile_screen.dart';
-import '../../features/profile/presentation/screens/appearance_screen.dart';
-import '../../features/professional_profile/presentation/screens/become_professional_screen.dart';
-import '../../features/professional_profile/presentation/screens/pro_hub_screen.dart';
-import '../../features/professional_profile/presentation/screens/service_areas_screen.dart';
-import '../../features/professional_profile/presentation/screens/payout_details_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/edit_profile_screen.dart';
+import '../../features/settings/presentation/screens/appearance_screen.dart';
+import '../../features/settings/presentation/screens/language_region_screen.dart';
+import '../../features/settings/presentation/screens/security_login_screen.dart';
+import '../../features/settings/presentation/screens/change_password_screen.dart';
+import '../../features/settings/presentation/screens/health_profile_screen.dart';
+import '../../features/settings/presentation/screens/notification_setting_screen.dart';
+import '../../features/settings/presentation/screens/become_professional_screen.dart' as settings_pro;
+import '../../features/professionals/presentation/screens/become_professional_screen.dart';
+import '../../features/professionals/presentation/screens/pro_hub_screen.dart';
+import '../../features/professionals/presentation/screens/service_areas_screen.dart';
+import '../../features/professionals/presentation/screens/payout_details_screen.dart';
 import '../../features/premium/presentation/screens/subscription_management_screen.dart';
 import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/support/presentation/screens/submit_ticket_screen.dart';
+import '../../features/support/presentation/screens/help_center_screen.dart';
 import '../../features/vitals/presentation/screens/vital_history_screen.dart';
 import '../../features/vitals/presentation/screens/add_vital_screen.dart';
 import '../../features/medicines/presentation/screens/add_medicine_screen.dart';
@@ -51,10 +57,16 @@ abstract final class AppRoutes {
   static const home = '/home';
 
   static const notifications = '/notifications';
+  static const notificationSettings = '/notification-settings';
   static const profile = '/profile';
+  static const healthProfile = '/health-profile';
+  static const proApplication = '/pro-application';
   static const settings = '/settings';
   static const settingsEdit = '/settings/edit';
   static const settingsAppearance = '/settings/appearance';
+  static const settingsLanguageRegion = '/settings/language-region';
+  static const settingsSecurityLogin = '/settings/security-login';
+  static const settingsChangePassword = '/settings/change-password';
   static const settingsPro = '/settings/pro';
   static const settingsProHub = '/settings/pro-hub';
   static const settingsProHubAreas = '/settings/pro-hub/areas';
@@ -63,6 +75,7 @@ abstract final class AppRoutes {
 
   static const support = '/support';
   static const supportTicket = '/support/ticket';
+  static const supportHelpCenter = '/support/help-center';
 
   static const vitalHistory = '/vitals/history';
   static const vitalAdd = '/vitals/add';
@@ -189,8 +202,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
-        path: AppRoutes.profile,
-        builder: (context, state) => const ProfileScreen(),
+        path: AppRoutes.notificationSettings,
+        builder: (context, state) => const NotificationSettingScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.healthProfile,
+        builder: (context, state) => const HealthProfileScreen(),
       ),
       GoRoute(
         path: AppRoutes.settings,
@@ -205,11 +222,20 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const AppearanceScreen(),
           ),
           GoRoute(
+            path: 'language-region',
+            builder: (context, state) => const LanguageRegionScreen(),
+          ),
+          GoRoute(
+            path: 'security-login',
+            builder: (context, state) => const SecurityLoginScreen(),
+          ),
+          GoRoute(
+            path: 'change-password',
+            builder: (context, state) => const ChangePasswordScreen(),
+          ),
+          GoRoute(
             path: 'pro',
-            builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              return BecomeProfessionalScreen(isEditing: extra?['isEditing'] == true);
-            },
+            builder: (context, state) => const settings_pro.BecomeAProfessionalScreen(),
           ),
           GoRoute(
             path: 'pro-hub',
@@ -238,6 +264,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'ticket',
             builder: (context, state) => const SubmitTicketScreen(),
+          ),
+          GoRoute(
+            path: 'help-center',
+            builder: (context, state) => const HelpCenterScreen(),
           ),
         ],
       ),
@@ -302,6 +332,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.professionalsMapPicker,
         builder: (context, state) => const MapPickerScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.proApplication,
+        builder: (context, state) => const BecomeProfessionalScreen(),
       ),
 
       // ── Messages ─────────────────────────────────────────────────────────────

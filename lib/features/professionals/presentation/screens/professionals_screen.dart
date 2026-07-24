@@ -69,8 +69,9 @@ Color _categoryColor(String name) {
   final n = name.toLowerCase();
   if (n.contains('doctor') || n.contains('physician')) return AppColors.teal;
   if (n.contains('nurse')) return AppColors.blue;
-  if (n.contains('therapist') || n.contains('psycholog'))
+  if (n.contains('therapist') || n.contains('psycholog')) {
     return AppColors.purple;
+  }
   if (n.contains('diet') || n.contains('nutrition')) return AppColors.amber;
   if (n.contains('caregiver') || n.contains('care')) return AppColors.red;
   if (n.contains('physio')) return AppColors.green;
@@ -1864,7 +1865,7 @@ class _ProConnectSheetState extends ConsumerState<ProConnectSheet> {
   }
 
   String _rateLabel(ProPlanType t) => switch (t) {
-        ProPlanType.hourly => '/ hr',
+        ProPlanType.hourly => '/ hour',
         ProPlanType.daily => '/ day',
         ProPlanType.monthly => '/ month',
       };

@@ -178,7 +178,8 @@ class AppBaseDialog extends StatelessWidget {
                             if (title != null)
                               Text(
                                 title!,
-                                style: AppTypography.h3.copyWith(fontSize: 17),
+                                style: AppTypography.h3.copyWith(
+                                    fontSize: 17, color: context.primaryText),
                               ),
                             if (subtitle != null) ...[
                               const SizedBox(height: 3),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/extensions/context_extensions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 
@@ -42,11 +43,14 @@ class SectionHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTypography.h3),
+                Text(title,
+                    style: AppTypography.h3.copyWith(color: context.primaryText)),
                 if (subtitle != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(subtitle!, style: AppTypography.bodySm),
+                    child: Text(subtitle!,
+                        style: AppTypography.bodySm
+                            .copyWith(color: context.secondaryText)),
                   ),
               ],
             ),

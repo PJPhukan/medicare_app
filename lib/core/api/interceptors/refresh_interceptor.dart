@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../constants/api_constants.dart';
+import '../token_store.dart';
 
 const _kToken = 'auth_token';
 const _kRefreshToken = 'refresh_token';
@@ -57,6 +58,7 @@ class RefreshInterceptor extends QueuedInterceptor {
     try {
       final newToken = await _refresh(refreshToken);
       await _storage.write(key: _kToken, value: newToken);
+      TokenStore.set(newToken);
       return handler.resolve(await _retry(req, newToken));
     } catch (_) {
       _onSessionExpired();

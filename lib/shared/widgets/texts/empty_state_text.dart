@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/extensions/context_extensions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
@@ -94,9 +95,8 @@ class AppEmptyStateText extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: compact
-                ? AppTypography.h3
-                : AppTypography.h2,
+            style: (compact ? AppTypography.h3 : AppTypography.h2)
+                .copyWith(color: context.primaryText),
           ),
 
           // ── Subtitle ──────────────────────────────────────────────────────

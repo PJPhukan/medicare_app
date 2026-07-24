@@ -9,6 +9,7 @@ class EmergencyContactEntity {
     required this.createdAt,
     this.relationship,
     this.isPrimary = false,
+    this.priority = 0,
   });
 
   final String id;
@@ -17,6 +18,9 @@ class EmergencyContactEntity {
   final String createdAt;
   final String? relationship;
   final bool isPrimary;
+
+  /// Lower = contacted first (v1 notifies everyone; used for display order).
+  final int priority;
 
   DateTime get createdAtDate => DateTime.parse(createdAt);
 }

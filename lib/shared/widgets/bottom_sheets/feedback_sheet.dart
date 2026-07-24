@@ -97,7 +97,9 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(AppStrings.feedbackTitle, style: AppTypography.h3.copyWith(fontSize: 18)),
+                    Text(AppStrings.feedbackTitle,
+                        style: AppTypography.h3.copyWith(
+                            fontSize: 18, color: context.primaryText)),
                     Text('Help us improve MediForze',
                         style: AppTypography.bodyXs.copyWith(color: AppColors.textSecondary)),
                   ],

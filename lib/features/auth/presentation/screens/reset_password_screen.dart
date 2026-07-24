@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/extensions/context_extensions.dart';
 
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/validators.dart';
@@ -96,7 +97,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 AppText.h1(AppStrings.setNewPassword, fontWeight: FontWeight.w800),
                 const SizedBox(height: 8),
                 AppText.bodyMd(AppStrings.setNewPasswordSubtitle,
-                    textAlign: TextAlign.center, color: AppColors.textSecondary),
+                    textAlign: TextAlign.center, color: context.secondaryText),
               ],
             ),
           ),

@@ -402,7 +402,8 @@ class _MultiSelectSheetState<T> extends State<_MultiSelectSheet<T>> {
                             title: Text.rich(
                               TextSpan(
                                 text: '${AppStrings.add}  ',
-                                style: AppTypography.bodyMd,
+                                style: AppTypography.bodyMd
+                                    .copyWith(color: context.primaryText),
                                 children: [
                                   TextSpan(
                                     text: '"${_query.trim()}"',

@@ -117,7 +117,7 @@ class AppInfoCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: AppTypography.labelMd,
+                  style: AppTypography.labelMd.copyWith(color: context.primaryText),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),

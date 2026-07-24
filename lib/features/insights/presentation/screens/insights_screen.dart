@@ -30,7 +30,9 @@ List<_DayStatus> _buildCalendar(List<DailyAdherenceEntity> daily) {
   }
 
   final result = <_DayStatus>[];
-  for (var i = 0; i < firstWeekday; i++) result.add(_DayStatus.noData);
+  for (var i = 0; i < firstWeekday; i++) {
+    result.add(_DayStatus.noData);
+  }
   for (var d = 1; d <= daysInMonth; d++) {
     if (d > now.day) {
       result.add(_DayStatus.future);

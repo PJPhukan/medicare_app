@@ -23,7 +23,7 @@ class AlertsNotifier extends StateNotifier<AlertsState> {
     try {
       final alerts = await _fetchAlerts();
       state = state.copyWith(alerts: alerts, isLoading: false);
-    } catch (e, s) {
+    } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }

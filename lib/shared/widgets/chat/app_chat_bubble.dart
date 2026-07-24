@@ -171,7 +171,7 @@ class _AppChatInputState extends State<AppChatInput> {
                 maxLines: 5,
                 minLines: 1,
                 textInputAction: TextInputAction.newline,
-                style: AppTypography.bodyMd,
+                style: AppTypography.bodyMd.copyWith(color: context.primaryText),
                 cursorColor: AppColors.teal,
                 decoration: InputDecoration(
                   hintText: widget.hint ?? 'Type a message…',

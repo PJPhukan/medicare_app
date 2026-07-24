@@ -11,11 +11,13 @@ class AddContactUseCase {
     required String phone,
     String? relationship,
     bool isPrimary = false,
+    int priority = 0,
   }) =>
       _repo.addContact(
         name: name,
         phone: phone,
         relationship: relationship,
         isPrimary: isPrimary,
+        priority: priority,
       );
 }

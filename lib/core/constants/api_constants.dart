@@ -4,7 +4,9 @@ abstract class ApiConstants {
   // or for a LAN device: `--dart-define=API_BASE_URL=http://192.168.x.x:4000`
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.29.210:4000',
+    // defaultValue: 'https://curaleecore-api-production.up.railway.app',
+      // defaultValue: 'http://192.168.29.210:4000', // Home
+       defaultValue: 'http://192.168.29.232:4000', // Ofice
   );
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -87,13 +89,14 @@ abstract class ApiConstants {
 
   // ── Users ─────────────────────────────────────────────────────────────────
   static const String users = '/api/users';
-  static const String myTabs = '/api/users/me/tabs';
+  static const String myTabs = '/api/users/tabs';
   static const String userProfile = '/api/users/me';
   static const String userAvatar = '/api/users/me/avatar';
 
   // ── Emergency ─────────────────────────────────────────────────────────────
   static const String emergencyProfile  = '/api/emergency/profile';
   static const String emergencyContacts = '/api/emergency/contacts';
+  static const String emergencySos      = '/api/emergency/sos';
 
   // ── Messages ──────────────────────────────────────────────────────────────
   static const String conversations = '/api/messages/conversations';

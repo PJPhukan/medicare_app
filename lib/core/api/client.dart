@@ -39,7 +39,10 @@ final dioProvider = Provider<Dio>((ref) {
       PrettyDioLogger(
         requestHeader: true,
         requestBody: false, // body logged (redacted) by SanitizeInterceptor
-        responseBody: true,
+        // Printing full response bodies stalls the UI isolate in debug runs
+        // (large payloads are serialized and pushed through the console).
+        // Flip to true temporarily when you need to inspect a payload.
+        responseBody: false,
         responseHeader: false,
         error: true,
         compact: true,

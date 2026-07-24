@@ -44,6 +44,7 @@ export 'feedback/offline_page.dart';
 export 'feedback/network_required.dart';
 export 'navigation/page_transition.dart';
 export 'layout/section_header.dart';
+export 'texts/section_header_text.dart';
 export 'skeleton/shimmer_widget.dart';
 export 'feedback/sync_indicator.dart';
 export 'tables/app_table.dart';

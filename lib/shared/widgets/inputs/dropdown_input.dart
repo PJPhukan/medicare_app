@@ -70,6 +70,7 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _DropdownSheet<T>(
+        title: widget.label ?? 'Select',
         options: widget.options,
         labels: widget.labels,
         selected: _selected,
@@ -91,7 +92,7 @@ class _AppDropdownInputState<T> extends State<AppDropdownInput<T>> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          AppText.labelMd(widget.label!),
+          AppText.labelMd(widget.label!, color: context.primaryText),
           const SizedBox(height: 6),
         ],
         Material(
@@ -151,6 +152,7 @@ class _DropdownSheet<T> extends StatelessWidget {
     required this.labels,
     required this.selected,
     required this.onSelect,
+    this.title,
     this.leadingIcons,
   });
 
@@ -158,6 +160,7 @@ class _DropdownSheet<T> extends StatelessWidget {
   final List<String> labels;
   final T? selected;
   final ValueChanged<T> onSelect;
+  final String? title;
   final List<IconData?>? leadingIcons;
 
   @override
@@ -184,6 +187,15 @@ class _DropdownSheet<T> extends StatelessWidget {
               borderRadius: AppBorderRadius.pill,
             ),
           ),
+          if (title != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: AppText.h3(title!),
+              ),
+            ),
+          ],
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),

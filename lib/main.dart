@@ -38,12 +38,10 @@ void main() async {
     systemNavigationBarDividerColor: Colors.transparent,
   ));
 
-  final results = await Future.wait([
-    AppLogger.init(),
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
-    SharedPreferences.getInstance(),
-  ]);
-  final prefs = results[2] as SharedPreferences;
+  // Only await what the first frame truly needs. Everything else is deferred
+  // below runApp — awaiting Firebase/device-info here kept the native launch
+  // window (black in dark mode) on screen for 1–2s before the splash rendered.
+  final prefs = await SharedPreferences.getInstance();
 
   runApp(
     ProviderScope(
@@ -52,11 +50,16 @@ void main() async {
     ),
   );
 
-  await NotificationService.init();
+  // Deferred initialisation — interleaves with the splash animation instead of
+  // delaying it. Firebase must complete before anything touches FCM; the
+  // dashboard's requestPermission() only runs after splash + routing.
+  AppLogger.init();
   try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await NotificationService.init();
     await FirebaseMessagingService.initialize();
   } catch (e) {
-    AppLogger.e('FCM initialization failed: $e', tag: 'FCM');
+    AppLogger.e('Startup services init failed: $e', tag: 'Init');
   }
 }
 
@@ -141,6 +144,11 @@ class _MediForzeAppState extends ConsumerState<MediForzeApp>
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
+      // Default AnimatedTheme lerps the whole ThemeData and rebuilds every
+      // mounted screen each frame for 200ms — with all visited tabs alive in
+      // the shell's IndexedStack that drops frames on the dark/light toggle.
+      // An instant switch reads as snappier.
+      themeAnimationDuration: Duration.zero,
       routerConfig: router,
     );
   }

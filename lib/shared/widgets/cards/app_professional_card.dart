@@ -102,7 +102,7 @@ class AppProfessionalCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(name,
-                            style: AppTypography.labelMd,
+                            style: AppTypography.labelMd.copyWith(color: context.primaryText),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

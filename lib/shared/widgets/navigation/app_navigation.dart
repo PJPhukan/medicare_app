@@ -184,7 +184,8 @@ class AppNavigationRail extends StatelessWidget {
       selectedIconTheme: const IconThemeData(color: AppColors.teal),
       unselectedIconTheme: const IconThemeData(color: AppColors.textHint),
       selectedLabelTextStyle: AppTypography.labelSm.copyWith(color: AppColors.teal),
-      unselectedLabelTextStyle: AppTypography.labelSm,
+      unselectedLabelTextStyle:
+          AppTypography.labelSm.copyWith(color: context.secondaryText),
       leading: header,
       destinations: items.map((item) => NavigationRailDestination(
         icon: AppNotificationDot(count: item.badge, child: Icon(item.icon)),

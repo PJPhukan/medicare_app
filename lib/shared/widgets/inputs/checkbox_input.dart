@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/extensions/context_extensions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
@@ -129,7 +130,8 @@ class AppCheckboxGroupInput<T> extends StatelessWidget {
       children: [
         if (label != null) ...[
           Text(label!,
-              style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+              style: AppTypography.labelSm.copyWith(
+                  letterSpacing: 0.2, color: context.secondaryText)),
           const SizedBox(height: 8),
         ],
         ...List.generate(options.length, (i) {

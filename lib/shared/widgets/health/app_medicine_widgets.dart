@@ -91,11 +91,14 @@ class MedicineCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: AppTypography.labelMd, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(name,
+                        style: AppTypography.labelMd.copyWith(color: context.primaryText),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 3),
                     Text(
                       '$dosage · $frequency',
-                      style: AppTypography.bodySm,
+                      style: AppTypography.bodySm.copyWith(color: context.secondaryText),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),

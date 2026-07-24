@@ -5,7 +5,13 @@ import 'app_border_radius.dart';
 import 'app_typography.dart';
 
 abstract class AppTheme {
-  static ThemeData get dark {
+  // Built once and cached: these were getters, so every rebuild of the root
+  // MaterialApp reconstructed both full ThemeData trees (and their GoogleFonts
+  // text styles) — noticeable jank when toggling dark/light mode.
+  static final ThemeData dark = _buildDark();
+  static final ThemeData light = _buildLight();
+
+  static ThemeData _buildDark() {
     const colorScheme = ColorScheme.dark(
       primary:        AppColors.teal,
       onPrimary:      AppColors.textInverse,
@@ -227,7 +233,7 @@ abstract class AppTheme {
     );
   }
 
-  static ThemeData get light {
+  static ThemeData _buildLight() {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,

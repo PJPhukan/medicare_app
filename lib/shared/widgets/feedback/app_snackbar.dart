@@ -43,7 +43,9 @@ abstract class AppSnackbar {
                 Icon(icon, size: 18, color: color),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(message, style: AppTypography.bodyMd),
+                  child: Text(message,
+                      style: AppTypography.bodyMd
+                          .copyWith(color: context.primaryText)),
                 ),
                 if (actionLabel != null && onAction != null)
                   GestureDetector(

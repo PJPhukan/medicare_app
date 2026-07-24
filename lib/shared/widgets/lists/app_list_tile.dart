@@ -4,6 +4,7 @@ import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../utils/animated_tap.dart';
+import '../cards/app_card.dart';
 
 /// Card-style list tile used throughout the app.
 class AppListTile extends StatelessWidget {
@@ -39,8 +40,8 @@ class AppListTile extends StatelessWidget {
     Widget tile = DecoratedBox(
       decoration: BoxDecoration(
         color: color ?? context.cardBg,
-        borderRadius: AppBorderRadius.xlAll,
-        border: Border.all(color: context.borderCol),
+        // borderRadius: AppBorderRadius.xlAll,
+        // border: Border.all(color: context.borderCol),
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -63,7 +64,7 @@ class AppListTile extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(subtitle!,
-                        style: AppTypography.bodySm,
+                        style: AppTypography.bodySm.copyWith(color: context.secondaryText),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -92,7 +93,7 @@ class AppListTile extends StatelessWidget {
   }
 }
 
-/// Settings-style grouped list section.
+/// Settings-style grouped list section with AppCard styling.
 class AppListSection extends StatelessWidget {
   const AppListSection({
     super.key,
@@ -100,12 +101,18 @@ class AppListSection extends StatelessWidget {
     this.header,
     this.footer,
     this.dividerIndent = 56,
+    this.hasShadow = true,
+    this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    this.margin = const EdgeInsets.all(10),
   });
 
   final List<AppListTile> items;
   final String? header;
   final String? footer;
   final double dividerIndent;
+  final bool hasShadow;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry margin;
 
   @override
   Widget build(BuildContext context) {
@@ -119,12 +126,10 @@ class AppListSection extends StatelessWidget {
               style: AppTypography.overline.copyWith(color: AppColors.textHint),
             ),
           ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: context.cardBg,
-            borderRadius: AppBorderRadius.xlAll,
-            border: Border.all(color: context.borderCol),
-          ),
+        AppCard(
+          hasShadow: hasShadow,
+          padding: padding,
+          margin: margin,
           child: Column(
             children: items.asMap().entries.map((e) {
               final isLast = e.key == items.length - 1;
@@ -148,7 +153,8 @@ class AppListSection extends StatelessWidget {
         if (footer != null)
           Padding(
             padding: const EdgeInsets.only(left: 4, top: 6),
-            child: Text(footer!, style: AppTypography.caption),
+            child: Text(footer!,
+                style: AppTypography.caption.copyWith(color: context.secondaryText)),
           ),
       ],
     );

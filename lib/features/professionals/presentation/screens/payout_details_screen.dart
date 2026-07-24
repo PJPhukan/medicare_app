@@ -66,9 +66,10 @@ class _PayoutDetailsScreenState extends ConsumerState<PayoutDetailsScreen> {
       AppSnackbar.success(context, 'Payout details saved');
       context.pop();
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         AppSnackbar.error(
             context, 'Could not save. Check the details and try again.');
+      }
     }
   }
 

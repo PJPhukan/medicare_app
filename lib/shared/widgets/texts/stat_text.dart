@@ -119,7 +119,7 @@ class AppStatText extends StatelessWidget {
           Text(
             label,
             style: AppTypography.labelSm.copyWith(
-              color: AppColors.textSecondary,
+              color: context.secondaryText,
               letterSpacing: 0.2,
             ),
           ),

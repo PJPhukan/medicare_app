@@ -2,39 +2,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../../../core/services/sos_native_service.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../../../shared/widgets/bottom_sheets/app_base_bottom_sheet.dart';
 import '../../domain/entities/emergency_contact_entity.dart';
+import '../../domain/entities/emergency_profile_entity.dart';
 import '../providers/emergency_provider.dart';
-
-// ─── Health profile model (local static data) ─────────────────────────────────
-
-class _HealthProfile {
-  final String bloodGroup;
-  final List<String> allergies;
-  final List<String> conditions;
-  final List<String> medications;
-  final String? notes;
-
-  const _HealthProfile({
-    required this.bloodGroup,
-    required this.allergies,
-    required this.conditions,
-    required this.medications,
-    this.notes,
-  });
-}
-
-const _kProfile = _HealthProfile(
-  bloodGroup: 'B+',
-  allergies: ['Penicillin', 'Aspirin'],
-  conditions: ['Hypertension', 'Type 2 Diabetes'],
-  medications: ['Metformin 500mg', 'Amlodipine 5mg'],
-  notes: 'Patient uses insulin pump. Do not administer NSAIDs.',
-);
+import '../providers/sos_provider.dart';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -43,7 +22,8 @@ class EmergencyScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final contacts = ref.watch(emergencyProvider).contacts;
+    final emergency = ref.watch(emergencyProvider);
+    final contacts = emergency.contacts;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
       child: Scaffold(
@@ -68,9 +48,9 @@ class EmergencyScreen extends ConsumerWidget {
                   AppText.bodySm(AppStrings.emergencySubtitle2,
                       color: AppColors.textSecondary),
                   const SizedBox(height: 24),
-                  _SosCard(),
+                  const _SosCard(),
                   const SizedBox(height: 16),
-                  _HealthProfileCard(profile: _kProfile),
+                  _HealthProfileCard(profile: emergency.profile),
                   const SizedBox(height: 16),
                   _ContactsCard(contacts: contacts),
                 ]),
@@ -85,9 +65,12 @@ class EmergencyScreen extends ConsumerWidget {
 
 // ─── SOS Card ─────────────────────────────────────────────────────────────────
 
-class _SosCard extends StatelessWidget {
+class _SosCard extends ConsumerWidget {
+  const _SosCard();
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sos = ref.watch(sosProvider);
     return AppCard(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -100,7 +83,10 @@ class _SosCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          const _SosButton(),
+          if (sos.phase == SosPhase.idle)
+            const _SosHoldButton()
+          else
+            const _ActiveSosView(),
           const SizedBox(height: 8),
         ],
       ),
@@ -108,25 +94,30 @@ class _SosCard extends StatelessWidget {
   }
 }
 
-enum _SosState { idle, countdown, triggered }
+// ─── Hold-to-trigger button (2 s radial fill) ─────────────────────────────────
 
-class _SosButton extends StatefulWidget {
-  const _SosButton();
+class _SosHoldButton extends ConsumerStatefulWidget {
+  const _SosHoldButton();
 
   @override
-  State<_SosButton> createState() => _SosButtonState();
+  ConsumerState<_SosHoldButton> createState() => _SosHoldButtonState();
 }
 
-class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMixin {
-  _SosState _state = _SosState.idle;
-  int _count = 3;
-  Timer? _timer;
-  late AnimationController _pulseCtrl;
-  late Animation<double> _pulse;
+class _SosHoldButtonState extends ConsumerState<_SosHoldButton>
+    with TickerProviderStateMixin {
+  static const _holdDuration = Duration(seconds: 2);
+
+  late final AnimationController _holdCtrl;
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _pulse;
 
   @override
   void initState() {
     super.initState();
+    _holdCtrl = AnimationController(vsync: this, duration: _holdDuration)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) _trigger();
+      });
     _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))
       ..repeat(reverse: true);
     _pulse = Tween(begin: 1.0, end: 1.08).animate(
@@ -136,169 +127,248 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _holdCtrl.dispose();
     _pulseCtrl.dispose();
     super.dispose();
   }
 
-  void _start() {
-    if (_state != _SosState.idle) return;
+  bool get _armed => ref.read(emergencyProvider).contacts.isNotEmpty;
+
+  void _onHoldStart() {
+    if (!_armed) return;
     HapticFeedback.heavyImpact();
-    setState(() {
-      _state = _SosState.countdown;
-      _count = 3;
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      setState(() => _count--);
-      if (_count <= 0) {
-        t.cancel();
-        _trigger();
-      }
-    });
+    _holdCtrl.forward(from: 0);
   }
 
-  void _cancel() {
-    _timer?.cancel();
-    HapticFeedback.mediumImpact();
-    setState(() {
-      _state = _SosState.idle;
-      _count = 3;
-    });
+  void _onHoldEnd() {
+    if (_holdCtrl.status == AnimationStatus.forward) {
+      _holdCtrl.reverse();
+    }
   }
 
   void _trigger() {
     HapticFeedback.heavyImpact();
-    setState(() => _state = _SosState.triggered);
+    ref.read(sosProvider.notifier).trigger();
   }
-
-  void _dismiss() => setState(() {
-        _state = _SosState.idle;
-        _count = 3;
-      });
 
   @override
   Widget build(BuildContext context) {
+    final armed = ref.watch(emergencyProvider).contacts.isNotEmpty;
+    final color = armed ? AppColors.red : AppColors.textHint;
+
     return Column(
       children: [
-        switch (_state) {
-          _SosState.idle => GestureDetector(
-              onLongPressStart: (_) => _start(),
-              child: ScaleTransition(
-                scale: _pulse,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: AppColors.red,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.red.withValues(alpha: 0.35), width: 8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.red.withValues(alpha: 0.35),
-                        blurRadius: 32,
-                        spreadRadius: 4,
+        GestureDetector(
+          onTapDown: (_) => _onHoldStart(),
+          onTapUp: (_) => _onHoldEnd(),
+          onTapCancel: _onHoldEnd,
+          child: ScaleTransition(
+            scale: _pulse,
+            child: SizedBox(
+              width: 140,
+              height: 140,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Radial fill while holding
+                  AnimatedBuilder(
+                    animation: _holdCtrl,
+                    builder: (_, __) => SizedBox(
+                      width: 140,
+                      height: 140,
+                      child: CircularProgressIndicator(
+                        value: _holdCtrl.value,
+                        strokeWidth: 6,
+                        color: color,
+                        backgroundColor: color.withValues(alpha: 0.15),
                       ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    AppStrings.sos,
-                    style: const TextStyle(
-                      fontSize: 28, fontWeight: FontWeight.w800,
-                      color: Colors.white, letterSpacing: 2,
                     ),
                   ),
-                ),
+                  Container(
+                    width: 116,
+                    height: 116,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.35),
+                          blurRadius: 32,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      AppStrings.sos,
+                      style: TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.w800,
+                        color: Colors.white, letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          _SosState.countdown => Column(
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: AppColors.red.withValues(alpha: 0.85),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.red.withValues(alpha: 0.5), width: 6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.red.withValues(alpha: 0.45),
-                        blurRadius: 48,
-                        spreadRadius: 8,
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '$_count',
-                    style: const TextStyle(
-                      fontSize: 52, fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                AppText.bodySm('${AppStrings.sosSendingIn} $_count…',
-                    color: AppColors.textSecondary),
-                const SizedBox(height: 10),
-                AppButton(
-                  variant: AppButtonVariant.outline,
-                  label: AppStrings.cancel,
-                  size: AppButtonSize.sm,
-                  onPressed: _cancel,
-                ),
-              ],
-            ),
-          _SosState.triggered => Column(
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFB91C1C),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.red.withValues(alpha: 0.6), width: 6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.red.withValues(alpha: 0.55),
-                        blurRadius: 56,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.shield_rounded, size: 48, color: Colors.white),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '🚨 ${AppStrings.sosActivated}',
-                  style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700,
-                    color: AppColors.red,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                AppText.bodySm(
-                  AppStrings.sosContactsNotified,
-                  color: AppColors.textSecondary,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                AppButton(
-                  variant: AppButtonVariant.outline,
-                  label: AppStrings.dismiss,
-                  size: AppButtonSize.sm,
-                  onPressed: _dismiss,
-                ),
-              ],
-            ),
-        },
+          ),
+        ),
+        const SizedBox(height: 14),
+        AppText.bodySm(
+          armed ? AppStrings.sosHoldHint : AppStrings.sosNeedContact,
+          color: armed ? AppColors.textHint : AppColors.amber,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
 
-        if (_state == _SosState.idle) ...[
-          const SizedBox(height: 14),
-          AppText.bodySm(AppStrings.sosIdleHint,
-              color: AppColors.textHint,
-              textAlign: TextAlign.center),
+// ─── Active SOS view (alarm sounding / sent state) ────────────────────────────
+
+class _ActiveSosView extends ConsumerStatefulWidget {
+  const _ActiveSosView();
+
+  @override
+  ConsumerState<_ActiveSosView> createState() => _ActiveSosViewState();
+}
+
+class _ActiveSosViewState extends ConsumerState<_ActiveSosView> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ticks once a second so the cancel-lock countdown updates.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  int _cancelLockRemaining(SosState sos) {
+    if (sos.triggeredAt == null) return 0;
+    final elapsed = DateTime.now().difference(sos.triggeredAt!);
+    final remaining = SosState.cancelLock - elapsed;
+    return remaining.isNegative ? 0 : remaining.inSeconds + 1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sos = ref.watch(sosProvider);
+    final notifier = ref.read(sosProvider.notifier);
+    final lockRemaining = _cancelLockRemaining(sos);
+
+    return Column(
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            color: const Color(0xFFB91C1C),
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.red.withValues(alpha: 0.6), width: 6),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.red.withValues(alpha: 0.55),
+                blurRadius: 56,
+                spreadRadius: 10,
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            sos.cancelled ? Icons.check_rounded : Icons.shield_rounded,
+            size: 48,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          sos.cancelled ? AppStrings.sosCancelled : '🚨 ${AppStrings.sosSent}',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14, fontWeight: FontWeight.w700,
+            color: AppColors.red,
+          ),
+        ),
+
+        if (sos.smsUnavailableReason != null) ...[
+          const SizedBox(height: 8),
+          AppText.bodySm('⚠️ ${sos.smsUnavailableReason!}',
+              color: AppColors.amber, textAlign: TextAlign.center),
+        ],
+
+        // Who was notified
+        if (sos.notifiedContacts.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppText.labelSm(AppStrings.sosWhoWasNotified,
+                color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          ...sos.notifiedContacts.map((c) {
+            final smsStatus = sos.smsResults[c.phone];
+            final (label, color) = switch (smsStatus) {
+              'sent' => (AppStrings.sosSmsSent, AppColors.green),
+              null => ('—', AppColors.textHint),
+              _ => (AppStrings.sosSmsFailed, AppColors.red),
+            };
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(child: AppText.bodySm(c.name)),
+                  AppText.labelXs(label, color: color),
+                ],
+              ),
+            );
+          }),
+        ],
+
+        const SizedBox(height: 16),
+
+        // STOP ALARM — local and instant, never cancels the alert itself.
+        if (sos.alarmPlaying)
+          AppButton(
+            label: AppStrings.sosStopAlarm,
+            variant: AppButtonVariant.primary,
+            color: AppColors.red,
+            isFullWidth: true,
+            onPressed: () => notifier.stopAlarm(),
+          ),
+
+        if (!sos.cancelled) ...[
+          const SizedBox(height: 10),
+          AppButton(
+            label: lockRemaining > 0
+                ? '${AppStrings.sosCancelFalseAlarm} ($lockRemaining)'
+                : AppStrings.sosCancelFalseAlarm,
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.sm,
+            onPressed: sos.canCancel ? () => notifier.cancel() : null,
+          ),
+        ] else ...[
+          const SizedBox(height: 10),
+          AppButton(
+            label: AppStrings.dismiss,
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.sm,
+            onPressed: () => notifier.dismiss(),
+          ),
+        ],
+
+        if (!sos.cancelled && !sos.alarmPlaying) ...[
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: () => notifier.dismiss(),
+            child: AppText.bodySm(AppStrings.dismiss, color: AppColors.textHint),
+          ),
         ],
       ],
     );
@@ -308,11 +378,26 @@ class _SosButtonState extends State<_SosButton> with SingleTickerProviderStateMi
 // ─── Health Profile Card ──────────────────────────────────────────────────────
 
 class _HealthProfileCard extends StatelessWidget {
-  final _HealthProfile profile;
+  final EmergencyProfileEntity? profile;
   const _HealthProfileCard({required this.profile});
 
   @override
   Widget build(BuildContext context) {
+    final profile = this.profile;
+    if (profile == null || profile.isEmpty) {
+      return AppCard(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppText.h3(AppStrings.healthProfileTitle),
+            const SizedBox(height: 12),
+            AppText.bodySm(AppStrings.emergencyDataNote,
+                color: AppColors.textHint),
+          ],
+        ),
+      );
+    }
     return AppCard(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -322,6 +407,7 @@ class _HealthProfileCard extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Blood group
+          if (profile.bloodGroup != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -344,7 +430,7 @@ class _HealthProfileCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      profile.bloodGroup,
+                      profile.bloodGroup!,
                       style: TextStyle(
                         fontSize: 26, fontWeight: FontWeight.w800,
                         color: context.primaryText,
@@ -435,12 +521,12 @@ class _TagSection extends StatelessWidget {
 
 // ─── Contacts Card ────────────────────────────────────────────────────────────
 
-class _ContactsCard extends StatelessWidget {
+class _ContactsCard extends ConsumerWidget {
   final List<EmergencyContactEntity> contacts;
   const _ContactsCard({required this.contacts});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return AppCard(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -451,7 +537,7 @@ class _ContactsCard extends StatelessWidget {
               AppText.h3(AppStrings.emergencyContacts),
               const Spacer(),
               GestureDetector(
-                onTap: () {},
+                onTap: () => _showContactSheet(context, ref),
                 child: AppContainer.tinted(
                   color: AppColors.green,
                   borderRadius: AppBorderRadius.lgAll,
@@ -482,42 +568,275 @@ class _ContactsCard extends StatelessWidget {
   }
 }
 
-class _ContactTile extends StatelessWidget {
+class _ContactTile extends ConsumerWidget {
   final EmergencyContactEntity contact;
   const _ContactTile({required this.contact});
 
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          AppAvatar(name: contact.name, size: AppAvatarSize.sm),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppText.labelMd(contact.name),
-                const SizedBox(height: 2),
-                if (contact.relationship != null)
-                  AppText.bodySm(contact.relationship!,
-                      color: AppColors.textSecondary),
-                AppText.bodyXs(contact.phone, color: AppColors.textHint),
-              ],
-            ),
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(AppStrings.deleteContactTitle),
+        content: const Text(AppStrings.deleteContactBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(AppStrings.cancel),
           ),
-          GestureDetector(
-            onTap: () {},
-            child: AppContainer.tinted(
-              color: AppColors.green,
-              borderRadius: AppBorderRadius.lgAll,
-              padding: const EdgeInsets.all(11),
-              child: const Icon(Icons.phone_rounded, size: 18, color: AppColors.green),
-            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(AppStrings.delete,
+                style: TextStyle(color: AppColors.red)),
           ),
         ],
       ),
+    );
+    if (confirmed == true) {
+      await ref.read(emergencyProvider.notifier).deleteContact(contact.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () => _showContactSheet(context, ref, existing: contact),
+      child: AppCard(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            AppAvatar(name: contact.name, size: AppAvatarSize.sm),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText.labelMd(contact.name),
+                  const SizedBox(height: 2),
+                  if (contact.relationship != null)
+                    AppText.bodySm(contact.relationship!,
+                        color: AppColors.textSecondary),
+                  AppText.bodyXs(contact.phone, color: AppColors.textHint),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => _confirmDelete(context, ref),
+              child: AppContainer.tinted(
+                color: AppColors.red,
+                borderRadius: AppBorderRadius.lgAll,
+                padding: const EdgeInsets.all(11),
+                child: const Icon(Icons.delete_outline_rounded,
+                    size: 18, color: AppColors.red),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Add / edit contact bottom sheet ──────────────────────────────────────────
+
+const _kRelationships = ['Family', 'Nurse', 'Neighbor', 'Other'];
+
+Future<void> _showContactSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  EmergencyContactEntity? existing,
+}) async {
+  final saved = await showAppBottomSheet<bool>(
+    context: context,
+    title: existing == null
+        ? AppStrings.addEmergencyContact
+        : AppStrings.editEmergencyContact,
+    child: _ContactForm(existing: existing),
+  );
+  // A saved contact arms SOS — get SMS permission and battery exemption now,
+  // with rationale, instead of mid-emergency.
+  if (saved == true && context.mounted) {
+    await _ensureSosPermissions(context);
+  }
+}
+
+/// Asks for SEND_SMS (with rationale) and battery-optimization exemption so
+/// the SOS SMS and alarm service work reliably when actually needed.
+Future<void> _ensureSosPermissions(BuildContext context) async {
+  const native = SosNativeService();
+
+  if (!await Permission.sms.isGranted) {
+    if (!context.mounted) return;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Allow SMS for SOS'),
+        content: const Text(
+          'When you trigger SOS, Curalee sends an SMS directly to your '
+          'emergency contacts — even without internet. Allow SMS so alerts '
+          'can go out in an emergency.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (proceed == true) await Permission.sms.request();
+  }
+
+  if (!await native.isIgnoringBatteryOptimizations()) {
+    await native.requestIgnoreBatteryOptimizations();
+  }
+}
+
+class _ContactForm extends ConsumerStatefulWidget {
+  const _ContactForm({this.existing});
+
+  final EmergencyContactEntity? existing;
+
+  @override
+  ConsumerState<_ContactForm> createState() => _ContactFormState();
+}
+
+class _ContactFormState extends ConsumerState<_ContactForm> {
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
+  late final TextEditingController _priority;
+  String? _relationship;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.existing;
+    _name = TextEditingController(text: c?.name ?? '');
+    _phone = TextEditingController(text: c?.phone ?? '');
+    _priority = TextEditingController(text: (c?.priority ?? 0).toString());
+    _relationship =
+        _kRelationships.contains(c?.relationship) ? c?.relationship : null;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _priority.dispose();
+    super.dispose();
+  }
+
+  // Backend validates strict E.164; mirror it here for instant feedback.
+  static final _e164 = RegExp(r'^\+[1-9]\d{7,14}$');
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    final phone = _phone.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Name is required');
+      return;
+    }
+    if (!_e164.hasMatch(phone)) {
+      setState(() => _error = 'Phone must be in international format, e.g. +919876543210');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final notifier = ref.read(emergencyProvider.notifier);
+      final priority = int.tryParse(_priority.text.trim()) ?? 0;
+      if (widget.existing == null) {
+        await notifier.addContact(
+          name: name,
+          phone: phone,
+          relationship: _relationship,
+          priority: priority,
+        );
+      } else {
+        await notifier.updateContact(
+          id: widget.existing!.id,
+          name: name,
+          phone: phone,
+          relationship: _relationship,
+          priority: priority,
+        );
+      }
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = 'Could not save contact — please try again';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppTextField(
+          controller: _name,
+          label: AppStrings.name,
+          hint: 'e.g. Anita Sharma',
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 12),
+        AppTextField(
+          controller: _phone,
+          label: AppStrings.phone,
+          hint: '+919876543210',
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 12),
+        AppText.labelSm(AppStrings.relationshipLabel,
+            color: AppColors.textSecondary),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: _kRelationships.map((r) {
+            final selected = _relationship == r;
+            return ChoiceChip(
+              label: Text(r),
+              selected: selected,
+              onSelected: (_) =>
+                  setState(() => _relationship = selected ? null : r),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        AppTextField(
+          controller: _priority,
+          label: AppStrings.priorityLabel,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 10),
+          AppText.bodySm(_error!, color: AppColors.red),
+        ],
+        const SizedBox(height: 18),
+        AppButton(
+          label: AppStrings.save,
+          isFullWidth: true,
+          isLoading: _saving,
+          onPressed: _saving ? null : _save,
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

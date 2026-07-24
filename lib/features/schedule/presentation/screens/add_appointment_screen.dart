@@ -409,7 +409,7 @@ class _TextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
 
-  _TextField({required this.controller, required this.hint});
+  const _TextField({required this.controller, required this.hint});
 
   @override
   Widget build(BuildContext context) => Container(

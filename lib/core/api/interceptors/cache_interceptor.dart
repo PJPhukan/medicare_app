@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/logger.dart';
 
@@ -15,6 +16,11 @@ class CacheInterceptor extends Interceptor {
   final SharedPreferences _prefs;
 
   static const _prefix = 'api_cache:GET:';
+  static const _indexKey = 'api_cache:index';
+  // Keep the offline cache bounded — SharedPreferences rewrites its whole
+  // backing file on every write, so unbounded growth makes every write (and
+  // app startup) progressively slower.
+  static const _maxEntries = 48;
 
   // ── Key helpers ─────────────────────────────────────────────────────────────
 
@@ -39,14 +45,34 @@ class CacheInterceptor extends Interceptor {
 
   @override
   void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
-    if (_isGet(response.requestOptions) && response.statusCode == 200) {
-      try {
-        _prefs.setString(_key(response.requestOptions), jsonEncode(response.data));
-      } catch (e, s) {
-        AppLogger.w('Cache write failed', error: e, stack: s);
-      }
-    }
+    // Deliver the response first — the cache write must never delay the UI.
     handler.next(response);
+    if (_isGet(response.requestOptions) && response.statusCode == 200) {
+      _write(_key(response.requestOptions), response.data);
+    }
+  }
+
+  Future<void> _write(String key, dynamic data) async {
+    try {
+      // Encoding large bodies is the expensive part — do it off the UI isolate.
+      final body = await compute(jsonEncode, data);
+      await _prefs.setString(key, body);
+      _touch(key);
+    } catch (e, s) {
+      AppLogger.w('Cache write failed', error: e, stack: s);
+    }
+  }
+
+  /// LRU bookkeeping: move [key] to the end of the index, evict the oldest
+  /// entries beyond [_maxEntries].
+  void _touch(String key) {
+    final index = _prefs.getStringList(_indexKey)?.toList() ?? <String>[];
+    index.remove(key);
+    index.add(key);
+    while (index.length > _maxEntries) {
+      _prefs.remove(index.removeAt(0));
+    }
+    _prefs.setStringList(_indexKey, index);
   }
 
   // ── Error: serve cached response on network failure ───────────────────────

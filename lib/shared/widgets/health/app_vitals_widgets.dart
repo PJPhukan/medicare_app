@@ -57,7 +57,9 @@ class VitalInputRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: AppTypography.labelSm),
+                  Text(label,
+                      style: AppTypography.labelSm
+                          .copyWith(color: context.secondaryText)),
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -171,7 +173,9 @@ class VitalHistoryRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(timestamp, style: AppTypography.bodySm),
+              child: Text(timestamp,
+                  style: AppTypography.bodySm
+                      .copyWith(color: context.secondaryText)),
             ),
             RichText(
               text: TextSpan(

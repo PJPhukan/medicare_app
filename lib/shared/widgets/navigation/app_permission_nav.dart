@@ -21,7 +21,7 @@ class NavPermissions {
   });
   static const professionalUser = NavPermissions(allowed: {
     'home', 'medicines', 'vitals', 'schedule', 'professionals',
-    'professional_profile', 'connections', 'messages', 'notifications',
+    'connections', 'messages', 'notifications',
     'profile', 'community', 'insights', 'alerts', 'patients', 'reports',
     'notes', 'emergency', 'support',
   });

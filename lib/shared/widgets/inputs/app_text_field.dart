@@ -127,7 +127,7 @@ class _AppTextFieldState extends State<AppTextField> {
           onFieldSubmitted: widget.onSubmitted,
           onTap: widget.onTap,
           focusNode: widget.focusNode,
-          style: AppTypography.bodyMd,
+          style: AppTypography.bodyMd.copyWith(color: context.primaryText),
           cursorColor: AppColors.teal,
           decoration: InputDecoration(
             hintText: widget.hint,

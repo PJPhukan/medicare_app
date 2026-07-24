@@ -5,6 +5,7 @@ import '../../../../core/local_db/sync_queue.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/utils/device_timezone.dart';
 import '../../../../core/utils/logger.dart';
 import '../../data/datasources/reminders_remote_datasource.dart';
 import '../../data/models/reminder_schedule_model.dart';
@@ -66,7 +67,7 @@ class RemindersNotifier extends StateNotifier<RemindersState> {
         schedules: schedules,
         userName: _userName,
       );
-    } catch (e, s) {
+    } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -88,18 +89,24 @@ class RemindersNotifier extends StateNotifier<RemindersState> {
     int preNotifyMinutes = 10,
   }) async {
     final isOnline = _ref.read(isOnlineProvider);
+    // Device clock's IANA zone (no permission needed) — the backend anchors
+    // reminder fire times and dose days to this.
+    final timezone = await DeviceTimezone.get();
+    final doseTimes = [
+      {'scheduledTime': time, 'unit': unit, 'foodTiming': foodTiming.toUpperCase()}
+    ];
 
     late ReminderScheduleModel schedule;
 
-    AppLogger.i('Reminder create → medicine:*** online:$isOnline', tag: 'Reminder');
+    AppLogger.i('Reminder create → medicine:*** online:$isOnline tz:$timezone', tag: 'Reminder');
     if (isOnline) {
+      // reminderType stays app-local (display/alarm category); the backend has
+      // no field for it, so it is not part of the payload.
       schedule = await _ds.createSchedule(
         medicineName: medicineName,
-        doseTimes: [
-          {'scheduledTime': time, 'unit': unit, 'foodTiming': foodTiming}
-        ],
-        reminderType: reminderType,
+        doseTimes: doseTimes,
         scheduleType: scheduleType,
+        timezone: timezone,
         preNotifyMinutes: preNotifyMinutes,
       );
     } else {
@@ -122,19 +129,18 @@ class RemindersNotifier extends StateNotifier<RemindersState> {
         preNotifyMinutes: preNotifyMinutes,
       );
 
-      // Enqueue for backend sync when connectivity returns.
+      // Enqueue for backend sync when connectivity returns — same canonical
+      // payload the online path sends.
       await _queue.enqueue(SyncOperation.create(
         feature: 'reminders',
         action: 'create_schedule',
-        payload: {
-          'medicineName': medicineName,
-          'doseTimes': [
-            {'scheduledTime': time, 'unit': unit, 'foodTiming': foodTiming}
-          ],
-          'reminderType': reminderType,
-          'scheduleType': scheduleType,
-          'preNotifyMinutes': preNotifyMinutes,
-        },
+        payload: buildCreateSchedulePayload(
+          medicineName: medicineName,
+          doseTimes: doseTimes,
+          scheduleType: scheduleType,
+          timezone: timezone,
+          preNotifyMinutes: preNotifyMinutes,
+        ),
       ));
     }
 

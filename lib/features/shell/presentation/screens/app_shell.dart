@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,18 +19,17 @@ import '../../../message/presentation/screens/message_screen.dart';
 import '../../../insights/presentation/screens/insights_screen.dart';
 import '../../../alerts/presentation/screens/alerts_screen.dart';
 import '../../../notes/presentation/screens/notes_screen.dart';
-import '../../../profile/presentation/screens/settings_screen.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../connections/presentation/screens/connections_screen.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../emergency/presentation/screens/emergency_screen.dart';
 import '../../../reminders/presentation/screens/reminders_screen.dart';
 import '../../../patients/presentation/screens/patients_screen.dart';
 import '../../../caretakers/presentation/screens/caretakers_screen.dart';
 import '../../../community/presentation/screens/community_screen.dart';
 import '../../../support/presentation/screens/support_screen.dart';
-import '../../../professional_profile/presentation/screens/pro_hub_screen.dart';
-import '../../../professional_profile/presentation/providers/pro_profile_provider.dart';
+import '../../../professionals/presentation/screens/pro_hub_screen.dart';
+import '../../../professionals/presentation/providers/pro_profile_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../shared/widgets/bottom_sheets/feedback_sheet.dart';
@@ -103,7 +101,6 @@ Widget? _pushScreenForSlug(String slug) => switch (slug) {
   'community'     => const CommunityScreen(),
   'notes'         => const NotesScreen(),
   'settings'      => const SettingsScreen(),
-  'profile'       => const ProfileScreen(),
   'pro-profile'   => const ProHubScreen(),
   'professional-profile' => const ProHubScreen(),
   'connections'   => const ConnectionsScreen(),
@@ -302,8 +299,10 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final tabsAsync = ref.watch(tabsProvider);
-    // Verified professionals get their role-only tabs; rebuild when this changes.
-    final isVerifiedPro = ref.watch(proProfileProvider).profile?.isVerified ?? false;
+    // Verified professionals get their role-only tabs; select() so the shell
+    // only rebuilds when verification flips, not on every profile-state change.
+    final isVerifiedPro = ref.watch(
+        proProfileProvider.select((s) => s.profile?.isVerified ?? false));
 
     _coreTabs = tabsAsync.when(
       data: (tabs) => _buildCoreTabs(tabs, isVerifiedPro),
@@ -411,9 +410,13 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Near-opaque panel instead of BackdropFilter glass: a live backdrop blur
+    // forces a saveLayer + 28px blur on every frame while content scrolls
+    // beneath the nav, which is the single biggest jank source on mid-range
+    // devices. At ~0.97 alpha the blur was barely visible anyway.
     final navBg = isDark
-        ? const Color(0xFF131920).withValues(alpha: 0.88)
-        : Colors.white.withValues(alpha: 0.94);
+        ? const Color(0xFF131920).withValues(alpha: 0.97)
+        : Colors.white.withValues(alpha: 0.98);
     final navBorderColor = isDark ? const Color(0xFF1F2D3F) : const Color(0xFFE2E8F0);
     final inactiveColor = isDark ? AppColors.textHint : const Color(0xFF94A3B8);
     final shadowColor = isDark
@@ -422,9 +425,7 @@ class _BottomNav extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-        child: Container(
+      child: Container(
           height: 68 + bottomPadding,
           padding: EdgeInsets.only(bottom: bottomPadding),
           decoration: BoxDecoration(
@@ -535,7 +536,6 @@ class _BottomNav extends StatelessWidget {
               );
             },
           ),
-        ),
       ),
     );
   }
@@ -563,7 +563,8 @@ class _AppSidebar extends ConsumerWidget {
     final bg = isDark ? context.bg : Colors.white;
     final border = isDark ? context.borderCol : const Color(0xFFE2E8F0);
 
-    final isVerifiedPro = ref.watch(proProfileProvider).profile?.isVerified ?? false;
+    final isVerifiedPro = ref.watch(
+        proProfileProvider.select((s) => s.profile?.isVerified ?? false));
 
     // Group all active tabs by section
     final grouped = <String, List<TabConfigModel>>{};
@@ -664,8 +665,8 @@ class _AppSidebar extends ConsumerWidget {
                   value: themeMode == ThemeMode.dark || (themeMode == ThemeMode.system && isDark),
                   isDark: isDark,
                   onChanged: (on) {
-                    ref.read(themeModeProvider.notifier).state =
-                        on ? ThemeMode.dark : ThemeMode.light;
+                    ref.read(themeModeProvider.notifier)
+                        .set(on ? ThemeMode.dark : ThemeMode.light);
                   },
                 ),
               ),

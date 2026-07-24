@@ -209,7 +209,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _msg(Exception e) {
-    if (e is DioException) return e.message ?? 'An unexpected error occurred';
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map<String, dynamic> && data['message'] is String) {
+        return data['message'] as String;
+      }
+      return e.message ?? 'An unexpected error occurred';
+    }
     return e.toString();
   }
 }

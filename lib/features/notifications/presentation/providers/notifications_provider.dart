@@ -73,7 +73,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         unreadCount: result.unreadCount,
         isLoading: false,
       );
-    } catch (e, s) {
+    } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }

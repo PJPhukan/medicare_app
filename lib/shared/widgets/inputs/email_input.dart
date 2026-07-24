@@ -56,7 +56,9 @@ class _AppEmailInputState extends State<AppEmailInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
-          Text(widget.label!, style: AppTypography.labelSm.copyWith(letterSpacing: 0.2)),
+          Text(widget.label!,
+              style: AppTypography.labelSm.copyWith(
+                  letterSpacing: 0.2, color: context.secondaryText)),
           const SizedBox(height: 6),
         ],
         Container(

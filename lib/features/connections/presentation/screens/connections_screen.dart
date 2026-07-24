@@ -26,8 +26,9 @@ String _fmtTime(String? isoStr) {
   final now = DateTime.now();
   final isToday =
       dt.year == now.year && dt.month == now.month && dt.day == now.day;
-  if (isToday)
+  if (isToday) {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
   const months = [
     'Jan',
     'Feb',

@@ -48,7 +48,7 @@ class BloodGroupGrid extends StatelessWidget {
             child: Center(
               child: AppText.labelMd(
                 bg,
-                color: active ? AppColors.teal : AppColors.textSecondary,
+                color: active ? AppColors.teal : context.secondaryText,
               ),
             ),
           ),

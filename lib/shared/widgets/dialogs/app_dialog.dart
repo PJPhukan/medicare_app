@@ -55,7 +55,8 @@ class AppDialog extends StatelessWidget {
                 ),
               ),
             if (title != null) ...[
-              Text(title!, style: AppTypography.h3),
+              Text(title!,
+                  style: AppTypography.h3.copyWith(color: context.primaryText)),
               const SizedBox(height: 8),
             ],
             content,

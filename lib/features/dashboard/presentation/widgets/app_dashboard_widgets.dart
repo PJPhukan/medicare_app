@@ -41,10 +41,11 @@ class GreetingHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$_greeting,', style: AppTypography.bodySm),
+              Text('$_greeting,',
+                  style: AppTypography.bodySm.copyWith(color: context.secondaryText)),
               Text(
                 name.split(' ').first,
-                style: AppTypography.h2,
+                style: AppTypography.h2.copyWith(color: context.primaryText),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -217,9 +218,11 @@ class DoseCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(medicineName, style: AppTypography.labelMd),
+                  Text(medicineName,
+                      style: AppTypography.labelMd.copyWith(color: context.primaryText)),
                   const SizedBox(height: 2),
-                  Text('$dosage · $time', style: AppTypography.bodySm),
+                  Text('$dosage · $time',
+                      style: AppTypography.bodySm.copyWith(color: context.secondaryText)),
                 ],
               ),
             ),
@@ -233,7 +236,9 @@ class DoseCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: Text(AppStrings.skip, style: AppTypography.labelSm),
+                  child: Text(AppStrings.skip,
+                      style: AppTypography.labelSm
+                          .copyWith(color: context.secondaryText)),
                 ),
               if (onTaken != null) ...[
                 const SizedBox(width: 4),
@@ -325,7 +330,10 @@ class VitalReadingCard extends StatelessWidget {
                 children: [
                   Icon(icon, size: 16, color: c),
                   const SizedBox(width: 6),
-                  Expanded(child: Text(label, style: AppTypography.labelSm)),
+                  Expanded(
+                      child: Text(label,
+                          style: AppTypography.labelSm
+                              .copyWith(color: context.secondaryText))),
                   if (statusColor != null)
                     Container(
                       width: 8, height: 8,

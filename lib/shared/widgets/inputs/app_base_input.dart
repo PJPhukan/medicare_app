@@ -197,7 +197,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
               child: Text(
                 widget.prefixText!,
                 style: AppTypography.bodyMd.copyWith(
-                    color: AppColors.textSecondary),
+                    color: context.secondaryText),
               ),
             )
           : null,
@@ -209,7 +209,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
               child: Text(
                 widget.suffixText!,
                 style: AppTypography.bodyMd.copyWith(
-                    color: AppColors.textSecondary),
+                    color: context.secondaryText),
               ),
             )
           : null,
@@ -253,7 +253,8 @@ class _AppBaseInputState extends State<AppBaseInput> {
           Text(
             widget.label!,
             style: widget.labelStyle ??
-                AppTypography.labelSm.copyWith(letterSpacing: 0.2),
+                AppTypography.labelSm.copyWith(
+                    letterSpacing: 0.2, color: context.secondaryText),
           ),
           const SizedBox(height: 6),
         ],
@@ -315,7 +316,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
   Widget? _buildPrefixIcon() {
     if (widget.prefixIcon == null) return null;
     final icon = Icon(widget.prefixIcon,
-        size: 18, color: _focused ? AppColors.teal : AppColors.textSecondary);
+        size: 18, color: _focused ? AppColors.teal : context.secondaryText);
     if (widget.onPrefixTap != null) {
       return GestureDetector(onTap: widget.onPrefixTap, child: icon);
     }
@@ -325,7 +326,7 @@ class _AppBaseInputState extends State<AppBaseInput> {
   Widget? _buildSuffixIcon() {
     if (widget.suffixIcon == null) return null;
     final icon = Icon(widget.suffixIcon,
-        size: 18, color: AppColors.textSecondary);
+        size: 18, color: context.secondaryText);
     if (widget.onSuffixTap != null) {
       return GestureDetector(onTap: widget.onSuffixTap, child: icon);
     }
