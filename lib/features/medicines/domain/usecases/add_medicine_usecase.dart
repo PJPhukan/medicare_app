@@ -7,12 +7,14 @@ class AddMedicineUseCase {
   final MedicinesRepository _repository;
 
   Future<UserMedicineEntity> call({
-    required String medicineId,
+    String? medicineId,
+    String? productId,
     String? customName,
     String? patientProfileId,
   }) =>
       _repository.addPersonalMedicine(
         medicineId: medicineId,
+        productId: productId,
         customName: customName,
         patientProfileId: patientProfileId,
       );

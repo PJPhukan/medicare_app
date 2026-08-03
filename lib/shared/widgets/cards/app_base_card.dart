@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_border_radius.dart';
+import '../../../core/theme/app_gradients.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../utils/animated_tap.dart';
 
@@ -27,11 +28,13 @@ class AppBaseCard extends StatelessWidget {
     this.borderWidth = 1.0,
     this.borderRadius,
     this.shadow,
+    this.effectColor,
     this.onTap,
     this.onLongPress,
     this.clipBehavior = Clip.antiAlias,
     this.width,
     this.height,
+    this.raised = false,
   });
 
   final Widget child;
@@ -46,8 +49,13 @@ class AppBaseCard extends StatelessWidget {
   final double borderWidth;
   final BorderRadius? borderRadius;
 
-  /// Box shadows. Pass an empty list `[]` to remove all shadow.
+  /// Outer drop shadow. Defaults to none — depth comes from the corner-lit
+  /// surface gradient instead, which keeps the card flush with the page.
   final List<BoxShadow>? shadow;
+
+  /// Tints the lit corner — e.g. `AppColors.teal` for an accent card.
+  /// Defaults to a neutral white sheen.
+  final Color? effectColor;
 
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -55,21 +63,26 @@ class AppBaseCard extends StatelessWidget {
   final double? width;
   final double? height;
 
+  /// Deepen the corner lighting — for the one hero card on a screen.
+  final bool raised;
+
   @override
   Widget build(BuildContext context) {
-    final bg        = color ?? context.cardBg;
-    final border    = borderColor ?? context.borderCol;
-    final br        = borderRadius ?? AppBorderRadius.lgAll;
+    final isDark = context.isDark;
+    final bg     = color ?? context.cardBg;
+    final border = borderColor ?? context.cardEdge;
+    final br     = borderRadius ?? AppBorderRadius.xlAll;
 
     Widget card = Container(
       width: width,
       height: height,
       clipBehavior: clipBehavior,
       decoration: BoxDecoration(
-        color: bg,
+        gradient: AppGradients.cardSheen(bg, isDark,
+            color: effectColor, strong: raised),
         borderRadius: br,
         border: Border.all(color: border, width: borderWidth),
-        boxShadow: shadow,
+        boxShadow: shadow ?? const [],
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(16),

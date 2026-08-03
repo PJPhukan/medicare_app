@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../services/biometric_service.dart';
+import '../utils/logger.dart';
 import '../local_db/local_cache.dart';
 import '../constants/prefs_keys.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
@@ -46,6 +47,7 @@ import '../../features/community/presentation/screens/post_detail_screen.dart';
 import '../../features/connections/presentation/screens/chat_screen.dart';
 import '../../features/patients/presentation/screens/patient_detail_screen.dart';
 import '../../features/reports/presentation/screens/report_viewer_screen.dart';
+import '../../shared/widgets/feedback/not_found_page.dart';
 import 'route_args.dart';
 
 // ── Route paths ───────────────────────────────────────────────────────────────
@@ -58,7 +60,6 @@ abstract final class AppRoutes {
 
   static const notifications = '/notifications';
   static const notificationSettings = '/notification-settings';
-  static const profile = '/profile';
   static const healthProfile = '/health-profile';
   static const proApplication = '/pro-application';
   static const settings = '/settings';
@@ -140,39 +141,58 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.splash,
     refreshListenable: notifier,
     redirect: notifier.redirect,
+    errorBuilder: (context, state) => NotFoundPage(path: state.uri.toString()),
     routes: [
       // ── Public ──────────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.splash,
         builder: (context, state) => SplashScreen(
+          // Splash is a dead end: if this callback throws or awaits something
+          // that never settles, the user sits on the logo forever with no
+          // error shown. So every path out is guarded and time-boxed, and any
+          // failure falls through to the auth screen.
           onDone: () async {
-            final prefs = ref.read(sharedPreferencesProvider);
-            final seen = prefs.getBool(PrefsKeys.onboardingSeen) ?? false;
-            if (!context.mounted) return;
-            if (!seen) {
-              context.go(AppRoutes.onboarding);
-              return;
-            }
-            await ref.read(authProvider.notifier).initialized;
-            if (!context.mounted) return;
-            final auth = ref.read(authProvider);
-            if (auth.isAuthenticated) {
-              final pendingStep = await ref.read(authRepositoryProvider).getOnboardingStep();
+            try {
+              final prefs = ref.read(sharedPreferencesProvider);
+              final seen = prefs.getBool(PrefsKeys.onboardingSeen) ?? false;
+              if (!context.mounted) return;
+              if (!seen) {
+                context.go(AppRoutes.onboarding);
+                return;
+              }
+              // Secure-storage reads go over a platform channel that can wedge;
+              // don't let that pin us to the splash screen.
+              await ref.read(authProvider.notifier).initialized.timeout(
+                    const Duration(seconds: 5),
+                    onTimeout: () => AppLogger.w(
+                        'Auth init timed out — routing as signed out',
+                        tag: 'Splash'),
+                  );
+              if (!context.mounted) return;
+              final auth = ref.read(authProvider);
+              if (!auth.isAuthenticated) {
+                context.go(AppRoutes.auth);
+                return;
+              }
+              final pendingStep =
+                  await ref.read(authRepositoryProvider).getOnboardingStep();
               if (!context.mounted) return;
               if (pendingStep != null) {
                 context.go(AppRoutes.auth);
                 return;
               }
               final bio = ref.read(biometricServiceProvider);
-              if (bio.isEnabled) {
-                final ok = await bio.authenticate(reason: 'Unlock to continue');
-                if (!context.mounted) return;
-                context.go(ok ? AppRoutes.home : AppRoutes.auth);
-              } else {
+              if (!bio.isEnabled) {
                 context.go(AppRoutes.home);
+                return;
               }
-            } else {
-              context.go(AppRoutes.auth);
+              final ok = await bio.authenticate(reason: 'Unlock to continue');
+              if (!context.mounted) return;
+              context.go(ok ? AppRoutes.home : AppRoutes.auth);
+            } catch (e, s) {
+              AppLogger.e('Splash routing failed — falling back to auth',
+                  tag: 'Splash', error: e, stack: s);
+              if (context.mounted) context.go(AppRoutes.auth);
             }
           },
         ),

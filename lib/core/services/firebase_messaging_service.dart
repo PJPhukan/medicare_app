@@ -18,6 +18,28 @@ class FirebaseMessagingService {
   static bool _initialized = false;
   static VoidCallback? _onNotificationReceived;
 
+  /// Called with a device token whenever one becomes available — at startup
+  /// and again whenever FCM rotates it. Set by [onTokenAvailable] so the
+  /// service stays free of app/provider dependencies.
+  static Future<void> Function(String token)? _tokenSink;
+
+  /// Registers the sink that ships the FCM token to the backend, and
+  /// immediately delivers the current token if there is one.
+  ///
+  /// Nothing pushed by the server can reach this device until a PushToken row
+  /// exists for the user, so this has to run once the user is authenticated.
+  static Future<void> onTokenAvailable(
+      Future<void> Function(String token) sink) async {
+    _tokenSink = sink;
+    try {
+      final token = await _fcm.getToken();
+      if (token != null) await sink(token);
+    } catch (e, st) {
+      AppLogger.e('FCM token registration failed',
+          tag: 'FCM', error: e, stack: st);
+    }
+  }
+
   /// Request notification permission from the user.
   /// Call this from a contextually appropriate screen (e.g. dashboard) rather
   /// than at app startup. Safe to call multiple times — OS only prompts once.
@@ -54,6 +76,17 @@ class FirebaseMessagingService {
       if (token == null) {
         AppLogger.e('FCM token is NULL - check Google Play Services', tag: 'FCM');
       }
+
+      // A rotated token leaves the stored one dead, so forward every refresh.
+      _fcm.onTokenRefresh.listen((token) async {
+        AppLogger.i('FCM token refreshed', tag: 'FCM');
+        try {
+          await _tokenSink?.call(token);
+        } catch (e, st) {
+          AppLogger.e('FCM token refresh registration failed',
+              tag: 'FCM', error: e, stack: st);
+        }
+      });
 
       // Handle foreground messages (app is OPEN)
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);

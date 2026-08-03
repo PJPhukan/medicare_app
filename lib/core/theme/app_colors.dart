@@ -38,6 +38,27 @@ abstract class AppColors {
   static const cream10  = Color(0x1AECF4D6);
   static const cream20  = Color(0x33ECF4D6);
 
+  // ─── Elevation & surface effects ───────────────────────────────────────────
+  // Every shadow / card-gradient ink resolves here, so retheming the app is a
+  // change in this file rather than a hunt through widgets.
+
+  /// Ink for drop shadows and the shaded corner of a card gradient (dark mode).
+  static const shadowInk      = Color(0xFF000000);
+
+  /// Same, for light mode — a cool slate so shadows don't read as dirty grey.
+  static const shadowInkLight = Color(0xFF101828);
+
+  /// Neutral highlight, for surfaces that shouldn't carry a brand hue.
+  static const sheenNeutral   = Color(0xFFFFFFFF);
+
+  /// Colour of a card's lit corner when it doesn't name one.
+  static const sheenDefault   = teal;
+
+  /// Hairline edge on an elevated card — the surface gradient does the
+  /// separating, so this only keeps the top edge from dissolving into the page.
+  static const cardEdgeDark   = Color(0x0FFFFFFF); // white @ ~6%
+  static const cardEdgeLight  = Color(0xB3E2E8F0); // light300 @ 70%
+
   // ─── Dark theme backgrounds ────────────────────────────────────────────────
 
   static const dark900 = Color(0xFF0F172A); // page bg
@@ -48,7 +69,10 @@ abstract class AppColors {
 
   // ─── Light theme backgrounds ───────────────────────────────────────────────
 
-  static const light100 = Color(0xFFF8FAFC); // scaffold bg
+  // Cards are white and can't get lighter, so in light mode the page carries
+  // the contrast instead. At the old #F8FAFC the card's shaded corner landed on
+  // the exact page colour and the surface dissolved into it.
+  static const light100 = Color(0xFFEDF1F6); // scaffold bg
   static const light200 = Color(0xFFFFFFFF); // card bg
   static const light300 = Color(0xFFE2E8F0); // borders / dividers
   static const light400 = Color(0xFFCBD5E1); // secondary borders
@@ -57,8 +81,11 @@ abstract class AppColors {
 
   // Light theme text
   static const textPrimaryLight   = Color(0xFF1E293B);
-  static const textSecondaryLight = Color(0xFF64748B);
-  static const textHintLight      = Color(0xFF94A3B8);
+  // Darkened alongside the page background above: at #64748B secondary text
+  // fell to 4.2:1 on the new scaffold colour, under the 4.5:1 AA floor. Now
+  // 4.8:1 on the page and 5.4:1 on a white card.
+  static const textSecondaryLight = Color(0xFF5C6B80);
+  static const textHintLight      = Color(0xFF7C8A9C);
 
   // Dark theme text
   static const textPrimary   = Color(0xFFF0F6FF);

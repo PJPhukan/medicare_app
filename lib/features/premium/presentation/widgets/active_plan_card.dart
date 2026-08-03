@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../shared/widgets/badges/app_badge.dart';
@@ -25,13 +26,10 @@ class ActivePlanCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: AppBorderRadius.lgAll,
         border: Border.all(color: accent, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: AppShadows.softCardRaised(
+          Theme.of(context).brightness == Brightness.dark,
+          color: accent,
+        ),
       ),
       child: ClipRRect(
         borderRadius: AppBorderRadius.lgAll,

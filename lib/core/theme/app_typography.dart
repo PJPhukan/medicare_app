@@ -133,18 +133,31 @@ abstract class AppTypography {
   );
 
   // ─── Number / Stat ──────────────────────────────────────────────────────────
+  // ─── Stats ──────────────────────────────────────────────────────────────────
+  // Every numeric style below is tabular: digits share one advance width, so a
+  // value ticking 9→10, or a column of dose times, never shifts sideways. Also
+  // slashed zero, which matters when a dosage is read at a glance.
+  static const _figures = <FontFeature>[
+    FontFeature.tabularFigures(),
+    FontFeature.slashedZero(),
+  ];
+
   static final TextStyle statXl = GoogleFonts.spaceGrotesk(
-    fontSize: 36,
-    fontWeight: FontWeight.w800,
+    fontSize: 40,
+    fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1,
+    letterSpacing: -1,
+    fontFeatures: _figures,
   );
 
   static final TextStyle statLg = GoogleFonts.spaceGrotesk(
-    fontSize: 28,
-    fontWeight: FontWeight.w800,
+    fontSize: 30,
+    fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1,
+    letterSpacing: -0.5,
+    fontFeatures: _figures,
   );
 
   static final TextStyle statMd = GoogleFonts.spaceGrotesk(
@@ -152,5 +165,24 @@ abstract class AppTypography {
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1,
+    fontFeatures: _figures,
+  );
+
+  /// Inline data values — dose times, quantities, durations. Tabular so lists
+  /// of times align down the column.
+  static final TextStyle data = GoogleFonts.spaceGrotesk(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+    height: 1.2,
+    fontFeatures: _figures,
+  );
+
+  static final TextStyle dataSm = GoogleFonts.spaceGrotesk(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textSecondary,
+    height: 1.2,
+    fontFeatures: _figures,
   );
 }

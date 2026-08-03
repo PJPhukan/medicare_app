@@ -43,7 +43,12 @@ class AppFilterChip extends StatelessWidget {
               IconTheme(
                 data: IconThemeData(
                   size: 13,
-                  color: selected ? AppColors.textInverse : AppColors.textSecondary,
+                  // context.secondaryText, not AppColors.textSecondary: that
+                  // constant is the DARK-theme value (a light slate meant for
+                  // a dark background) and a raw Text/IconTheme never adapts
+                  // it — in light mode it rendered as near-invisible light
+                  // text on a light chip.
+                  color: selected ? AppColors.textInverse : context.secondaryText,
                 ),
                 child: icon!,
               ),
@@ -52,7 +57,7 @@ class AppFilterChip extends StatelessWidget {
             Text(
               label,
               style: AppTypography.labelSm.copyWith(
-                color: selected ? AppColors.textInverse : AppColors.textSecondary,
+                color: selected ? AppColors.textInverse : context.secondaryText,
               ),
             ),
           ],

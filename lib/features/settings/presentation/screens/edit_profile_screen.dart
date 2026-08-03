@@ -2,10 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/api/client.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../core/utils/logger.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────
 
@@ -134,7 +137,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
-    // TODO: Load from user profile state/API
+    final user = ref.read(authProvider).user;
+    if (user != null) {
+      _nameCtrl.text = user.name ?? '';
+      _emailCtrl.text = user.email ?? '';
+      _phoneCtrl.text = user.phone ?? '';
+      _avatarUrl = user.avatarUrl;
+      _updateOriginalValues();
+    }
   }
 
   @override
@@ -163,19 +173,36 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       return;
     }
 
-    AppLogger.i('Profile update: ${_modifiedFields.join(', ')}',
-        tag: 'Profile');
+    AppLogger.i('Profile update: ${_modifiedFields.join(', ')}', tag: 'Profile');
     setState(() => _saving = true);
     try {
-      // TODO: Call backend API to update profile with modified fields only
-      // final updateData = _buildUpdatePayload();
-      // await profileService.updateProfile(updateData);
+      final payload = <String, dynamic>{};
+      if (_modifiedFields.contains(ModifiedField.name)) payload['name'] = _nameCtrl.text.trim();
+      if (_modifiedFields.contains(ModifiedField.email)) payload['email'] = _emailCtrl.text.trim();
+      if (_modifiedFields.contains(ModifiedField.phone)) payload['phone'] = _phoneCtrl.text.trim();
 
-      await Future.delayed(const Duration(milliseconds: 500));
+      if (payload.isNotEmpty) {
+        final dio = ref.read(dioProvider);
+        final response = await dio.patch<Map<String, dynamic>>('/api/users/me', data: payload);
+        final resData = response.data;
+        if (resData != null && resData['data'] is Map<String, dynamic>) {
+          final updatedUserJson = resData['data'] as Map<String, dynamic>;
+          final currentUser = ref.read(authProvider).user;
+          if (currentUser != null) {
+            final updatedUser = currentUser.copyWith(
+              name: updatedUserJson['name'] as String? ?? currentUser.name,
+              email: updatedUserJson['email'] as String? ?? currentUser.email,
+              phone: updatedUserJson['phone'] as String? ?? currentUser.phone,
+              avatarUrl: updatedUserJson['avatar'] as String? ?? currentUser.avatarUrl,
+            );
+            await ref.read(authProvider.notifier).updateUser(updatedUser);
+          }
+        }
+      }
+
       AppLogger.i('Profile updated ✓', tag: 'Profile');
       if (!mounted) return;
 
-      // Reset modified fields after successful save
       _modifiedFields.clear();
       _updateOriginalValues();
       setState(() => _saving = false);
@@ -185,7 +212,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       AppLogger.e('Profile update failed', tag: 'Profile', error: e);
       if (!mounted) return;
       setState(() => _saving = false);
-      AppSnackbar.error(context, 'Failed to update profile');
+      String msg = 'Failed to update profile';
+      if (e is DioException) {
+        final resData = e.response?.data;
+        if (resData is Map<String, dynamic> && resData['message'] is String) {
+          msg = resData['message'] as String;
+        }
+      }
+      AppSnackbar.error(context, msg);
     }
   }
 

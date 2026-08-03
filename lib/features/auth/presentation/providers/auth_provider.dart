@@ -52,21 +52,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repo;
 
   /// Completes once the cached token/user have been loaded from secure storage.
+  ///
+  /// Never completes with an error — startup awaits this before it can route
+  /// away from the splash screen, so a failure here must degrade to "logged
+  /// out", not propagate.
   late final Future<void> initialized;
 
   Future<void> _init() async {
-    final token = await _repo.getCachedToken();
-    final user = await _repo.getCachedUser();
-    if (token != null && user != null) {
-      state = AuthState(token: token, user: user);
-      AppLogger.i('Session restored → uid:${user.id}', tag: 'Auth');
-    } else {
-      AppLogger.i('No cached session', tag: 'Auth');
+    try {
+      final token = await _repo.getCachedToken();
+      final user = await _repo.getCachedUser();
+      if (token != null && user != null) {
+        state = AuthState(token: token, user: user);
+        AppLogger.i('Session restored → uid:${user.id}', tag: 'Auth');
+      } else {
+        AppLogger.i('No cached session', tag: 'Auth');
+      }
+    } catch (e, s) {
+      // Secure storage can throw on a Keystore/Keychain decrypt failure (app
+      // restored from backup, reinstall over old data). Treat it as no session.
+      AppLogger.e('Session restore failed — continuing signed out',
+          tag: 'Auth', error: e, stack: s);
     }
   }
 
   void _setAuthenticated(AuthSession result) {
     state = AuthState(token: result.token, user: result.user);
+  }
+
+  Future<void> updateUser(UserEntity updatedUser) async {
+    state = state.copyWith(user: updatedUser);
+    await _repo.saveUser(updatedUser);
   }
 
   Future<void> loginWithPassword({

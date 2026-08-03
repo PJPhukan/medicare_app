@@ -1,5 +1,5 @@
 import '../../../../core/local_db/sync_queue.dart';
-import '../../domain/entities/appointment_entity.dart';
+import '../../domain/entities/dose_entity.dart';
 import '../../domain/repositories/schedule_repository.dart';
 import '../datasources/schedule_remote_datasource.dart';
 

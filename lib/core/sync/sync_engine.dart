@@ -101,15 +101,15 @@ class SyncEngine {
         );
 
       case 'reminders:create_schedule':
+        // The payload is already the canonical request body, built by
+        // buildCreateSchedulePayload — the same function the online path
+        // uses. Forward it whole: cherry-picking keys here silently dropped
+        // userMedicineId (so the synced schedule attached to a second,
+        // catalog-less medicine), timezone (fire times fell back to UTC),
+        // daysOfWeek (weekly schedules became daily) and isPrn.
         await _dio.post<void>(
           ApiConstants.reminderSchedules,
-          data: {
-            'medicineName': op.payload['medicineName'],
-            'doseTimes': op.payload['doseTimes'],
-            'reminderType': op.payload['reminderType'],
-            'scheduleType': op.payload['scheduleType'],
-            'preNotifyMinutes': op.payload['preNotifyMinutes'],
-          },
+          data: op.payload,
         );
     }
   }

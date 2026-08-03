@@ -7,6 +7,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../providers/message_provider.dart';
 import '../../../../core/network/connectivity_monitor.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/utils/logger.dart';
 
 // ─── Model ────────────────────────────────────────────────────────────────────
@@ -149,11 +150,9 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
           children: [
             Expanded(
               child: _messages.isEmpty
-                  ? Center(
-                      child: AppText.bodySm(
-                        AppStrings.noMessagesYetSayHi,
-                        color: AppColors.textHint,
-                      ),
+                  ? AppEmptyState(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: AppStrings.noMessagesYetSayHi,
                     )
                   : ListView.builder(
                       controller: _scrollCtrl,
@@ -163,7 +162,8 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
                         final msg = _messages[i];
                         final prev = i > 0 ? _messages[i - 1] : null;
                         final showDate =
-                            prev == null || !_sameDay(msg.sentAt, prev.sentAt);
+                            prev == null ||
+                                !DateFormatter.isSameDay(msg.sentAt, prev.sentAt);
                         final nextMsg =
                             i < _messages.length - 1 ? _messages[i + 1] : null;
                         final isLastInGroup = nextMsg == null ||
@@ -200,9 +200,6 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
       ),
     );
   }
-
-  bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 
   String _fmtTime(DateTime dt) =>
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';

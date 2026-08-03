@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/router/route_args.dart';
 import '../../../../core/network/connectivity_monitor.dart';
+import '../../../../core/utils/date_formatter.dart';
 
 class MessageScreen extends ConsumerStatefulWidget {
   const MessageScreen({super.key});
@@ -147,12 +148,12 @@ class _ConvTile extends StatelessWidget {
     try {
       final dt = DateTime.parse(isoStr).toLocal();
       final now = DateTime.now();
-      final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+      final isToday = DateFormatter.isSameDay(dt, now);
       if (isToday) {
         return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
       }
       final yesterday = now.subtract(const Duration(days: 1));
-      if (dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day) {
+      if (DateFormatter.isSameDay(dt, yesterday)) {
         return AppStrings.yesterdayLabel;
       }
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];

@@ -6,14 +6,18 @@ import '../../../../core/constants/api_constants.dart';
 import '../models/tab_config_model.dart';
 
 class TabsRemoteDataSource {
-  const TabsRemoteDataSource(this._dio);
+  const TabsRemoteDataSource(this._dio, this._prefs);
 
   final Dio _dio;
+  final SharedPreferences _prefs;
 
   static const _cacheKey = 'tab_config_app_v1';
 
+  /// Synchronous read of the last-known tab config, if any. Used so a
+  /// returning user's tabs render instantly instead of waiting on the network.
+  List<TabConfigModel>? getCachedTabs() => _fromPrefs();
+
   Future<List<TabConfigModel>> getMyTabs() async {
-    final prefs = await SharedPreferences.getInstance();
     try {
       final res = await _dio.get<Map<String, dynamic>>(
         ApiConstants.myTabs,
@@ -24,7 +28,7 @@ class TabsRemoteDataSource {
       // Cache the last-known tab config so it still renders offline, the same
       // way banners are cached — instead of dropping to the hardcoded defaults.
       if (list.isNotEmpty) {
-        unawaited(prefs.setString(_cacheKey, jsonEncode(list)));
+        unawaited(_prefs.setString(_cacheKey, jsonEncode(list)));
       }
 
       return list
@@ -32,14 +36,14 @@ class TabsRemoteDataSource {
           .toList();
     } catch (_) {
       // Offline / request failed → fall back to the cached config if we have it.
-      final cached = _fromPrefs(prefs);
+      final cached = _fromPrefs();
       if (cached != null) return cached;
-      rethrow; // no cache yet → let the shell use its hardcoded defaults
+      rethrow; // no cache yet → shell handles empty/loading state
     }
   }
 
-  List<TabConfigModel>? _fromPrefs(SharedPreferences prefs) {
-    final raw = prefs.getString(_cacheKey);
+  List<TabConfigModel>? _fromPrefs() {
+    final raw = _prefs.getString(_cacheKey);
     if (raw == null) return null;
     try {
       final list = jsonDecode(raw) as List<dynamic>;

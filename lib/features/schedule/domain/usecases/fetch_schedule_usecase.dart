@@ -1,4 +1,4 @@
-import '../entities/appointment_entity.dart';
+import '../entities/dose_entity.dart';
 import '../repositories/schedule_repository.dart';
 
 class FetchScheduleUseCase {

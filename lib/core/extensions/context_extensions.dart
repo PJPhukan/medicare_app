@@ -10,6 +10,10 @@ extension ThemeX on BuildContext {
   Color get cardBg     => isDark ? AppColors.dark800  : Colors.white;
   Color get inputBg    => isDark ? AppColors.dark800  : AppColors.light100;
   Color get borderCol  => isDark ? AppColors.dark600  : AppColors.light300;
+
+  /// Hairline edge for elevated cards — the shadow does the separating, so the
+  /// border is only there to keep the top edge from dissolving into the page.
+  Color get cardEdge   => isDark ? AppColors.cardEdgeDark : AppColors.cardEdgeLight;
   Color get dividerCol => isDark ? AppColors.dark500  : AppColors.light300;
 
   // ── Text ────────────────────────────────────────────────────────────────────

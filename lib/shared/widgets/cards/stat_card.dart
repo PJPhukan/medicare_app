@@ -61,6 +61,9 @@ class AppStatCard extends StatelessWidget {
       shadow: const [],
       color: c.withValues(alpha: 0.06),
       borderColor: c.withValues(alpha: 0.18),
+      // Light the corner with this card's own accent — the default teal sheen
+      // would muddy an amber or red stat surface.
+      effectColor: c,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/adherence_entity.dart';
@@ -246,13 +247,7 @@ class _HeroScoreCard extends StatelessWidget {
           ],
         ),
         borderRadius: AppBorderRadius.xlAll,
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: AppShadows.softCardRaised(context.isDark, color: accent),
       ),
       child: Column(
         children: [

@@ -58,6 +58,15 @@ class AppSectionHeaderText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedTitle =
+        titleStyle ?? AppTypography.h3.copyWith(color: context.primaryText);
+
+    // Scale the action off the title rather than pinning it to labelSm (11pt).
+    // Against the default h3 (18pt) a fixed 11pt read as a footnote beside the
+    // heading; tracking the title keeps the pair looking like one unit at any
+    // heading size a caller passes in.
+    final actionSize = ((resolvedTitle.fontSize ?? 18) * 0.75).clamp(11.0, 15.0);
+
     return Padding(
       padding: padding ??
           const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
@@ -89,8 +98,7 @@ class AppSectionHeaderText extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: titleStyle ??
-                      AppTypography.h3.copyWith(color: context.primaryText),
+                  style: resolvedTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -99,9 +107,13 @@ class AppSectionHeaderText extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       subtitle!,
+                      // context.secondaryText: AppColors.textSecondary is the
+                      // dark-theme value and a raw Text never adapts it —
+                      // every section subtitle (e.g. "12 available") rendered
+                      // near-invisible in light mode.
                       style: subtitleStyle ??
                           AppTypography.bodySm.copyWith(
-                              color: AppColors.textSecondary),
+                              color: context.secondaryText),
                     ),
                   ),
               ],
@@ -119,20 +131,20 @@ class AppSectionHeaderText extends StatelessWidget {
                 children: [
                   Text(
                     actionLabel!,
-                    style: AppTypography.labelSm.copyWith(
+                    style: AppTypography.labelMd.copyWith(
+                      fontSize: actionSize,
                       color: AppColors.teal,
                       letterSpacing: 0,
                     ),
                   ),
-                  if (actionIcon != null) ...[
-                    const SizedBox(width: 2),
-                    Icon(actionIcon,
-                        size: 13, color: AppColors.teal),
-                  ] else ...[
-                    const SizedBox(width: 2),
-                    const Icon(Icons.arrow_forward_ios_rounded,
-                        size: 11, color: AppColors.teal),
-                  ],
+                  const SizedBox(width: 3),
+                  Icon(
+                    actionIcon ?? Icons.arrow_forward_ios_rounded,
+                    // A chevron reads larger than it measures, so it stays a
+                    // touch smaller than a supplied action icon.
+                    size: actionIcon != null ? actionSize + 2 : actionSize - 1,
+                    color: AppColors.teal,
+                  ),
                 ],
               ),
             ),

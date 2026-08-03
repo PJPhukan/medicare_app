@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../../../core/constants/api_constants.dart';
-import '../models/appointment_model.dart';
+import '../models/today_dose_model.dart';
 
 class ScheduleRemoteDataSource {
   const ScheduleRemoteDataSource(this._dio);

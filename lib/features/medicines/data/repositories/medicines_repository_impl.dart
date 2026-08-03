@@ -18,20 +18,68 @@ class MedicinesRepositoryImpl implements MedicinesRepository {
   Future<List<UserMedicineEntity>> getMyMedicines() => _ds.getMyMedicines();
 
   @override
-  Future<List<CatalogMedicineEntity>> searchCatalog(String query) =>
-      _ds.searchCatalog(query);
+  Future<CatalogPageEntity> searchCatalog(
+    String query, {
+    int page = 1,
+    int limit = 20,
+  }) =>
+      _ds.searchCatalog(query, page: page, limit: limit);
 
   @override
   Future<UserMedicineEntity> addPersonalMedicine({
-    required String medicineId,
+    String? medicineId,
+    String? productId,
     String? customName,
     String? patientProfileId,
   }) =>
       _ds.addPersonalMedicine(
         medicineId: medicineId,
+        productId: productId,
         customName: customName,
         patientProfileId: patientProfileId,
       );
+
+  @override
+  Future<MedicineStockEntity> addStock(
+    String userMedicineId, {
+    required int quantity,
+    String? expiryDate,
+    int? minThreshold,
+  }) =>
+      _ds.addStock(
+        userMedicineId,
+        quantity: quantity,
+        expiryDate: expiryDate,
+        minThreshold: minThreshold,
+      );
+
+  @override
+  Future<UserMedicineEntity> reassignMedicine(
+    String userMedicineId, {
+    required String? patientProfileId,
+  }) =>
+      _ds.reassignMedicine(userMedicineId, patientProfileId: patientProfileId);
+
+  @override
+  Future<UserMedicineEntity> addSharedMedicine({
+    String? medicineId,
+    String? productId,
+    String? customName,
+    required List<String> memberPatientProfileIds,
+  }) =>
+      _ds.addSharedMedicine(
+        medicineId: medicineId,
+        productId: productId,
+        customName: customName,
+        memberPatientProfileIds: memberPatientProfileIds,
+      );
+
+  @override
+  Future<void> requestMedicine({
+    required String medicineName,
+    String? details,
+  }) =>
+      _ds.requestMedicine(medicineName: medicineName, details: details);
 
   @override
   Future<void> deleteMedicine(String id) async {

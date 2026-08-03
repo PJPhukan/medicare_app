@@ -5,6 +5,7 @@ import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/utils/hex_color.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../domain/entities/note_entity.dart';
 import '../providers/notes_provider.dart';
@@ -44,9 +45,7 @@ const _kPalette = [
 
 Color _hexToColor(String? hex) {
   if (hex == null || hex.isEmpty) return _kPalette[0];
-  final h = hex.startsWith('#') ? hex.substring(1) : hex;
-  if (h.length == 6) return Color(int.parse('FF$h', radix: 16));
-  return _kPalette[0];
+  return hexToColor(hex, fallback: _kPalette[0]);
 }
 
 String _colorToHex(Color color) {

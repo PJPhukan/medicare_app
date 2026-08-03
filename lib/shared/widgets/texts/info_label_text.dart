@@ -63,7 +63,12 @@ class AppInfoLabelText extends StatelessWidget {
         Text(
           label,
           style: AppTypography.labelSm.copyWith(
-            color: AppColors.textSecondary,
+            // context.secondaryText, not AppColors.textSecondary: this is
+            // the label half of every info row across the app (medicine
+            // details, health profiles, ...) — the raw constant is the
+            // dark-theme value and never adapts, so every one of these
+            // labels rendered near-invisible in light mode.
+            color: context.secondaryText,
             letterSpacing: 0.2,
           ),
         ),

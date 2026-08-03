@@ -1,4 +1,5 @@
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'logger.dart';
 
 /// Reads the device clock's IANA timezone (e.g. "Asia/Kolkata") from the OS —
 /// no location permission involved. Cached per app session; falls back to UTC
@@ -14,7 +15,8 @@ class DeviceTimezone {
     try {
       final info = await FlutterTimezone.getLocalTimezone();
       _cached = info.identifier;
-    } catch (_) {
+    } catch (e, s) {
+      AppLogger.e('Timezone lookup failed', tag: 'DeviceTimezone', error: e, stack: s);
       _cached = 'UTC';
     }
     return _cached!;

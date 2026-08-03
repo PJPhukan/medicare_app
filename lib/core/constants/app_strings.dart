@@ -248,11 +248,48 @@ static const noCountriesFound     = 'No countries found';
   static const goodEvening = 'Good evening';
   static const goodNight = 'Good night';
   static const todayOverview = "Today's Overview";
+  /// Fallback in the greeting when the user has no display name yet.
+  static const there = 'there';
   static const upcomingDoses = 'Upcoming Doses';
   static const todayMedicines = "Today's Medicines";
   static const recentVitals = 'Recent Vitals';
   static const quickActions = 'Quick Actions';
   static const noActivityToday = 'No activity today';
+  static const dashboardLoadFailed =
+      'Dashboard failed to load — pull down to retry';
+
+  // Adherence hero — one label / headline / body triple per adherence band.
+  static const adherenceNoneLabel     = 'Nothing scheduled';
+  static const adherenceNoneTitle     = 'No doses today';
+  static const adherenceNoneBody      =
+      'Add a medicine to start tracking your adherence.';
+  static const adherencePerfectLabel  = 'On track';
+  static const adherencePerfectTitle  = 'Perfect week';
+  static const adherencePerfectBody   =
+      'You have taken every scheduled dose. Keep this rhythm going.';
+  static const adherenceGoodLabel     = 'On track';
+  static const adherenceGoodTitle     = 'Staying consistent';
+  static const adherenceGoodBody      =
+      'Your adherence is strong. A few doses left to stay on target.';
+  static const adherenceFairLabel     = 'Slipping';
+  static const adherenceFairTitle     = 'A few missed doses';
+  static const adherenceFairBody      =
+      'Some doses went untaken this week. Reminders can help you catch up.';
+  static const adherencePoorLabel     = 'Needs attention';
+  static const adherencePoorTitle     = 'Falling behind';
+  static const adherencePoorBody      =
+      'Several doses were missed. Review your schedule with your care team.';
+
+  // Dashboard stats & empty states
+  static const lowStock            = 'Low stock';
+  static const dosesLabel          = 'Doses';
+  static const dosesTakenSuffix    = 'taken';
+  static const noDosesToday        = 'No medicines scheduled today';
+  static const noDosesTodayHint    = 'Doses you add will appear here.';
+  static const noVitalsYetHint     = 'Log a reading to see your trend here.';
+  static const addMedicineHint     = 'Add to your medicine list';
+  static const addVitalHint        = 'Record your health';
+  static const addDoseHint         = 'Manage dose schedule';
 
   // ─── Medicines ──────────────────────────────────────────────────────────────
   static const medicines = 'Medicines';
@@ -859,24 +896,17 @@ static const noCountriesFound     = 'No countries found';
   static const voiceSearchTooltip  = 'Voice search';
   static const micPermissionDenied = 'Microphone permission is required for voice search.';
 
-  // ─── Reminders ───────────────────────────────────────────────────────────────
-  static const reminders            = 'Reminders';
-  static const addReminder          = 'Add Reminder';
-  static const reminderTitle        = 'Reminder Title';
-  static const reminderTitleHint    = 'e.g. Take insulin';
-  static const reminderRepeat       = 'Repeat';
-  static const reminderType         = 'Type';
-  static const reminderTypeMed      = 'Medicine';
-  static const reminderTypeAppt     = 'Appointment';
-  static const reminderTypeVital    = 'Vital Check';
-  static const reminderTypeOther    = 'Other';
-  static const reminderEnabled      = 'Reminder active';
-  static const noReminders          = 'No reminders set';
-  static const noRemindersDesc      = 'Tap + to schedule a reminder';
-  static const reminderSaved        = 'Reminder saved';
-  static const reminderDeleted      = 'Reminder deleted';
-  static const deleteReminder       = 'Delete Reminder';
-  static const deleteReminderConfirm = 'Delete this reminder?';
+  // ─── Dose schedules ──────────────────────────────────────────────────────────
+  // The recurring rules behind the dose timeline. Managed from the Schedule
+  // screen (there is no separate Reminders page).
+  static const manageSchedules       = 'Manage Schedules';
+  static const manageSchedulesDesc   = 'Turn a schedule off to stop its reminders, or delete it entirely.';
+  static const noSchedulesYet        = 'No dose schedules yet';
+  static const schedulesLoadFailed   = 'Could not load schedules.';
+  static const deleteSchedule        = 'Delete Schedule';
+  static const deleteScheduleConfirm = 'Delete this schedule? All its future reminders stop.';
+  static const scheduleDeleted       = 'Schedule deleted';
+  static const scheduleSaved         = 'Schedule saved';
 
   // ─── Prescriptions ───────────────────────────────────────────────────────────
   static const prescriptions        = 'Prescriptions';

@@ -1,7 +1,7 @@
 import '../../domain/entities/dashboard_stats_entity.dart';
 import '../../domain/repositories/dashboard_repository.dart';
 import '../datasources/dashboard_remote_datasource.dart';
-import '../../../schedule/domain/entities/appointment_entity.dart';
+import '../../../schedule/domain/entities/dose_entity.dart';
 import '../../../vitals/domain/entities/vital_reading_entity.dart';
 import '../models/banner_config.dart';
 

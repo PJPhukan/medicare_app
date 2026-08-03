@@ -35,10 +35,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   bool _didAutoSkip = false;
 
   /// If the backend has no plans configured, skip this screen entirely.
+  /// A failed fetch is NOT the same as "no plans" — that case falls through
+  /// to an error state with retry instead of silently skipping past the paywall.
   void _autoSkipIfNeeded(SubscriptionState st) {
     if (_didAutoSkip) return;
     if (st.isLoadingPlans || st.isLoadingMine) return;
-    if (st.plans.isEmpty) {
+    if (st.plans.isEmpty && st.error == null) {
       _didAutoSkip = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.onDone?.call();
@@ -83,6 +85,18 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         ? plans[_selectedIndex]
         : plans.firstOrNull;
     final selectedIsFree = selectedPlan?.isFree ?? true;
+    final failedToLoad = !isLoading && plans.isEmpty && st.error != null;
+
+    if (failedToLoad) {
+      return AuthShell(
+        leading: AppBarLeading.back,
+        onBack: widget.onBack,
+        child: AppErrorState(
+          message: st.error,
+          onRetry: () => ref.read(subscriptionProvider.notifier).loadAll(),
+        ),
+      );
+    }
 
     return AuthShell(
       leading: AppBarLeading.back,

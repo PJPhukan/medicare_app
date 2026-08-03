@@ -6,6 +6,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../core/utils/logger.dart';
+import '../../../../core/services/notification_service.dart';
+import '../../../schedule/presentation/providers/reminders_provider.dart';
 
 class NotificationSettingScreen extends ConsumerStatefulWidget {
   const NotificationSettingScreen({super.key});
@@ -34,8 +36,53 @@ class _NotificationSettingScreenState
   TimeOfDay _quietEndTime = const TimeOfDay(hour: 6, minute: 0);
   bool _allowEmergency = true;
 
-  String _snoozeMinutes = '10 minutes';
-  String _defaultAlertTone = 'CareDose Default';
+  final String _snoozeMinutes = '10 minutes';
+  final String _defaultAlertTone = 'CareDose Default';
+
+  /// Null while the first check is in flight.
+  bool? _exactAlarmsAllowed;
+  Map<String, Object?>? _diagnostics;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExactAlarms();
+  }
+
+  Future<void> _checkExactAlarms() async {
+    await NotificationService.refreshExactAlarmPermission();
+    final diagnostics = await NotificationService.alarmDiagnostics();
+    if (mounted) {
+      setState(() {
+        _exactAlarmsAllowed = NotificationService.canUseExactAlarms;
+        _diagnostics = diagnostics;
+      });
+    }
+  }
+
+  Future<void> _testAlarm() async {
+    await NotificationService.fireTestAlarm();
+    if (!mounted) return;
+    AppSnackbar.info(context, 'Test alarm will sound in 2 seconds');
+  }
+
+  Future<void> _grantExactAlarms() async {
+    // Opens the system "Alarms & reminders" screen — Android has no in-app
+    // dialog for this permission. The answer only lands once the user returns,
+    // so re-check rather than trusting the call's result.
+    await NotificationService.requestExactAlarmPermission();
+    if (!mounted) return;
+    await _checkExactAlarms();
+    if (!mounted) return;
+    if (NotificationService.canUseExactAlarms) {
+      // Pending alarms were built in inexact mode — rebuild them so they move
+      // onto exact delivery straight away.
+      await ref.read(remindersProvider.notifier).load();
+      if (mounted) {
+        AppSnackbar.success(context, 'Exact reminders enabled');
+      }
+    }
+  }
 
   void _save() {
     AppLogger.i('Notification settings saved', tag: 'Notifications');
@@ -90,6 +137,94 @@ class _NotificationSettingScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ── Alarm diagnostics + test ──────────────────────────
+                      AppCard(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppText.labelMd('Alarm check'),
+                            const SizedBox(height: 8),
+                            if (_diagnostics case final d?) ...[
+                              AppInfoLabelText(
+                                icon: Icons.public_rounded,
+                                label: 'Timezone',
+                                value: '${d['timezone']}',
+                              ),
+                              AppInfoLabelText(
+                                icon: Icons.alarm_on_rounded,
+                                label: 'Exact alarms',
+                                value: d['exactAlarms'] == true
+                                    ? 'Allowed'
+                                    : 'Not allowed',
+                              ),
+                              AppInfoLabelText(
+                                icon: Icons.notifications_active_outlined,
+                                label: 'Notifications',
+                                value: d['notificationsEnabled'] == false
+                                    ? 'Blocked'
+                                    : 'Enabled',
+                              ),
+                              AppInfoLabelText(
+                                icon: Icons.pending_actions_rounded,
+                                label: 'Scheduled alarms',
+                                value: '${d['pending']}',
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            AppButton(
+                              variant: AppButtonVariant.secondary,
+                              label: 'Test alarm now',
+                              leading: const Icon(Icons.volume_up_rounded,
+                                  size: 18),
+                              isFullWidth: true,
+                              onPressed: _testAlarm,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Exact alarm permission ────────────────────────────
+                      if (_exactAlarmsAllowed == false) ...[
+                        AppCard(
+                          padding: const EdgeInsets.all(14),
+                          color: AppColors.amber.withValues(alpha: 0.08),
+                          borderColor: AppColors.amber.withValues(alpha: 0.3),
+                          effectColor: AppColors.amber,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.alarm_off_rounded,
+                                      size: 18, color: AppColors.amber),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: AppText.labelMd(
+                                        'Reminders may arrive late'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              AppText.bodySm(
+                                'Android is holding your dose alarms in battery-saving mode, '
+                                'which can delay them by several minutes. Allow exact alarms '
+                                'so they fire on time.',
+                              ),
+                              const SizedBox(height: 12),
+                              AppButton(
+                                variant: AppButtonVariant.primary,
+                                label: 'Allow exact alarms',
+                                isFullWidth: true,
+                                onPressed: _grantExactAlarms,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
                       // ── All Reminders Active Status ────────────────────────
                       AppCard(
                         padding: const EdgeInsets.all(16),
@@ -121,9 +256,14 @@ class _NotificationSettingScreenState
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
-                                        'All reminders are\nactive',
-                                        style: TextStyle(
+                                      Text(
+                                        // Claiming "active" while the OS is
+                                        // throttling the alarms would be a
+                                        // lie the user can act on.
+                                        _exactAlarmsAllowed == false
+                                            ? 'Reminders are\ndelayed'
+                                            : 'All reminders are\nactive',
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
                                           height: 1.3,
@@ -148,9 +288,11 @@ class _NotificationSettingScreenState
                                           color: AppColors.teal.withValues(alpha: 0.1),
                                           borderRadius: AppBorderRadius.pill,
                                         ),
-                                        child: const Text(
-                                          'ON TRACK',
-                                          style: TextStyle(
+                                        child: Text(
+                                          _exactAlarmsAllowed == false
+                                              ? 'NEEDS ATTENTION'
+                                              : 'ON TRACK',
+                                          style: const TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.w700,
                                             color: AppColors.teal,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/utils/plan_feature_formatter.dart';
@@ -93,15 +94,8 @@ class PlanCard extends StatelessWidget {
             borderRadius: AppBorderRadius.lgAll,
             border: Border.all(color: borderColor, width: selected ? 2 : 1),
             boxShadow: selected
-                ? [BoxShadow(
-                    color: _accent.withValues(alpha: 0.18),
-                    blurRadius: 24,
-                    offset: const Offset(0, 4),
-                  )]
-                : [BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                  )],
+                ? AppShadows.softCardRaised(context.isDark, color: _accent)
+                : AppShadows.softCard(context.isDark),
           ),
           child: ClipRRect(
             borderRadius: AppBorderRadius.lgAll,

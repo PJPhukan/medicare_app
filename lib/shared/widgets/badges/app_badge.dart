@@ -28,14 +28,19 @@ class AppBadge extends StatelessWidget {
   final bool dot;
   final bool filled;
 
-  static Color _color(AppBadgeVariant v) => switch (v) {
+  // Takes context because `neutral` is the one variant backed by a semantic
+  // (theme-adapting) colour rather than a fixed brand one — teal/blue/etc.
+  // are deliberately the same in both themes, but AppColors.textHint is the
+  // dark-theme value and needs context.hintText to read correctly as this
+  // badge's TEXT colour (not just a background tint) in light mode.
+  static Color _color(BuildContext context, AppBadgeVariant v) => switch (v) {
     AppBadgeVariant.teal    => AppColors.teal,
     AppBadgeVariant.blue    => AppColors.blue,
     AppBadgeVariant.purple  => AppColors.purple,
     AppBadgeVariant.amber   => AppColors.amber,
     AppBadgeVariant.red     => AppColors.red,
     AppBadgeVariant.green   => AppColors.green,
-    AppBadgeVariant.neutral => AppColors.textHint,
+    AppBadgeVariant.neutral => context.hintText,
   };
 
   EdgeInsets _getPadding() => switch (size) {
@@ -58,7 +63,7 @@ class AppBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = _color(variant);
+    final c = _color(context, variant);
     final fontSize = _getFontSize();
     final iconSize = _getIconSize();
     final padding = _getPadding();

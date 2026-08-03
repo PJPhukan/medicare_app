@@ -31,7 +31,11 @@ class AppEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) Icon(icon, size: 48, color: AppColors.textHint),
+            // context.hintText: a raw Icon never adapts AppColors.textHint
+            // (the dark-theme value), so every empty-state icon on this
+            // widget — used across the medicine detail tabs, no-internet
+            // states, etc. — rendered washed out in light mode.
+            if (icon != null) Icon(icon, size: 48, color: context.hintText),
             const SizedBox(height: 16),
             Text(
               title,

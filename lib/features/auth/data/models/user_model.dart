@@ -12,6 +12,17 @@ class UserModel extends UserEntity {
     super.avatarUrl,
   });
 
+  factory UserModel.fromEntity(UserEntity entity) => UserModel(
+        id: entity.id,
+        name: entity.name,
+        phone: entity.phone,
+        email: entity.email,
+        avatarUrl: entity.avatarUrl,
+        isActive: entity.isActive,
+        theme: entity.theme,
+        createdAt: entity.createdAt,
+      );
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
     if (id is! String) throw const FormatException('Invalid user id');

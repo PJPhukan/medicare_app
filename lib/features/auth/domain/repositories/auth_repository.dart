@@ -29,6 +29,7 @@ abstract interface class AuthRepository {
   });
   Future<UserEntity?> getCachedUser();
   Future<String?> getCachedToken();
+  Future<void> saveUser(UserEntity user);
   Future<void> logout();
 
   Future<String?> getOnboardingStep();

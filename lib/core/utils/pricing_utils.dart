@@ -12,6 +12,8 @@ abstract final class PricingUtils {
   }
 
   /// Max yearly savings % across all plans in a list.
-  static int maxYearlySavingsPct(List<PlanEntity> plans) =>
-      plans.fold(0, (best, p) => yearlySavingsPct(p) > best ? yearlySavingsPct(p) : best);
+  static int maxYearlySavingsPct(List<PlanEntity> plans) => plans.fold(0, (best, p) {
+        final pct = yearlySavingsPct(p);
+        return pct > best ? pct : best;
+      });
 }

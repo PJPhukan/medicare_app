@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_animations.dart';
 import '../../../core/theme/app_shadows.dart';
+import '../../../core/theme/app_gradients.dart';
 import '../../../core/extensions/context_extensions.dart';
 
 // ─── Base card ────────────────────────────────────────────────────────────────
@@ -18,6 +19,8 @@ class AppCard extends StatelessWidget {
     this.onTap,
     this.hasShadow = false,
     this.margin,
+    this.raised = false,
+    this.effectColor,
   });
 
   final Widget child;
@@ -26,21 +29,35 @@ class AppCard extends StatelessWidget {
   final Color? borderColor;
   final BorderRadius? borderRadius;
   final VoidCallback? onTap;
+
+  /// Opt in to an outer drop shadow. Off by default — depth comes from the
+  /// corner-lit surface gradient, which keeps the card flush with the page.
   final bool hasShadow;
   final EdgeInsetsGeometry? margin;
 
+  /// Deepen the corner lighting — for the one hero card on a screen.
+  final bool raised;
+
+  /// Tints the lit corner — e.g. `AppColors.teal` for an accent card.
+  /// Defaults to a neutral white sheen.
+  final Color? effectColor;
+
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDark;
     final br  = borderRadius ?? AppBorderRadius.xlAll;
     final bg  = color ?? context.cardBg;
-    final bc  = borderColor ?? context.borderCol;
+    final bc  = borderColor ?? context.cardEdge;
 
     Widget card = DecoratedBox(
       decoration: BoxDecoration(
-        color: bg,
+        gradient: AppGradients.cardSheen(bg, isDark,
+            color: effectColor, strong: raised),
         borderRadius: br,
         border: Border.all(color: bc),
-        boxShadow: hasShadow ? AppShadows.card : [],
+        boxShadow: hasShadow
+            ? AppShadows.softCard(isDark, color: effectColor)
+            : const [],
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(16),
@@ -122,6 +139,8 @@ class AppStatCard extends StatelessWidget {
     final c = color ?? AppColors.teal;
     return AppCard(
       onTap: onTap,
+      // Match the sheen to this card's accent instead of the default teal.
+      effectColor: c,
       color: Color.fromRGBO(
         c.r.round(), c.g.round(), c.b.round(), 0.06,
       ),

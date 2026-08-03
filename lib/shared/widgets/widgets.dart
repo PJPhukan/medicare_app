@@ -16,7 +16,6 @@ export 'graphs/app_chart.dart';
 export 'chat/app_chat_bubble.dart';
 export 'chips/app_chip.dart';
 export 'chips/category_chip.dart';
-export '../../features/dashboard/presentation/widgets/app_dashboard_widgets.dart';
 export 'dialogs/app_dialog.dart';
 export 'feedback/app_error_widget.dart';
 export 'inputs/app_form_field.dart';
@@ -45,6 +44,17 @@ export 'feedback/network_required.dart';
 export 'navigation/page_transition.dart';
 export 'layout/section_header.dart';
 export 'texts/section_header_text.dart';
+export 'texts/empty_state_text.dart';
+export 'texts/page_header_text.dart';
+export 'texts/highlighted_text.dart';
+
+// Four names are defined twice across the library. Rather than delete anyone's
+// implementation, the barrel picks one canonical export per name so callers can
+// `import widgets.dart` and use them unambiguously — which is the whole point
+// of the shared library. Canonical: AppStatRow + AppAdherenceRing from graphs/,
+// AppStatCard + AppInfoCard from cards/.
+export 'texts/stat_text.dart' hide AppStatRow;
+export 'texts/info_label_text.dart' hide AppInfoCard;
 export 'skeleton/shimmer_widget.dart';
 export 'feedback/sync_indicator.dart';
 export 'tables/app_table.dart';

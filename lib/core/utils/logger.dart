@@ -50,7 +50,11 @@ abstract final class AppLogger {
   /// Post a structured event to the backend (admin activity log).
   /// Fire-and-forget — never throws, never blocks UI.
   static void track(String type, {String? page, Map<String, dynamic>? meta, String? error}) {
-    _remoteTracker?.call(type, page: page, meta: meta, error: error);
+    try {
+      _remoteTracker?.call(type, page: page, meta: meta, error: error);
+    } catch (e, s) {
+      debugPrint('[Logger] remote tracker threw: $e\n$s');
+    }
   }
 
   /// Call after login with the authenticated user's ID (UUID — not email/name).
@@ -98,14 +102,26 @@ abstract final class AppLogger {
 
     final uid = _userId != null ? ' [uid:${_userId!}]' : '';
 
+    final line = '${level.emoji} [$time] [$_device]$uid $msg';
+    final name = tag ?? 'App';
+
     dev.log(
-      '${level.emoji} [$time] [$_device]$uid $msg',
-      name: tag ?? 'App',
+      line,
+      name: name,
       level: level.value,
       error: error,
       stackTrace: stack,
       time: now,
     );
+
+    // dev.log only reaches the VM service (DevTools) — it does NOT show up in
+    // `adb logcat`, and didn't reach the `flutter run` console either, which
+    // made every log here invisible while debugging on a device. debugPrint
+    // goes through print, so it lands in logcat under the `flutter` tag.
+    // Debug builds only: _emit already returns early in release.
+    debugPrint('[$name] $line');
+    if (error != null) debugPrint('[$name] error: $error');
+    if (stack != null) debugPrint('[$name] $stack');
   }
 }
 

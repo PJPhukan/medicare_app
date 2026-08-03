@@ -1,4 +1,4 @@
-import '../entities/appointment_entity.dart';
+import '../entities/dose_entity.dart';
 
 abstract interface class ScheduleRepository {
   Future<List<DoseEntity>> getTodayDoses({String? date});

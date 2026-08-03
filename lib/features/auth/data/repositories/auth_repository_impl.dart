@@ -80,6 +80,10 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<String?> getCachedToken() => _local.readToken();
 
   @override
+  Future<void> saveUser(UserEntity user) =>
+      _local.saveUser(UserModel.fromEntity(user));
+
+  @override
   Future<void> logout() async {
     try {
       await _remote.logout();

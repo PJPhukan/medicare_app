@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/utils/logger.dart';
 import 'core/theme/app_theme.dart';
@@ -18,6 +18,7 @@ import 'core/router/app_router.dart';
 import 'core/sync/sync_engine.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/professionals/presentation/providers/location_provider.dart';
+import 'features/schedule/presentation/providers/reminders_provider.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -80,7 +81,8 @@ class _MediForzeAppState extends ConsumerState<MediForzeApp>
     WidgetsBinding.instance.addObserver(this);
     AppLogger.i('App launched', tag: 'Lifecycle');
     // Pre-warm auth so secure-storage reads run during the splash animation.
-    ref.read(authProvider.notifier).initialized;
+    // Deliberately not awaited — the splash route awaits the same future.
+    unawaited(ref.read(authProvider.notifier).initialized);
     AppLogger.setRemoteTracker(ref.read(eventLogServiceProvider).track);
   }
 
@@ -95,6 +97,7 @@ class _MediForzeAppState extends ConsumerState<MediForzeApp>
     switch (state) {
       case AppLifecycleState.resumed:
         AppLogger.i('App foregrounded', tag: 'Lifecycle');
+        unawaited(_syncExactAlarmPermission());
       case AppLifecycleState.paused:
         AppLogger.i('App backgrounded', tag: 'Lifecycle');
       case AppLifecycleState.detached:
@@ -106,18 +109,36 @@ class _MediForzeAppState extends ConsumerState<MediForzeApp>
     }
   }
 
+  /// Android grants SCHEDULE_EXACT_ALARM from a system settings screen and
+  /// gives no callback, so the only way to notice is to re-check on resume.
+  /// When it flips on, pending alarms are still inexact — rebuilding them
+  /// moves every reminder onto exact delivery.
+  Future<void> _syncExactAlarmPermission() async {
+    final changed = await NotificationService.refreshExactAlarmPermission();
+    if (!changed || !mounted) return;
+    AppLogger.i('Rebuilding alarms after exact-alarm permission change',
+        tag: 'Notification');
+    await ref.read(remindersProvider.notifier).load();
+  }
+
+  Future<void> _postFcmToken(String token) async {
+    if (!mounted) return;
+    final platform = Platform.isAndroid ? 'ANDROID' : 'IOS';
+    // PushPlatform is an uppercase enum server-side — lowercase is a 400.
+    await ref.read(dioProvider).post(
+      '/api/notifications/tokens',
+      data: {'token': token, 'platform': platform},
+    );
+    AppLogger.i('FCM token registered ($platform)', tag: 'FCM');
+  }
+
   Future<void> _registerFcmToken() async {
     try {
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken != null && mounted) {
-        final dio = ref.read(dioProvider);
-        final platform = Platform.isAndroid ? 'ANDROID' : 'IOS';
-        await dio.post(
-          '/api/notifications/tokens',
-          data: {'token': fcmToken, 'platform': platform},
-        );
-        AppLogger.i('FCM token registered ($platform)', tag: 'FCM');
-      }
+      // Registers the current token and keeps registering rotated ones. A
+      // rotated token leaves the stored row dead, and login is the only other
+      // moment this runs — so without the refresh hook push delivery silently
+      // stops whenever FCM cycles the token.
+      await FirebaseMessagingService.onTokenAvailable(_postFcmToken);
     } catch (e) {
       AppLogger.e('Failed to register FCM token: $e', tag: 'FCM');
     }
@@ -126,6 +147,10 @@ class _MediForzeAppState extends ConsumerState<MediForzeApp>
   @override
   Widget build(BuildContext context) {
     ref.watch(syncEngineProvider);
+    // Keeps dose schedules loaded app-wide so local alarms are rescheduled on
+    // every launch (reinstalls, new devices) without waiting for the user to
+    // open the Schedule screen.
+    ref.watch(remindersProvider);
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 

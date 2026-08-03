@@ -369,15 +369,12 @@ class _ServiceAreasScreenState extends ConsumerState<ServiceAreasScreen> {
                   );
                   if (mounted && context.mounted) {
                     setState(() => _showRequestModal = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Area request submitted for admin review')),
-                    );
+                    AppSnackbar.success(
+                        context, 'Area request submitted for admin review');
                   }
                 } catch (e) {
                   if (mounted && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: ${e.toString()}')),
-                    );
+                    AppSnackbar.error(context, 'Error: ${e.toString()}');
                   }
                 }
               },
@@ -420,9 +417,7 @@ class _RequestAreaModalState extends State<_RequestAreaModal> {
         _pincodesCtrl.text.trim().isEmpty ||
         _stateCtrl.text.trim().isEmpty ||
         _districtCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
+      AppSnackbar.warning(context, 'Please fill all fields');
       return;
     }
     setState(() => _isLoading = true);

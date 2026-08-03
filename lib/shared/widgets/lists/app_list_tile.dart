@@ -13,6 +13,7 @@ class AppListTile extends StatelessWidget {
     this.leading,
     required this.title,
     this.subtitle,
+    this.subtitleWidget,
     this.trailing,
     this.onTap,
     this.onLongPress,
@@ -25,6 +26,11 @@ class AppListTile extends StatelessWidget {
   final Widget? leading;
   final String title;
   final String? subtitle;
+
+  /// Rich subtitle — for a row of metadata, an inline icon, or tabular figures
+  /// that a plain [subtitle] string can't express. Takes precedence over it.
+  final Widget? subtitleWidget;
+
   final Widget? trailing;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -60,7 +66,12 @@ class AppListTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (subtitle != null)
+                  if (subtitleWidget != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: subtitleWidget!,
+                    )
+                  else if (subtitle != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(subtitle!,

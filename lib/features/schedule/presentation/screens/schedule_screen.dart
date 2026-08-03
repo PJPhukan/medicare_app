@@ -6,10 +6,13 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../shared/widgets/skeleton/skeleton.dart';
 import '../../../schedule/presentation/providers/schedule_provider.dart';
-import '../../../schedule/data/models/appointment_model.dart' as sched_model;
-import 'add_appointment_screen.dart';
+import '../../../schedule/presentation/providers/reminders_provider.dart';
+import '../../../schedule/data/models/today_dose_model.dart' as sched_model;
+import '../widgets/manage_schedules_sheet.dart';
+import '../widgets/add_dose_sheet.dart';
 
 // ─── Dose model ───────────────────────────────────────────────────────────────
 
@@ -143,7 +146,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   void _scrollToSelected() {
     if (!_stripController.hasClients) return;
-    final idx = _days.indexWhere((d) => _isSameDay(d, _selectedDate));
+    final idx = _days.indexWhere((d) => DateFormatter.isSameDay(d, _selectedDate));
     if (idx < 0) return;
     final target = (idx * _chipExtent - 120)
         .clamp(0.0, _stripController.position.maxScrollExtent);
@@ -153,7 +156,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   /// Switch the viewed day and fetch that date's doses from the backend.
   void _selectDate(DateTime day) {
-    if (_isSameDay(day, _selectedDate)) return;
+    if (DateFormatter.isSameDay(day, _selectedDate)) return;
     setState(() => _selectedDate = day);
     ref.read(scheduleProvider.notifier).load(date: day);
   }
@@ -164,34 +167,50 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     super.dispose();
   }
 
+  /// Creates a real recurring dose schedule (DoseSchedule + DoseTime) and its
+  /// local alarm. The notifier handles the offline case by queueing the create,
+  /// so this works with no connectivity too.
   Future<void> _openAddDose() async {
     final input = await showAddDoseSheet(context);
     if (input == null || !mounted) return;
-    setState(() {
-      _doses.add(_Dose(
-        id: 'local-${DateTime.now().millisecondsSinceEpoch}',
-        name: input.name,
-        time: input.time,
-        unit: input.unit,
-        foodTiming: switch (input.foodTiming) {
-          DoseFoodTiming.before => _FoodTiming.before,
-          DoseFoodTiming.with_  => _FoodTiming.with_,
-          DoseFoodTiming.after  => _FoodTiming.after,
-        },
-        status: _DoseStatus.pending,
-      ));
-    });
+    try {
+      await ref.read(remindersProvider.notifier).createSchedule(
+            medicineName: input.name,
+            time: input.time,
+            unit: input.unit,
+            foodTiming: switch (input.foodTiming) {
+              DoseFoodTiming.before => 'BEFORE',
+              DoseFoodTiming.with_ => 'WITH',
+              DoseFoodTiming.after => 'AFTER',
+            },
+            scheduleType: _toApiScheduleType(input.repeat),
+            endDate: input.endDate,
+          );
+      if (!mounted) return;
+      AppSnackbar.success(context, AppStrings.doseAdded);
+      // Re-read the day so the new dose appears with its real doseTimeId
+      // (marking taken needs the server-side id, not a local placeholder).
+      await ref.read(scheduleProvider.notifier).load(date: _selectedDate);
+    } catch (e) {
+      if (mounted) AppSnackbar.error(context, e.toString());
+    }
+  }
+
+  static String _toApiScheduleType(String label) => switch (label) {
+        AppStrings.repeatWeekdays => 'WEEKDAYS',
+        AppStrings.repeatWeekends => 'WEEKENDS',
+        AppStrings.repeatCustom => 'CUSTOM',
+        _ => 'DAILY',
+      };
+
+  Future<void> _openManageSchedules() async {
+    await showManageSchedulesSheet(context);
     if (!mounted) return;
-    AppSnackbar.success(context, AppStrings.doseAdded);
+    // Toggling or deleting a schedule changes which doses exist for the day.
+    await ref.read(scheduleProvider.notifier).load(date: _selectedDate);
   }
 
-  bool _isToday(DateTime d) {
-    final n = DateTime.now();
-    return d.year == n.year && d.month == n.month && d.day == n.day;
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
+  bool _isToday(DateTime d) => DateFormatter.isSameDay(d, DateTime.now());
 
   String _fmtSelectedDate(DateTime d) {
     if (_isToday(d)) return 'Today';
@@ -218,11 +237,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       if (idx >= 0) _doses[idx].status = s;
     });
     if (s == _DoseStatus.taken) _showCelebration();
-    // Only call API for real doses (not locally-added ones)
-    if (!id.startsWith('local-')) {
-      final apiStatus = s == _DoseStatus.taken ? 'TAKEN' : 'SKIPPED';
-      ref.read(scheduleProvider.notifier).markDose(id, apiStatus);
-    }
+    final apiStatus = s == _DoseStatus.taken ? 'TAKEN' : 'SKIPPED';
+    ref.read(scheduleProvider.notifier).markDose(id, apiStatus);
   }
 
   void _showCelebration() {
@@ -268,6 +284,18 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               subtitle: 'Track and manage your daily doses',
               backgroundColor: bgPage,
               actions: [
+                AppIconButton(
+                  icon: const Icon(Icons.alarm_rounded),
+                  iconSize: 20,
+                  color: AppColors.amber,
+                  size: 36,
+                  borderColor: context.borderCol,
+                  backgroundColor: context.cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  onPressed: _openManageSchedules,
+                  tooltip: AppStrings.manageSchedules,
+                ),
+                const SizedBox(width: 8),
                 AppIconButton(
                   icon: const Icon(Icons.add_rounded),
                   iconSize: 20,
@@ -328,7 +356,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                     itemCount: _days.length,
                     itemBuilder: (_, i) {
                       final day = _days[i];
-                      final selected = _isSameDay(day, _selectedDate);
+                      final selected = DateFormatter.isSameDay(day, _selectedDate);
                       final isToday = _isToday(day);
                       return GestureDetector(
                         onTap: () => _selectDate(day),

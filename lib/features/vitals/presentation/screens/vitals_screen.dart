@@ -10,6 +10,9 @@ import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/utils/date_formatter.dart';
+import '../../../../core/utils/hex_color.dart';
+import '../../../../core/utils/time_format.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/widgets/chips/status_chip.dart';
 import '../../../../shared/widgets/graphs/donut_chart.dart';
@@ -118,11 +121,6 @@ class _VitalReading {
 
 // ─── Adapters ─────────────────────────────────────────────────────────────────
 
-Color _hexColor(String hex) {
-  final h = hex.replaceFirst('#', '');
-  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
-}
-
 IconData _iconForVital(String name) {
   final n = name.toLowerCase();
   if (n.contains('blood pressure') || n.contains(' bp')) {
@@ -143,7 +141,7 @@ _VitalInput _toVitalInput(vm.VitalInput i) => _VitalInput(
       id: i.id,
       label: i.label,
       unit: i.unit,
-      color: _hexColor(i.color),
+      color: hexToColor(i.color),
       normalMin: i.normalMin,
       normalMax: i.normalMax,
       warningMin: i.warningMin,
@@ -1701,7 +1699,7 @@ String _fmtHour(DateTime dt) {
 String _axisLabel(DateTime dt, _Range range) => switch (range) {
       _Range.today => _fmtHour(dt),
       _Range.week => _weekdaysShort[dt.weekday - 1],
-      _Range.month => _fmtDate(dt),
+      _Range.month => DateFormatter.monthDay(dt),
     };
 
 /// Evenly-spaced, DE-DUPLICATED axis labels keyed by reading index. Skips a
@@ -1724,27 +1722,5 @@ Map<int, String> _buildAxisLabels(List<_VitalReading> sorted, _Range range) {
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
-String _fmtDate(DateTime dt) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec'
-  ];
-  return '${months[dt.month - 1]} ${dt.day}';
-}
-
-String _fmtDateTime(DateTime dt) {
-  final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-  final m = dt.minute.toString().padLeft(2, '0');
-  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-  return '${_fmtDate(dt)}, $h:$m $ampm';
-}
+String _fmtDateTime(DateTime dt) =>
+    '${DateFormatter.monthDay(dt)}, ${formatTime12hDt(dt)}';

@@ -19,4 +19,8 @@ abstract final class DateFormatter {
 
   /// "June 2026"
   static String monthYearLong(DateTime dt) => '${_long[dt.month - 1]} ${dt.year}';
+
+  /// True when [a] and [b] fall on the same calendar day (ignores time).
+  static bool isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 }

@@ -23,7 +23,6 @@ import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../connections/presentation/screens/connections_screen.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../emergency/presentation/screens/emergency_screen.dart';
-import '../../../reminders/presentation/screens/reminders_screen.dart';
 import '../../../patients/presentation/screens/patients_screen.dart';
 import '../../../caretakers/presentation/screens/caretakers_screen.dart';
 import '../../../community/presentation/screens/community_screen.dart';
@@ -60,7 +59,9 @@ const _slugMeta = <String, _SlugMeta>{
   'vitals':        _SlugMeta(outlineIcon: Icons.monitor_heart_outlined, filledIcon: Icons.monitor_heart_rounded, color: AppColors.red, section: 'Health'),
   'professionals': _SlugMeta(outlineIcon: Icons.people_outline_rounded, filledIcon: Icons.people_rounded, color: AppColors.teal, section: 'Health'),
   'messages':      _SlugMeta(outlineIcon: Icons.chat_bubble_outline_rounded, filledIcon: Icons.chat_bubble_rounded, color: AppColors.green, section: 'People & Care'),
-  'reminders':     _SlugMeta(outlineIcon: Icons.alarm_outlined, filledIcon: Icons.alarm_rounded, color: AppColors.amber, section: 'Overview'),
+  // 'reminders' is an alias of 'schedule' (see _pushScreenForSlug) — same
+  // section and icon so a legacy TabConfig looks identical to the real one.
+  'reminders':     _SlugMeta(outlineIcon: Icons.calendar_today_outlined, filledIcon: Icons.calendar_today_rounded, color: AppColors.blue, section: 'Health'),
   'schedule':      _SlugMeta(outlineIcon: Icons.calendar_today_outlined, filledIcon: Icons.calendar_today_rounded, color: AppColors.blue, section: 'Health'),
   'reports':       _SlugMeta(outlineIcon: Icons.description_outlined, filledIcon: Icons.description_rounded, color: AppColors.purple, section: 'Health'),
   'insights':      _SlugMeta(outlineIcon: Icons.insights_outlined, filledIcon: Icons.insights_rounded, color: AppColors.purple, section: 'Health'),
@@ -90,7 +91,10 @@ Widget? _pushScreenForSlug(String slug) => switch (slug) {
   'vitals'        => const VitalsScreen(),
   'professionals' => const ProfessionalsScreen(),
   'messages'      => const MessageScreen(),
-  'reminders'     => const RemindersScreen(),
+  // Reminders is no longer a page of its own — schedule management lives inside
+  // ScheduleScreen. Kept as an alias so TabConfigs still set to 'reminders' in
+  // admin keep resolving instead of silently vanishing from the nav.
+  'reminders'     => const ScheduleScreen(),
   'schedule'      => const ScheduleScreen(),
   'reports'       => const ReportsScreen(),
   'insights'      => const InsightsScreen(),
@@ -118,7 +122,8 @@ String _stripSlash(String s) => s.startsWith('/') ? s.substring(1) : s;
 
 // Map sidebar-only slugs to go_router routes (tabs handled separately)
 String? _slugToRoute(String slug) => switch (_stripSlash(slug)) {
-  'profile'                              => AppRoutes.profile,
+  // No dedicated profile screen exists; SettingsScreen is the account page.
+  'profile'                              => AppRoutes.settings,
   'settings'                             => AppRoutes.settings,
   'pro-profile' || 'professional-profile' => AppRoutes.settingsProHub,
   'connections'                          => AppRoutes.professionalsConnections,
@@ -306,13 +311,18 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     _coreTabs = tabsAsync.when(
       data: (tabs) => _buildCoreTabs(tabs, isVerifiedPro),
-      loading: _fallbackCoreTabs,
-      error: (_, __) => _fallbackCoreTabs(),
+      // A first-time load has nothing cached yet — keep the list empty so the
+      // shell shows a real loading/retry state instead of hardcoded tabs.
+      // A background refresh (returning user) keeps whatever's on screen.
+      loading: () => _coreTabs,
+      error: (_, __) => _coreTabs,
     );
 
     final coreTabs = _coreTabs;
-    final safeIndex = _index.clamp(0, coreTabs.length - 1);
-    _activatedIndices.add(safeIndex);
+    final isFirstTabsLoad = tabsAsync.isLoading && coreTabs.isEmpty;
+    final tabsLoadFailed = tabsAsync.hasError && coreTabs.isEmpty;
+    final safeIndex = coreTabs.isEmpty ? 0 : _index.clamp(0, coreTabs.length - 1);
+    if (coreTabs.isNotEmpty) _activatedIndices.add(safeIndex);
 
     return PopScope(
       canPop: _index == 0,
@@ -343,16 +353,26 @@ class _AppShellState extends ConsumerState<AppShell> {
                     onTap: () { if (!_navVisible) setState(() => _navVisible = true); },
                     child: NotificationListener<ScrollNotification>(
                       onNotification: _onScrollNotification,
-                      child: IndexedStack(
-                        index: safeIndex,
-                        children: List.generate(coreTabs.length, (i) {
-                          // Lazily build each tab's screen only after its first
-                          // visit; keep it alive afterwards so state persists.
-                          return _activatedIndices.contains(i)
-                              ? coreTabs[i].screen
-                              : const SizedBox.shrink();
-                        }),
-                      ),
+                      child: tabsLoadFailed
+                          ? AppErrorState(
+                              message: 'Unable to load your tabs.',
+                              onRetry: () => ref.read(tabsProvider.notifier).retry(),
+                            )
+                          : isFirstTabsLoad
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                      color: AppColors.teal, strokeWidth: 2),
+                                )
+                              : IndexedStack(
+                                  index: safeIndex,
+                                  children: List.generate(coreTabs.length, (i) {
+                                    // Lazily build each tab's screen only after its first
+                                    // visit; keep it alive afterwards so state persists.
+                                    return _activatedIndices.contains(i)
+                                        ? coreTabs[i].screen
+                                        : const SizedBox.shrink();
+                                  }),
+                                ),
                     ),
                   ),
                 ),

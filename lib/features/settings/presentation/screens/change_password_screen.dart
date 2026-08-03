@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/api/client.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
@@ -67,18 +69,33 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      final dio = ref.read(dioProvider);
+      await dio.post<void>(
+        '/api/auth/change-password',
+        data: {
+          'currentPassword': _currentPasswordCtrl.text,
+          'newPassword': _newPasswordCtrl.text,
+        },
+      );
+
       AppLogger.i('Password updated successfully', tag: 'Security');
       if (!mounted) return;
       AppSnackbar.success(context, 'Password updated successfully');
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) context.pop();
       });
     } on Exception catch (e) {
       AppLogger.e('Password update failed', tag: 'Security', error: e);
       if (!mounted) return;
       setState(() => _isLoading = false);
-      AppSnackbar.error(context, 'Failed to update password. Try again.');
+      String msg = 'Failed to update password. Try again.';
+      if (e is DioException) {
+        final resData = e.response?.data;
+        if (resData is Map<String, dynamic> && resData['message'] is String) {
+          msg = resData['message'] as String;
+        }
+      }
+      AppSnackbar.error(context, msg);
     }
   }
 

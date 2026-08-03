@@ -115,8 +115,12 @@ class _AppDonutChartState extends State<AppDonutChart> {
                 if (widget.centerLabel != null)
                   Text(
                     widget.centerLabel!,
+                    // context.secondaryText, not AppColors.textSecondary: a
+                    // raw Text never adapts that constant (it's the
+                    // dark-theme value), so this rendered near-invisible in
+                    // light mode.
                     style: AppTypography.bodyXs.copyWith(
-                      color: AppColors.textSecondary,
+                      color: context.secondaryText,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -175,7 +179,7 @@ class _DonutLegend extends StatelessWidget {
             Text(
               '${e.value.label} $pct',
               style: AppTypography.bodyXs.copyWith(
-                color: AppColors.textSecondary,
+                color: context.secondaryText,
                 fontWeight: FontWeight.w500,
               ),
             ),

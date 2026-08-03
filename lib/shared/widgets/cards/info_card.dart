@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_border_radius.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_shadows.dart';
 import '../../../core/extensions/context_extensions.dart';
 import 'app_base_card.dart';
 
@@ -76,13 +77,7 @@ class AppInfoCard extends StatelessWidget {
     };
 
     final shadow = style == AppInfoCardStyle.elevated
-        ? [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ]
+        ? AppShadows.softCard(isDark)
         : <BoxShadow>[];
 
     return AppBaseCard(
@@ -91,6 +86,9 @@ class AppInfoCard extends StatelessWidget {
       color: bgColor,
       borderColor: borderColor,
       shadow: shadow,
+      // Follow the card's own semantic colour so a warning/error surface isn't
+      // lit teal by the default sheen.
+      effectColor: c,
       borderRadius: AppBorderRadius.lgAll,
       onTap: onTap,
       child: Row(

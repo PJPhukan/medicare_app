@@ -3,12 +3,13 @@ import '../../../../core/api/client.dart';
 import '../../../../core/local_db/sync_queue.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 import '../../data/datasources/schedule_remote_datasource.dart';
-import '../../data/models/appointment_model.dart';
+import '../../data/models/today_dose_model.dart';
 import '../../data/repositories/schedule_repository_impl.dart';
 import '../../domain/repositories/schedule_repository.dart';
 import '../../domain/usecases/fetch_schedule_usecase.dart';
-import '../../domain/usecases/add_appointment_usecase.dart';
+import '../../domain/usecases/mark_dose_usecase.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/utils/logger.dart';
 
 class ScheduleState {
@@ -63,10 +64,7 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   static String _dateKey(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  static bool _isToday(DateTime d) {
-    final n = DateTime.now();
-    return d.year == n.year && d.month == n.month && d.day == n.day;
-  }
+  static bool _isToday(DateTime d) => DateFormatter.isSameDay(d, DateTime.now());
 
   Future<void> load({DateTime? date}) async {
     if (date != null) _currentDate = date;

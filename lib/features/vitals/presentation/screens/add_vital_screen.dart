@@ -6,16 +6,12 @@ import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/utils/hex_color.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../data/models/vital_config_model.dart';
 import '../providers/vitals_provider.dart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-Color _hexColor(String hex) {
-  final h = hex.replaceFirst('#', '');
-  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
-}
 
 IconData _iconForVital(String name) {
   final n = name.toLowerCase();
@@ -29,7 +25,7 @@ IconData _iconForVital(String name) {
 }
 
 Color _configColor(VitalConfig c) =>
-    c.inputs.isNotEmpty ? _hexColor(c.inputs.first.color) : AppColors.teal;
+    c.inputs.isNotEmpty ? hexToColor(c.inputs.first.color) : AppColors.teal;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -348,7 +344,7 @@ class _VitalForm extends StatelessWidget {
               child: _InputRow(
                 input: inp,
                 controller: ctrl,
-                accentColor: _hexColor(inp.color),
+                accentColor: hexToColor(inp.color),
                 onChanged: (_) => onChanged(),
               ),
             );
