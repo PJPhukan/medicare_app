@@ -35,6 +35,7 @@ export 'navigation/app_tab_bar.dart';
 export 'inputs/app_text_field.dart';
 export 'inputs/phone_input.dart';
 export 'inputs/dob_picker.dart';
+export 'inputs/time_picker_input.dart';
 export 'texts/app_text.dart';
 export 'health/app_vitals_widgets.dart';
 export 'cards/app_gradient_card.dart';

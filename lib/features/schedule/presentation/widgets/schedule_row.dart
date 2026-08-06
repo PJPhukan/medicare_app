@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/extensions/context_extensions.dart';
-import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../../../shared/widgets/widgets.dart';
@@ -15,6 +14,15 @@ String repeatLabel(String type) => switch (type) {
       'WEEKENDS' => AppStrings.repeatWeekends,
       'PRN' => AppStrings.asNeeded,
       _ => AppStrings.repeatCustom,
+    };
+
+/// Reverse of [repeatLabel] — the add/edit dose sheet works in labels, the
+/// API in schedule-type codes.
+String apiScheduleType(String label) => switch (label) {
+      AppStrings.repeatWeekdays => 'WEEKDAYS',
+      AppStrings.repeatWeekends => 'WEEKENDS',
+      AppStrings.repeatCustom => 'CUSTOM',
+      _ => 'DAILY',
     };
 
 String formatScheduleTime(String hhmm) => formatTime12h(hhmm);
@@ -70,15 +78,10 @@ class ScheduleRow extends StatelessWidget {
           effectColor: schedule.isActive ? AppColors.teal : null,
           child: Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppColors.teal.withValues(alpha: 0.12),
-                  borderRadius: AppBorderRadius.smAll,
-                ),
-                child: const Icon(Icons.alarm_rounded,
-                    color: AppColors.teal, size: 19),
+              MedicineTypeIcon(
+                type: 'capsule',
+                size: 38,
+                color: schedule.isActive ? AppColors.teal : context.hintText,
               ),
               const SizedBox(width: 10),
               Expanded(

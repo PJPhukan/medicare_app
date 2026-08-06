@@ -4,9 +4,9 @@ abstract class ApiConstants {
   // or for a LAN device: `--dart-define=API_BASE_URL=http://192.168.x.x:4000`
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://curaleecore-api-production.up.railway.app',
+    // defaultValue: 'https://curaleecore-api-production.up.railway.app',
       // defaultValue: 'http://192.168.29.210:4000', // Home
-      //  defaultValue: 'http://192.168.29.232:4000', // Ofice
+       defaultValue: 'http://192.168.29.232:4000', // Ofice
   );
 
   // ── Auth ──────────────────────────────────────────────────────────────────

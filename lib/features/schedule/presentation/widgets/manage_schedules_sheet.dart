@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/extensions/context_extensions.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../data/models/reminder_schedule_model.dart';
 import '../providers/reminders_provider.dart';
+import 'add_dose_sheet.dart';
 import 'schedule_row.dart';
 
 /// Recurring dose-schedule management, folded into the Schedule screen.
@@ -15,11 +13,11 @@ import 'schedule_row.dart';
 /// is the only place that edits the *rules* behind them (DoseSchedule +
 /// DoseTime), so toggling or deleting here is what stops future doses and
 /// cancels the local alarms.
-Future<void> showManageSchedulesSheet(BuildContext context) => showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _ManageSchedulesSheet(),
+Future<void> showManageSchedulesSheet(BuildContext context) => AppBottomSheet.show<void>(
+      context,
+      title: AppStrings.manageSchedules,
+      subtitle: AppStrings.manageSchedulesDesc,
+      child: const _ManageSchedulesSheet(),
     );
 
 class _ManageSchedulesSheet extends ConsumerWidget {
@@ -28,110 +26,107 @@ class _ManageSchedulesSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(remindersProvider);
-    final bottomPad = MediaQuery.paddingOf(context).bottom;
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.8,
-      ),
-      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 20),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                  color: context.borderCol, borderRadius: AppBorderRadius.pill),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(AppStrings.manageSchedules,
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-              GestureDetector(
-                onTap: () => context.pop(),
-                child: const Icon(Icons.close_rounded,
-                    color: AppColors.textHint, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          AppText.bodyXs(AppStrings.manageSchedulesDesc,
-              color: AppColors.textSecondary),
-          const SizedBox(height: 16),
+    if (state.isLoading && state.schedules.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: AppLoadingSpinner(size: 32, strokeWidth: 2.5)),
+      );
+    }
 
-          if (state.isLoading && state.schedules.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.teal),
-              ),
-            )
-          else if (state.error != null && state.schedules.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: Column(
-                  children: [
-                    const Icon(Icons.cloud_off_rounded,
-                        size: 40, color: AppColors.textHint),
-                    const SizedBox(height: 12),
-                    AppText.bodySm(AppStrings.schedulesLoadFailed,
-                        color: AppColors.textSecondary),
-                    TextButton(
-                      onPressed: () =>
-                          ref.read(remindersProvider.notifier).load(),
-                      child: const Text('Retry',
-                          style: TextStyle(color: AppColors.teal)),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (state.schedules.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: Column(
-                  children: [
-                    const Icon(Icons.alarm_off_rounded,
-                        size: 40, color: AppColors.textHint),
-                    const SizedBox(height: 12),
-                    AppText.bodySm(AppStrings.noSchedulesYet,
-                        color: AppColors.textSecondary),
-                  ],
-                ),
-              ),
-            )
-          else
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: state.schedules.length,
-                itemBuilder: (_, i) {
-                  final s = state.schedules[i];
-                  return ScheduleRow(
-                    schedule: s,
-                    onToggle: () => toggleScheduleWithFeedback(context, ref, s.id),
-                    onDelete: () => confirmDeleteSchedule(context, ref, s),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
+    if (state.error != null && state.schedules.isEmpty) {
+      return AppErrorState(
+        message: AppStrings.schedulesLoadFailed,
+        onRetry: () => ref.read(remindersProvider.notifier).load(),
+      );
+    }
+
+    if (state.schedules.isEmpty) {
+      return const AppEmptyState(
+        icon: Icons.alarm_off_rounded,
+        title: AppStrings.noSchedulesYet,
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      itemCount: state.schedules.length,
+      itemBuilder: (_, i) {
+        final s = state.schedules[i];
+        return ScheduleRow(
+          schedule: s,
+          onToggle: () => toggleScheduleWithFeedback(context, ref, s.id),
+          onDelete: () => confirmDeleteSchedule(context, ref, s),
+          onEdit: () => _editSchedule(context, ref, s),
+        );
+      },
     );
   }
+}
 
+/// Opens the edit sheet for a schedule's first dose time — schedules created
+/// from this sheet's own "+" always hold exactly one; multi-time schedules
+/// (from the Add Medicine wizard) still open here since editing the overall
+/// time/food/repeat/duration is the point, not per-time granularity.
+///
+/// The PATCH replaces the whole dose-time list, so untouched times are sent
+/// back unchanged or the server would treat them as removed.
+Future<void> _editSchedule(
+  BuildContext context,
+  WidgetRef ref,
+  ReminderScheduleModel schedule,
+) async {
+  final doseTime = schedule.doseTimes.first;
+  final input = await showAddDoseSheet(
+    context,
+    medicineName: schedule.medicineName,
+    isActive: schedule.isActive,
+    onToggleActive: (_) => toggleScheduleWithFeedback(context, ref, schedule.id),
+    onDelete: () => confirmDeleteSchedule(context, ref, schedule),
+    initial: DoseInput(
+      name: schedule.medicineName,
+      time: doseTime.scheduledTime,
+      unit: doseTime.unit ?? '',
+      foodTiming: switch (doseTime.foodTiming?.toUpperCase()) {
+        'BEFORE' => DoseFoodTiming.before,
+        'WITH' => DoseFoodTiming.with_,
+        _ => DoseFoodTiming.after,
+      },
+      repeat: repeatLabel(schedule.scheduleType),
+      durationDays: schedule.daysRemaining,
+    ),
+  );
+  if (input == null || !context.mounted) return;
+
+  final dose = parseDoseAmount(input.unit);
+  final edited = [
+    for (final dt in schedule.doseTimes)
+      dt.id == doseTime.id
+          ? DoseTimeEdit.from(dt).copyWith(
+              scheduledTime: input.time,
+              quantity: dose.quantity ?? 1,
+              unit: dose.unit ?? input.unit,
+              foodTiming: switch (input.foodTiming) {
+                DoseFoodTiming.before => 'BEFORE',
+                DoseFoodTiming.with_ => 'WITH',
+                DoseFoodTiming.after => 'AFTER',
+              },
+            )
+          : DoseTimeEdit.from(dt),
+  ];
+
+  try {
+    await ref.read(remindersProvider.notifier).updateSchedule(
+          id: schedule.id,
+          doseTimes: edited,
+          scheduleType: apiScheduleType(input.repeat),
+          endDate: input.endDate,
+          clearEndDate: input.durationDays == null,
+        );
+    if (!context.mounted) return;
+    AppSnackbar.success(context, 'Dose updated');
+  } catch (e) {
+    if (context.mounted) AppSnackbar.error(context, e.toString());
+  }
 }

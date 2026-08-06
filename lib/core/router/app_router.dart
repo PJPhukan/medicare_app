@@ -29,6 +29,7 @@ import '../../features/premium/presentation/screens/subscription_management_scre
 import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/support/presentation/screens/submit_ticket_screen.dart';
 import '../../features/support/presentation/screens/help_center_screen.dart';
+import '../../features/schedule/presentation/screens/schedule_screen.dart';
 import '../../features/vitals/presentation/screens/vital_history_screen.dart';
 import '../../features/vitals/presentation/screens/add_vital_screen.dart';
 import '../../features/medicines/presentation/screens/add_medicine_screen.dart';
@@ -80,6 +81,8 @@ abstract final class AppRoutes {
 
   static const vitalHistory = '/vitals/history';
   static const vitalAdd = '/vitals/add';
+
+  static const schedule = '/schedule';
 
   static const medicineAdd = '/medicines/add';
   static const medicineDetail = '/medicines/detail';
@@ -307,6 +310,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             },
           ),
         ],
+      ),
+
+      // ── Schedule ─────────────────────────────────────────────────────────────
+      // Direct-push fallback for callers that switchToTab('schedule') when
+      // the 'schedule' tab isn't currently among the backend-driven bottom
+      // nav tabs (still loading, deactivated, or capped out).
+      GoRoute(
+        path: AppRoutes.schedule,
+        builder: (context, state) => const ScheduleScreen(standalone: true),
       ),
 
       // ── Vitals ───────────────────────────────────────────────────────────────

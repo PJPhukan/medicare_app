@@ -128,6 +128,10 @@ String? _slugToRoute(String slug) => switch (_stripSlash(slug)) {
   'pro-profile' || 'professional-profile' => AppRoutes.settingsProHub,
   'connections'                          => AppRoutes.professionalsConnections,
   'help' || 'support' || 'privacy'       => AppRoutes.support,
+  // 'schedule'/'reminders' isn't guaranteed to be in _coreTabs (loading,
+  // deactivated, or capped past 7), so give switchToTab('schedule') a real
+  // fallback destination instead of silently no-opping.
+  'schedule' || 'reminders'              => AppRoutes.schedule,
   _                                      => null,
 };
 

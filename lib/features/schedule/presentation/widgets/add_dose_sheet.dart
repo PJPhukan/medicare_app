@@ -55,11 +55,11 @@ Future<DoseInput?> showAddDoseSheet(
   ValueChanged<bool>? onToggleActive,
   bool isActive = true,
 }) {
-  return showModalBottomSheet<DoseInput>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _AddDoseSheet(
+  final title = medicineName ?? (initial != null ? 'Edit dose' : AppStrings.addDose);
+  return AppBottomSheet.show<DoseInput>(
+    context,
+    title: title,
+    child: _AddDoseSheet(
       medicineName: medicineName,
       initial: initial,
       onDelete: onDelete,
@@ -128,44 +128,10 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
     super.dispose();
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _time,
-      builder: (ctx, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: ColorScheme.dark(
-            primary: AppColors.teal,
-            surface: context.cardBg,
-            onSurface: context.primaryText,
-          ),
-          timePickerTheme: TimePickerThemeData(
-            backgroundColor: context.cardBg,
-            hourMinuteColor: context.inputBg,
-            hourMinuteTextColor: context.primaryText,
-            dialBackgroundColor: context.inputBg,
-            dialHandColor: AppColors.teal,
-            dialTextColor: context.primaryText,
-            entryModeIconColor: AppColors.teal,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => _time = picked);
-  }
-
   String get _timeString {
     final h = _time.hour.toString().padLeft(2, '0');
     final m = _time.minute.toString().padLeft(2, '0');
     return '$h:$m';
-  }
-
-  String get _timeDisplay {
-    final h = _time.hourOfPeriod == 0 ? 12 : _time.hourOfPeriod;
-    final m = _time.minute.toString().padLeft(2, '0');
-    final period = _time.period == DayPeriod.am ? 'AM' : 'PM';
-    return '$h:$m $period';
   }
 
   void _save() {
@@ -186,91 +152,31 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.paddingOf(context).bottom;
-    final keyboardPad = MediaQuery.viewInsetsOf(context).bottom;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: keyboardPad),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad + 20),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle + header
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(color: context.borderCol, borderRadius: AppBorderRadius.pill),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      _nameLocked
-                          ? widget.medicineName!
-                          : (_isEdit ? 'Edit dose' : AppStrings.addDose),
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: const Icon(Icons.close_rounded, color: AppColors.textHint, size: 20),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Medicine name — omitted when the caller already fixed it.
-              if (!_nameLocked) ...[
-                _Label(AppStrings.medicineName, required: true),
-                const SizedBox(height: 6),
-                _TextField(controller: _nameCtrl, hint: AppStrings.doseNameHint),
-                const SizedBox(height: 14),
-              ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Medicine name — omitted when the caller already fixed it.
+        if (!_nameLocked) ...[
+          _Label(AppStrings.medicineName, required: true),
+          const SizedBox(height: 6),
+          AppSearchTextVoiceInput(
+            controller: _nameCtrl,
+            hint: AppStrings.doseNameHint,
+            backgroundColor: context.inputBg,
+            borderColor: context.borderCol,
+          ),
+          const SizedBox(height: 14),
+        ],
 
               // Time + Dosage row
               Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _Label(AppStrings.doseTime),
-                        SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: _pickTime,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                            decoration: BoxDecoration(
-                              color: context.inputBg,
-                              borderRadius: AppBorderRadius.lgAll,
-                              border: Border.all(color: context.borderCol),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.access_time_rounded, size: 15, color: AppColors.teal),
-                                SizedBox(width: 8),
-                                Text(
-                                  _timeDisplay,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: context.primaryText),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: AppTimePickerInput(
+                      value: _time,
+                      label: AppStrings.doseTime,
+                      onChanged: (t) => setState(() => _time = t),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -280,7 +186,7 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                       children: [
                         _Label(AppStrings.doseUnit, required: true),
                         const SizedBox(height: 6),
-                        _TextField(controller: _unitCtrl, hint: '1 tablet'),
+                        AppTextField(controller: _unitCtrl, hint: '1 tablet'),
                       ],
                     ),
                   ),
@@ -332,29 +238,10 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                   AppStrings.repeatWeekends,
                   AppStrings.repeatCustom,
                 ].map((r) {
-                  final selected = _repeat == r;
-                  return GestureDetector(
+                  return AppFilterChip(
+                    label: r,
+                    selected: _repeat == r,
                     onTap: () => setState(() => _repeat = r),
-                    child: AnimatedContainer(
-                      duration: Duration(milliseconds: 160),
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: selected ? AppColors.teal.withValues(alpha: 0.15) : context.inputBg,
-                        borderRadius: AppBorderRadius.pill,
-                        border: Border.all(
-                          color: selected ? AppColors.teal.withValues(alpha: 0.5) : context.borderCol,
-                        ),
-                      ),
-                      child: Text(
-                        r,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                          letterSpacing: 0.5,
-                          color: selected ? AppColors.teal : AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
                   );
                 }).toList(),
               ),
@@ -368,37 +255,10 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                 spacing: 8,
                 runSpacing: 8,
                 children: _durationOptions.map((days) {
-                  final selected = _durationDays == days;
-                  return GestureDetector(
+                  return AppFilterChip(
+                    label: days == null ? 'Ongoing' : '$days days',
+                    selected: _durationDays == days,
                     onTap: () => setState(() => _durationDays = days),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.teal.withValues(alpha: 0.15)
-                            : context.inputBg,
-                        borderRadius: AppBorderRadius.pill,
-                        border: Border.all(
-                          color: selected
-                              ? AppColors.teal.withValues(alpha: 0.5)
-                              : context.borderCol,
-                        ),
-                      ),
-                      child: Text(
-                        days == null ? 'Ongoing' : '$days days',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
-                          letterSpacing: 0.5,
-                          color: selected
-                              ? AppColors.teal
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
                   );
                 }).toList(),
               ),
@@ -444,40 +304,11 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                   valueListenable: _unitCtrl,
                   builder: (_, unitVal, __) {
                     final canSave = nameVal.text.trim().isNotEmpty && unitVal.text.trim().isNotEmpty;
-                    return SizedBox(
-                      width: double.infinity,
-                      child: GestureDetector(
-                        onTap: canSave ? _save : null,
-                        child: AnimatedContainer(
-                          duration: Duration(milliseconds: 200),
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: canSave ? AppColors.teal : context.inputBg,
-                            borderRadius: AppBorderRadius.lgAll,
-                          ),
-                          alignment: Alignment.center,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.check_rounded,
-                                size: 16,
-                                color: canSave ? context.bg : AppColors.textHint,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                _isEdit ? 'Save changes' : AppStrings.saveDose,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.2,
-                                  color: canSave ? context.bg : AppColors.textHint,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    return AppButton(
+                      label: _isEdit ? 'Save changes' : AppStrings.saveDose,
+                      leading: const Icon(Icons.check_rounded, size: 16),
+                      isFullWidth: true,
+                      onPressed: canSave ? _save : null,
                     );
                   },
                 ),
@@ -498,10 +329,7 @@ class _AddDoseSheetState extends State<_AddDoseSheet> {
                 ),
               ],
             ],
-          ),
-        ),
-      ),
-    );
+          );
   }
 }
 
@@ -577,32 +405,4 @@ class _Label extends StatelessWidget {
       );
 }
 
-class _TextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
 
-  const _TextField({required this.controller, required this.hint});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: context.inputBg,
-          borderRadius: AppBorderRadius.lgAll,
-          border: Border.all(color: context.borderCol),
-        ),
-        child: TextField(
-          controller: controller,
-          style: TextStyle(fontSize: 14, color: context.primaryText),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            filled: true,
-            fillColor: Colors.transparent,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          ),
-        ),
-      );
-}

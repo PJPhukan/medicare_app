@@ -89,22 +89,6 @@ class _NotificationSettingScreenState
     AppSnackbar.success(context, 'Reminder settings saved successfully');
   }
 
-  Future<void> _selectTime(bool isStart) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: isStart ? _quietStartTime : _quietEndTime,
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _quietStartTime = picked;
-        } else {
-          _quietEndTime = picked;
-        }
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -653,7 +637,7 @@ class _NotificationSettingScreenState
                             ),
                             const Icon(
                               Icons.expand_more_rounded,
-                              size: 18,
+                               size: 18,
                               color: AppColors.textHint,
                             ),
                           ],
@@ -727,66 +711,16 @@ class _NotificationSettingScreenState
                               Row(
                                 children: [
                                   Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => _selectTime(true),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 10,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: context.inputBg,
-                                          borderRadius: AppBorderRadius.mdAll,
-                                          border: Border.all(color: context.borderCol),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              _quietStartTime.format(context),
-                                              style: const TextStyle(fontSize: 13),
-                                            ),
-                                            const Icon(
-                                              Icons.circle_rounded,
-                                              size: 8,
-                                              color: AppColors.teal,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                    child: AppTimePickerInput(
+                                      value: _quietStartTime,
+                                      onChanged: (t) => setState(() => _quietStartTime = t),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => _selectTime(false),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 10,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: context.inputBg,
-                                          borderRadius: AppBorderRadius.mdAll,
-                                          border: Border.all(color: context.borderCol),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              _quietEndTime.format(context),
-                                              style: const TextStyle(fontSize: 13),
-                                            ),
-                                            const Icon(
-                                              Icons.circle_rounded,
-                                              size: 8,
-                                              color: AppColors.teal,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                    child: AppTimePickerInput(
+                                      value: _quietEndTime,
+                                      onChanged: (t) => setState(() => _quietEndTime = t),
                                     ),
                                   ),
                                 ],

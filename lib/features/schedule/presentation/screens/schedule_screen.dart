@@ -1,83 +1,35 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/extensions/context_extensions.dart';
-import '../../../../shared/widgets/widgets.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/extensions/context_extensions.dart';
+import '../../../../core/theme/app_border_radius.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../shared/widgets/skeleton/skeleton.dart';
-import '../../../schedule/presentation/providers/schedule_provider.dart';
-import '../../../schedule/presentation/providers/reminders_provider.dart';
-import '../../../schedule/data/models/today_dose_model.dart' as sched_model;
-import '../widgets/manage_schedules_sheet.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../data/models/reminder_schedule_model.dart';
+import '../models/presentation_dose.dart';
+import '../providers/reminders_provider.dart';
+import '../providers/schedule_provider.dart';
+import '../utils/dose_mapper.dart';
 import '../widgets/add_dose_sheet.dart';
-
-// ─── Dose model ───────────────────────────────────────────────────────────────
-
-enum _DoseStatus { taken, skipped, pending }
-
-enum _FoodTiming { before, with_, after }
-
-class _Dose {
-  _Dose({
-    required this.id,
-    required this.name,
-    required this.time,
-    required this.unit,
-    required this.foodTiming,
-    required this.status,
-  });
-  final String id;
-  final String name;
-  final String time;
-  final String unit;
-  final _FoodTiming foodTiming;
-  _DoseStatus status;
-}
-
-// ─── Adapter ──────────────────────────────────────────────────────────────────
-
-_FoodTiming _parseFoodTiming(String? s) {
-  if (s == null) return _FoodTiming.with_;
-  final u = s.toUpperCase();
-  if (u.contains('BEFORE') || u.contains('EMPTY')) return _FoodTiming.before;
-  if (u.contains('AFTER')) return _FoodTiming.after;
-  return _FoodTiming.with_;
-}
-
-_Dose _toDose(sched_model.TodayDose d) => _Dose(
-      id: d.doseTimeId,
-      name: d.medicineName,
-      time: d.scheduledTime,
-      unit: '${d.quantity?.toStringAsFixed(0) ?? '1'} ${d.unit ?? 'dose'}',
-      foodTiming: _parseFoodTiming(d.foodTiming),
-      status: d.isTaken
-          ? _DoseStatus.taken
-          : d.isSkipped
-              ? _DoseStatus.skipped
-              : _DoseStatus.pending,
-    );
-
-String _foodLabel(_FoodTiming t) => switch (t) {
-      _FoodTiming.before => AppStrings.beforeFood,
-      _FoodTiming.with_  => AppStrings.withFood,
-      _FoodTiming.after  => AppStrings.afterFood,
-    };
-
-String _timeGroup(String hhmm) {
-  final h = int.parse(hhmm.split(':')[0]);
-  if (h >= 5 && h < 12) return 'Morning';
-  if (h >= 12 && h < 17) return 'Afternoon';
-  if (h >= 17 && h < 21) return 'Evening';
-  return 'Night';
-}
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
+import '../widgets/celebration_overlay.dart';
+import '../widgets/manage_schedules_sheet.dart';
+import '../widgets/schedule_date_strip.dart';
+import '../widgets/schedule_group_section.dart';
+import '../widgets/schedule_row.dart';
+import '../widgets/schedule_summary_chips.dart';
 
 class ScheduleScreen extends ConsumerStatefulWidget {
-  const ScheduleScreen({super.key});
+  const ScheduleScreen({super.key, this.standalone = false});
+
+  /// True when pushed as its own route (e.g. the `/schedule` fallback used
+  /// when the tab isn't currently in the bottom nav) rather than shown as a
+  /// core tab inside [AppShell]. Embedded, the default "menu" leading opens
+  /// the shell's drawer correctly; standalone, that same Scaffold sits
+  /// underneath this pushed route so the drawer would open invisibly — use
+  /// a back button instead.
+  final bool standalone;
 
   @override
   ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -85,886 +37,237 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
-  List<_Dose> _doses = [];
-  late DateTime _visibleMonth; // first day of the month shown in the strip
-  List<DateTime> _days = [];
-  final ScrollController _stripController = ScrollController();
-
-  static const double _chipExtent = 56; // width 50 + horizontal margin 6
-
-  void _buildDays() {
-    final daysInMonth = DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0).day;
-    _days = List.generate(
-      daysInMonth,
-      (i) => DateTime(_visibleMonth.year, _visibleMonth.month, i + 1),
-    );
-  }
-
-  void _changeMonth(int delta) {
-    setState(() {
-      _visibleMonth = DateTime(_visibleMonth.year, _visibleMonth.month + delta);
-      _buildDays();
-    });
-    // Bring today (if in view) or the start of the month into view.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_stripController.hasClients) return;
-      final idx = _days.indexWhere(_isToday);
-      final target = (idx > 0 ? idx * _chipExtent - 120 : 0.0)
-          .clamp(0.0, _stripController.position.maxScrollExtent);
-      _stripController.animateTo(target,
-          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-    });
-  }
-
-  String _monthLabel(DateTime d) {
-    const mo = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
-        'August', 'September', 'October', 'November', 'December'];
-    return '${mo[d.month - 1]} ${d.year}';
-  }
 
   @override
   void initState() {
     super.initState();
-    final today = DateTime.now();
-    _visibleMonth = DateTime(today.year, today.month);
-    _buildDays();
-    // Populate from provider once loaded
-    ref.listenManual(scheduleProvider, (prev, next) {
-      if (!next.isLoading && (prev?.isLoading ?? true) && mounted) {
-        setState(() => _doses = next.doses.map(_toDose).toList());
-      }
-    });
-    // Sync immediately if provider already has data, and centre today.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final s = ref.read(scheduleProvider);
-      if (!s.isLoading && s.doses.isNotEmpty && mounted) {
-        setState(() => _doses = s.doses.map(_toDose).toList());
-      }
-      _scrollToSelected();
+      ref.read(remindersProvider.notifier).load();
     });
   }
 
-  void _scrollToSelected() {
-    if (!_stripController.hasClients) return;
-    final idx = _days.indexWhere((d) => DateFormatter.isSameDay(d, _selectedDate));
-    if (idx < 0) return;
-    final target = (idx * _chipExtent - 120)
-        .clamp(0.0, _stripController.position.maxScrollExtent);
-    _stripController.animateTo(target,
-        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  void _onDateSelected(DateTime date) {
+    if (DateFormatter.isSameDay(_selectedDate, date)) return;
+    setState(() => _selectedDate = date);
+    ref.read(scheduleProvider.notifier).load(date: date);
   }
 
-  /// Switch the viewed day and fetch that date's doses from the backend.
-  void _selectDate(DateTime day) {
-    if (DateFormatter.isSameDay(day, _selectedDate)) return;
-    setState(() => _selectedDate = day);
-    ref.read(scheduleProvider.notifier).load(date: day);
+  void _onMonthChanged(DateTime visibleMonth) {
+    final firstDay = DateTime(visibleMonth.year, visibleMonth.month, 1);
+    setState(() => _selectedDate = firstDay);
+    ref.read(scheduleProvider.notifier).load(date: firstDay);
   }
 
-  @override
-  void dispose() {
-    _stripController.dispose();
-    super.dispose();
+  Future<void> _markDose(String doseTimeId, DoseStatus status) async {
+    final statusStr = status == DoseStatus.taken ? 'TAKEN' : 'SKIPPED';
+    
+    if (status == DoseStatus.taken) {
+      CelebrationOverlay.show(context);
+    }
+
+    try {
+      await ref.read(scheduleProvider.notifier).markDose(doseTimeId, statusStr);
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbar.error(context, 'Could not update dose: ${e.toString()}');
+    }
   }
 
-  /// Creates a real recurring dose schedule (DoseSchedule + DoseTime) and its
-  /// local alarm. The notifier handles the offline case by queueing the create,
-  /// so this works with no connectivity too.
   Future<void> _openAddDose() async {
     final input = await showAddDoseSheet(context);
     if (input == null || !mounted) return;
+
+    final dose = parseDoseAmount(input.unit);
     try {
       await ref.read(remindersProvider.notifier).createSchedule(
             medicineName: input.name,
             time: input.time,
-            unit: input.unit,
+            unit: dose.unit ?? input.unit,
+            quantity: dose.quantity ?? 1,
             foodTiming: switch (input.foodTiming) {
               DoseFoodTiming.before => 'BEFORE',
               DoseFoodTiming.with_ => 'WITH',
               DoseFoodTiming.after => 'AFTER',
             },
-            scheduleType: _toApiScheduleType(input.repeat),
+            scheduleType: apiScheduleType(input.repeat),
             endDate: input.endDate,
           );
       if (!mounted) return;
-      AppSnackbar.success(context, AppStrings.doseAdded);
-      // Re-read the day so the new dose appears with its real doseTimeId
-      // (marking taken needs the server-side id, not a local placeholder).
       await ref.read(scheduleProvider.notifier).load(date: _selectedDate);
+      if (mounted) AppSnackbar.success(context, AppStrings.doseAdded);
     } catch (e) {
-      if (mounted) AppSnackbar.error(context, e.toString());
+      if (mounted) {
+        AppSnackbar.error(context, 'Could not add dose: ${e.toString()}');
+      }
     }
   }
 
-  static String _toApiScheduleType(String label) => switch (label) {
-        AppStrings.repeatWeekdays => 'WEEKDAYS',
-        AppStrings.repeatWeekends => 'WEEKENDS',
-        AppStrings.repeatCustom => 'CUSTOM',
-        _ => 'DAILY',
-      };
-
-  Future<void> _openManageSchedules() async {
-    await showManageSchedulesSheet(context);
-    if (!mounted) return;
-    // Toggling or deleting a schedule changes which doses exist for the day.
-    await ref.read(scheduleProvider.notifier).load(date: _selectedDate);
+  void _openManageSchedules() {
+    showManageSchedulesSheet(context);
   }
 
-  bool _isToday(DateTime d) => DateFormatter.isSameDay(d, DateTime.now());
-
-  String _fmtSelectedDate(DateTime d) {
-    if (_isToday(d)) return 'Today';
-    const wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${wd[d.weekday - 1]}, ${d.day} ${mo[d.month - 1]}';
+  String _fmtSelectedDateHeader(DateTime d) {
+    if (DateFormatter.isSameDay(d, DateTime.now())) return 'Today';
+    return DateFormatter.weekdayMonthDay(d);
   }
-
-  Map<String, List<_Dose>> get _grouped {
-    final order = ['Morning', 'Afternoon', 'Evening', 'Night'];
-    final map = <String, List<_Dose>>{for (final g in order) g: []};
-    for (final d in _doses) {
-      map[_timeGroup(d.time)]!.add(d);
-    }
-    return {
-      for (final g in order)
-        if (map[g]!.isNotEmpty) g: map[g]!,
-    };
-  }
-
-  void _mark(String id, _DoseStatus s) {
-    setState(() {
-      final idx = _doses.indexWhere((d) => d.id == id);
-      if (idx >= 0) _doses[idx].status = s;
-    });
-    if (s == _DoseStatus.taken) _showCelebration();
-    final apiStatus = s == _DoseStatus.taken ? 'TAKEN' : 'SKIPPED';
-    ref.read(scheduleProvider.notifier).markDose(id, apiStatus);
-  }
-
-  void _showCelebration() {
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (_) => _CelebrationOverlay(onDone: () {
-        entry.remove();
-      }),
-    );
-    Overlay.of(context).insert(entry);
-  }
-
-  static const _groupMeta = {
-    'Morning':   (icon: Icons.wb_sunny_rounded,        color: Color(0xFFF59E0B), range: '5 AM – 12 PM'),
-    'Afternoon': (icon: Icons.wb_cloudy_rounded,        color: Color(0xFF4D9EFF), range: '12 PM – 5 PM'),
-    'Evening':   (icon: Icons.nights_stay_rounded,      color: Color(0xFFA855F7), range: '5 PM – 9 PM'),
-    'Night':     (icon: Icons.dark_mode_rounded,        color: Color(0xFF8B9BB4), range: '9 PM – 5 AM'),
-  };
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgPage = isDark ? context.bg : AppColors.light100;
-    final bgCard = isDark ? context.cardBg : Colors.white;
-    final border = isDark ? context.borderCol : const Color(0xFFE2E8F0);
-    final textColor = isDark ? context.primaryText : const Color(0xFF1A202C);
-    final secondary = isDark ? AppColors.textSecondary : const Color(0xFF64748B);
+    // Single provider watch as single source of truth
+    final scheduleState = ref.watch(scheduleProvider);
+    final textColor = context.primaryText;
+    final secondaryColor = context.secondaryText;
 
-    final takenCount   = _doses.where((d) => d.status == _DoseStatus.taken).length;
-    final pendingCount = _doses.where((d) => d.status == _DoseStatus.pending).length;
-    final skippedCount = _doses.where((d) => d.status == _DoseStatus.skipped).length;
+    // Convert domain doses to presentation doses
+    final doses = scheduleState.doses.map((d) => d.toPresentation()).toList();
+
+    // Group doses by time group
+    final groupedDoses = <DoseTimeGroup, List<PresentationDose>>{
+      for (final g in DoseTimeGroup.values) g: [],
+    };
+    for (final d in doses) {
+      groupedDoses[d.group]?.add(d);
+    }
+
+    final totalCount = doses.length;
+    final takenCount = doses.where((d) => d.status == DoseStatus.taken).length;
+    final skippedCount = doses.where((d) => d.status == DoseStatus.skipped).length;
+
+    final failedToLoad =
+        scheduleState.error != null && !scheduleState.isLoading && doses.isEmpty;
 
     return Scaffold(
-      backgroundColor: bgPage,
+      backgroundColor: context.bg,
       body: RefreshIndicator(
-        onRefresh: () => ref.read(scheduleProvider.notifier).load(),
+        onRefresh: () => ref.read(scheduleProvider.notifier).load(date: _selectedDate),
         child: CustomScrollView(
-        slivers: [
-          // ── App bar ───────────────────────────────────────────────────────
-          AppSliverAppBar(
-            config: AppBarConfig(
-              title: AppStrings.doseSchedule,
-              subtitle: 'Track and manage your daily doses',
-              backgroundColor: bgPage,
-              actions: [
-                AppIconButton(
-                  icon: const Icon(Icons.alarm_rounded),
-                  iconSize: 20,
-                  color: AppColors.amber,
-                  size: 36,
-                  borderColor: context.borderCol,
-                  backgroundColor: context.cardBg,
-                  borderRadius: BorderRadius.circular(10),
-                  onPressed: _openManageSchedules,
-                  tooltip: AppStrings.manageSchedules,
-                ),
-                const SizedBox(width: 8),
-                AppIconButton(
-                  icon: const Icon(Icons.add_rounded),
-                  iconSize: 20,
-                  color: AppColors.teal,
-                  size: 36,
-                  borderColor: context.borderCol,
-                  backgroundColor: context.cardBg,
-                  borderRadius: BorderRadius.circular(10),
-                  onPressed: _openAddDose,
-                  tooltip: 'Add dose',
-                ),
-              ],
+          slivers: [
+            // AppBar
+            AppSliverAppBar(
+              config: AppBarConfig(
+                title: AppStrings.schedule,
+                subtitle: "Manage your medication schedule",
+                leading: widget.standalone ? AppBarLeading.back : AppBarLeading.menu,
+                actions: [
+                  AppIconButton(
+                    icon: const Icon(Icons.settings_outlined),
+                    iconSize: 20,
+                    size: 36,
+                    color: textColor,
+                    borderColor: context.borderCol,
+                    backgroundColor: context.cardBg,
+                    borderRadius: AppBorderRadius.mdAll,
+                    onPressed: _openManageSchedules,
+                    tooltip: 'Manage schedules',
+                  ),
+                  const SizedBox(width: 8),
+                  AppIconButton(
+                    icon: const Icon(Icons.add_rounded),
+                    iconSize: 20,
+                    size: 36,
+                    color: Colors.white,
+                    backgroundColor: AppColors.teal,
+                    borderColor: AppColors.teal,
+                    borderRadius: AppBorderRadius.mdAll,
+                    onPressed: _openAddDose,
+                    tooltip: AppStrings.addDose,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
             ),
-          ),
 
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Month header with prev/next ──────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 12, 0),
-                  child: Row(
+            // Date Strip
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: ScheduleDateStrip(
+                  selectedDate: _selectedDate,
+                  onDateSelected: _onDateSelected,
+                  onMonthChanged: _onMonthChanged,
+                ),
+              ),
+            ),
+
+            // Offline / Sync warning banner if offline
+            if (scheduleState.isOffline)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: OfflineBanner(),
+                ),
+              ),
+
+            // Summary chips
+            SliverToBoxAdapter(
+              child: ScheduleSummaryChips(
+                totalCount: totalCount,
+                takenCount: takenCount,
+                skippedCount: skippedCount,
+              ),
+            ),
+
+            // Dose List Body
+            if (failedToLoad)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: AppEmptyState(
+                    icon: Icons.calendar_today_rounded,
+                    title: 'Could not load schedule',
+                    subtitle: scheduleState.error,
+                    actionLabel: 'Retry',
+                    action: () =>
+                        ref.read(scheduleProvider.notifier).load(date: _selectedDate),
+                  ),
+                ),
+              )
+            else if (scheduleState.isLoading && doses.isEmpty)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
                     children: [
-                      Text(
-                        _monthLabel(_visibleMonth),
-                        style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w800,
-                          color: textColor, letterSpacing: -0.3,
-                        ),
-                      ),
-                      const Spacer(),
-                      _MonthArrow(
-                        icon: Icons.chevron_left_rounded,
-                        onTap: () => _changeMonth(-1),
-                        border: border,
-                        textColor: textColor,
-                      ),
-                      const SizedBox(width: 8),
-                      _MonthArrow(
-                        icon: Icons.chevron_right_rounded,
-                        onTap: () => _changeMonth(1),
-                        border: border,
-                        textColor: textColor,
-                      ),
+                      AppCardSkeleton(height: 70),
+                      SizedBox(height: 12),
+                      AppCardSkeleton(height: 70),
+                      SizedBox(height: 12),
+                      AppCardSkeleton(height: 70),
                     ],
                   ),
                 ),
-                const SizedBox(height: 4),
-
-                // ── Date strip ──────────────────────────────────────────────
-                SizedBox(
-                  height: 96,
-                  child: ListView.builder(
-                    controller: _stripController,
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: _days.length,
-                    itemBuilder: (_, i) {
-                      final day = _days[i];
-                      final selected = DateFormatter.isSameDay(day, _selectedDate);
-                      final isToday = _isToday(day);
-                      return GestureDetector(
-                        onTap: () => _selectDate(day),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                          margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 8),
-                          width: 50,
-                          padding: const EdgeInsets.symmetric(vertical: 7),
-                          decoration: BoxDecoration(
-                            // Selected day floats in a soft pill outline.
-                            color: selected
-                                ? AppColors.teal.withValues(alpha: 0.06)
-                                : Colors.transparent,
-                            borderRadius: AppBorderRadius.pill,
-                            border: Border.all(
-                              color: selected
-                                  ? AppColors.teal.withValues(alpha: 0.5)
-                                  : Colors.transparent,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                ['M','T','W','T','F','S','S'][day.weekday - 1],
-                                style: TextStyle(
-                                  fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2,
-                                  color: selected
-                                      ? AppColors.teal
-                                      : isToday ? AppColors.teal : secondary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              // Date inside a circle — gradient fill when selected.
-                              Container(
-                                width: 34,
-                                height: 34,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: selected
-                                      ? const LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [AppColors.teal, AppColors.blue],
-                                        )
-                                      : null,
-                                  color: selected
-                                      ? null
-                                      : isToday
-                                          ? AppColors.teal.withValues(alpha: 0.12)
-                                          : (isDark
-                                              ? context.inputBg
-                                              : AppColors.teal.withValues(alpha: 0.05)),
-                                  border: selected
-                                      ? null
-                                      : Border.all(
-                                          color: isToday
-                                              ? AppColors.teal
-                                              : AppColors.teal.withValues(alpha: 0.55),
-                                          width: 1.5,
-                                        ),
-                                ),
-                                child: Text('${day.day}',
-                                    style: TextStyle(
-                                      fontSize: 15, fontWeight: FontWeight.w800,
-                                      color: selected
-                                          ? Colors.white
-                                          : isToday ? AppColors.teal : textColor.withValues(alpha: 0.7),
-                                    )),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+              )
+            else if (doses.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: AppEmptyStateText(
+                    icon: Icons.calendar_today_rounded,
+                    title: 'No doses scheduled',
+                    subtitle: 'No doses scheduled for this date.',
+                    actionLabel: AppStrings.addDose,
+                    onAction: _openAddDose,
                   ),
                 ),
-
-                // ── Selected-date label ──────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.event_note_rounded, size: 15, color: AppColors.teal),
-                      const SizedBox(width: 6),
-                      Text(
-                        _fmtSelectedDate(_selectedDate),
-                        style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700,
-                          color: textColor, letterSpacing: -0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Summary chips ────────────────────────────────────────────
-                if (_doses.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    child: Wrap(
-                      spacing: 8, runSpacing: 8,
-                      children: [
-                        if (takenCount > 0)
-                          _SummaryChip(Icons.check_rounded, '$takenCount ${AppStrings.taken}', AppColors.green),
-                        if (pendingCount > 0)
-                          _SummaryChip(Icons.hourglass_bottom_rounded, '$pendingCount ${AppStrings.pending}', AppColors.amber),
-                        if (skippedCount > 0)
-                          _SummaryChip(Icons.close_rounded, '$skippedCount ${AppStrings.skip}', AppColors.error),
-                      ],
-                    ),
-                  ),
-
-                const SizedBox(height: 16),
-
-                // ── Dose timeline by group ────────────────────────────────────
-                if (ref.watch(scheduleProvider).isLoading)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: List.generate(4, (_) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: AppSkeleton(
-                          child: Container(
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: bgCard,
-                              borderRadius: AppBorderRadius.lgAll,
-                            ),
-                          ),
-                        ),
-                      )),
-                    ),
-                  )
-                else if (_grouped.isEmpty)
-                  _EmptyDoses(isDark: isDark, secondary: secondary, textColor: textColor, onAdd: _openAddDose)
-                else
-                  ...() {
-                    final grouped = _grouped;
-                    return grouped.entries.map((entry) {
-                      final meta = _groupMeta[entry.key]!;
-                      return _GroupSection(
-                        group: entry.key,
-                        range: meta.range,
-                        icon: meta.icon,
-                        color: meta.color,
-                        doses: entry.value,
-                        onMark: _mark,
-                        bgCard: bgCard,
-                        border: border,
+              )
+            else
+              SliverList(
+                delegate: SliverChildListDelegate([
+                  for (final group in DoseTimeGroup.values)
+                    if ((groupedDoses[group] ?? []).isNotEmpty)
+                      ScheduleGroupSection(
+                        group: group,
+                        doses: groupedDoses[group]!,
+                        onMark: (id, status) => _markDose(id, status),
                         textColor: textColor,
-                        secondary: secondary,
-                      );
-                    });
-                  }(),
-
-                const SizedBox(height: 32),
-              ],
-            ),
-          ),
-        ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Month nav arrow ──────────────────────────────────────────────────────────
-
-class _MonthArrow extends StatelessWidget {
-  const _MonthArrow({
-    required this.icon,
-    required this.onTap,
-    required this.border,
-    required this.textColor,
-  });
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color border;
-  final Color textColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: AppBorderRadius.mdAll,
-          border: Border.all(color: border),
-        ),
-        child: Icon(icon, size: 20, color: textColor),
-      ),
-    );
-  }
-}
-
-// ─── Summary chip ─────────────────────────────────────────────────────────────
-
-class _SummaryChip extends StatelessWidget {
-  const _SummaryChip(this.icon, this.label, this.color);
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: AppBorderRadius.pill,
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-class _EmptyDoses extends StatelessWidget {
-  const _EmptyDoses({required this.isDark, required this.secondary, required this.textColor, required this.onAdd});
-  final bool isDark;
-  final Color secondary;
-  final Color textColor;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        decoration: BoxDecoration(
-          borderRadius: AppBorderRadius.xlAll,
-          border: Border.all(
-            color: isDark ? context.borderCol : const Color(0xFFE2E8F0),
-            style: BorderStyle.solid,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.medication_outlined, size: 36, color: secondary),
-            const SizedBox(height: 12),
-            Text(AppStrings.noMedicinesYet,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
-            const SizedBox(height: 4),
-            AppText.bodySm('No doses scheduled for this day.', color: secondary),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Add Dose Schedule'),
-              onPressed: onAdd,
-            ),
+                        secondaryColor: secondaryColor,
+                      ),
+                  const SizedBox(height: 32),
+                ]),
+              ),
           ],
         ),
       ),
     );
   }
-}
-
-// ─── Time group section ───────────────────────────────────────────────────────
-
-class _GroupSection extends StatelessWidget {
-  const _GroupSection({
-    required this.group,
-    required this.range,
-    required this.icon,
-    required this.color,
-    required this.doses,
-    required this.onMark,
-    required this.bgCard,
-    required this.border,
-    required this.textColor,
-    required this.secondary,
-  });
-
-  final String group;
-  final String range;
-  final IconData icon;
-  final Color color;
-  final List<_Dose> doses;
-  final void Function(String, _DoseStatus) onMark;
-  final Color bgCard;
-  final Color border;
-  final Color textColor;
-  final Color secondary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Group header
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Icon(icon, size: 14, color: color),
-                const SizedBox(width: 6),
-                AppText.bodySm(group, color: color, fontWeight: FontWeight.w700),
-                const SizedBox(width: 6),
-                AppText.bodyXs(range, color: secondary),
-              ],
-            ),
-          ),
-          // Dose cards
-          Container(
-            decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: AppBorderRadius.xlAll,
-              border: Border.all(color: border),
-            ),
-            child: Column(
-              children: List.generate(doses.length, (i) {
-                final dose = doses[i];
-                final isLast = i == doses.length - 1;
-                return Column(children: [
-                  _DoseRow(
-                    dose: dose,
-                    onTake: () => onMark(dose.id, _DoseStatus.taken),
-                    onSkip: () => onMark(dose.id, _DoseStatus.skipped),
-                    textColor: textColor,
-                    secondary: secondary,
-                  ),
-                  if (!isLast) Divider(height: 1, color: border),
-                ]);
-              }),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Dose row ─────────────────────────────────────────────────────────────────
-
-class _DoseRow extends StatelessWidget {
-  const _DoseRow({
-    required this.dose,
-    required this.onTake,
-    required this.onSkip,
-    required this.textColor,
-    required this.secondary,
-  });
-
-  final _Dose dose;
-  final VoidCallback onTake;
-  final VoidCallback onSkip;
-  final Color textColor;
-  final Color secondary;
-
-  @override
-  Widget build(BuildContext context) {
-    final (statusColor, statusLabel) = switch (dose.status) {
-      _DoseStatus.taken   => (AppColors.green, AppStrings.taken),
-      _DoseStatus.skipped => (AppColors.amber, AppStrings.skip),
-      _DoseStatus.pending => (AppColors.textHint, AppStrings.pending),
-    };
-
-    // Format "08:00" → "8:00 AM"
-    final parts = dose.time.split(':');
-    final h = int.parse(parts[0]);
-    final m = parts[1];
-    final timeLabel = '${h > 12 ? h - 12 : h == 0 ? 12 : h}:$m ${h >= 12 ? 'PM' : 'AM'}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      child: Row(
-        children: [
-          // Time
-          SizedBox(
-            width: 48,
-            child: AppText.bodyXs(timeLabel, color: secondary, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 10),
-
-          // Pill icon
-          Container(
-            width: 34, height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.teal.withValues(alpha: 0.10),
-              borderRadius: AppBorderRadius.smAll,
-            ),
-            child: const Icon(Icons.medication_rounded, size: 17, color: AppColors.teal),
-          ),
-          const SizedBox(width: 10),
-
-          // Name + detail
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppText.labelMd(dose.name, color: textColor, overflow: TextOverflow.ellipsis),
-                AppText.bodyXs('${dose.unit} · ${_foodLabel(dose.foodTiming)}', color: secondary),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Status / actions
-          if (dose.status == _DoseStatus.pending) ...[
-            _ActionBtn(Icons.check_rounded, AppColors.green, onTake),
-            const SizedBox(width: 6),
-            _ActionBtn(Icons.close_rounded, AppColors.amber, onSkip),
-          ] else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: AppBorderRadius.pill,
-              ),
-              child: Text(statusLabel,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionBtn extends StatelessWidget {
-  const _ActionBtn(this.icon, this.color, this.onTap);
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 34, height: 34,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: AppBorderRadius.smAll,
-        ),
-        child: Icon(icon, size: 16, color: color),
-      ),
-    );
-  }
-}
-
-// ─── Celebration overlay ──────────────────────────────────────────────────────
-
-class _CelebrationOverlay extends StatefulWidget {
-  final VoidCallback onDone;
-  const _CelebrationOverlay({required this.onDone});
-
-  @override
-  State<_CelebrationOverlay> createState() => _CelebrationOverlayState();
-}
-
-class _CelebrationOverlayState extends State<_CelebrationOverlay>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final List<_Particle> _particles;
-  final _rng = math.Random();
-
-  static const _colors = [
-    AppColors.teal,
-    AppColors.green,
-    AppColors.amber,
-    AppColors.blue,
-    AppColors.purple,
-    AppColors.pink,
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
-      ..addStatusListener((s) {
-        if (s == AnimationStatus.completed) widget.onDone();
-      })
-      ..forward();
-
-    _particles = List.generate(28, (i) => _Particle(
-      x: _rng.nextDouble(),
-      y: 0.45 + _rng.nextDouble() * 0.2,
-      vx: (_rng.nextDouble() - 0.5) * 0.6,
-      vy: -0.3 - _rng.nextDouble() * 0.5,
-      color: _colors[i % _colors.length],
-      size: 6 + _rng.nextDouble() * 8,
-      rotation: _rng.nextDouble() * math.pi * 2,
-      rotSpeed: (_rng.nextDouble() - 0.5) * 6,
-      shape: _rng.nextBool(),
-    ));
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, __) {
-          final t = _ctrl.value;
-          final fadeOut = t > 0.7 ? 1.0 - ((t - 0.7) / 0.3) : 1.0;
-          return Stack(
-            children: [
-              // Particles
-              ..._particles.map((p) {
-                final px = (p.x + p.vx * t) * size.width;
-                final py = (p.y + p.vy * t + 0.5 * 0.8 * t * t) * size.height;
-                final opacity = (fadeOut * (1.0 - t * 0.5)).clamp(0.0, 1.0);
-                return Positioned(
-                  left: px - p.size / 2,
-                  top: py - p.size / 2,
-                  child: Opacity(
-                    opacity: opacity,
-                    child: Transform.rotate(
-                      angle: p.rotation + p.rotSpeed * t,
-                      child: p.shape
-                          ? Container(
-                              width: p.size,
-                              height: p.size,
-                              decoration: BoxDecoration(
-                                color: p.color,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            )
-                          : Container(
-                              width: p.size * 0.6,
-                              height: p.size,
-                              decoration: BoxDecoration(
-                                color: p.color,
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                            ),
-                    ),
-                  ),
-                );
-              }),
-
-              // Central checkmark burst
-              if (t < 0.6)
-                Center(
-                  child: Opacity(
-                    opacity: (t < 0.3
-                        ? t / 0.3
-                        : t < 0.5
-                            ? 1.0
-                            : 1.0 - ((t - 0.5) / 0.1)).clamp(0.0, 1.0),
-                    child: Transform.scale(
-                      scale: t < 0.25
-                          ? Curves.elasticOut.transform(t / 0.25) * 1.1
-                          : 1.0,
-                      child: Container(
-                        width: 80, height: 80,
-                        decoration: BoxDecoration(
-                          color: AppColors.green.withValues(alpha: 0.92),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.green.withValues(alpha: 0.5),
-                              blurRadius: 24,
-                              spreadRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Particle {
-  final double x, y, vx, vy, size, rotation, rotSpeed;
-  final Color color;
-  final bool shape; // true = square, false = oval
-
-  const _Particle({
-    required this.x, required this.y,
-    required this.vx, required this.vy,
-    required this.color, required this.size,
-    required this.rotation, required this.rotSpeed,
-    required this.shape,
-  });
 }

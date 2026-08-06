@@ -4,7 +4,7 @@ import '../../../core/theme/app_border_radius.dart';
 import '../../../core/extensions/context_extensions.dart';
 import '../texts/app_text.dart';
 
-/// Tappable time input that opens the system time picker.
+/// Tappable time input that opens a themed system time picker.
 class AppTimePickerInput extends StatefulWidget {
   const AppTimePickerInput({
     super.key,
@@ -13,9 +13,15 @@ class AppTimePickerInput extends StatefulWidget {
     this.error,
     this.helper,
     this.initialTime,
+    this.value,
     this.onChanged,
     this.enabled = true,
     this.use24HourFormat = false,
+    this.backgroundColor,
+    this.borderColor,
+    this.borderRadius,
+    this.padding,
+    this.icon,
   });
 
   final String? label;
@@ -23,9 +29,15 @@ class AppTimePickerInput extends StatefulWidget {
   final String? error;
   final String? helper;
   final TimeOfDay? initialTime;
+  final TimeOfDay? value;
   final ValueChanged<TimeOfDay>? onChanged;
   final bool enabled;
   final bool use24HourFormat;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final BorderRadius? borderRadius;
+  final EdgeInsetsGeometry? padding;
+  final Widget? icon;
 
   @override
   State<AppTimePickerInput> createState() => _AppTimePickerInputState();
@@ -33,6 +45,8 @@ class AppTimePickerInput extends StatefulWidget {
 
 class _AppTimePickerInputState extends State<AppTimePickerInput> {
   TimeOfDay? _selected;
+
+  TimeOfDay? get _effectiveValue => widget.value ?? _selected;
 
   @override
   void initState() {
@@ -61,7 +75,26 @@ class _AppTimePickerInputState extends State<AppTimePickerInput> {
   Future<void> _pick() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: _selected ?? TimeOfDay.now(),
+      initialTime: _effectiveValue ?? TimeOfDay.now(),
+      builder: (ctx, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: AppColors.teal,
+            surface: context.cardBg,
+            onSurface: context.primaryText,
+          ),
+          timePickerTheme: TimePickerThemeData(
+            backgroundColor: context.cardBg,
+            hourMinuteColor: context.inputBg,
+            hourMinuteTextColor: context.primaryText,
+            dialBackgroundColor: context.inputBg,
+            dialHandColor: AppColors.teal,
+            dialTextColor: context.primaryText,
+            entryModeIconColor: AppColors.teal,
+          ),
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) {
       setState(() => _selected = picked);
@@ -72,7 +105,10 @@ class _AppTimePickerInputState extends State<AppTimePickerInput> {
   @override
   Widget build(BuildContext context) {
     final hasError  = widget.error != null && widget.error!.isNotEmpty;
-    final borderCol = hasError ? AppColors.error : context.borderCol;
+    final borderCol = widget.borderColor ?? (hasError ? AppColors.error : context.borderCol);
+    final bgCol     = widget.backgroundColor ?? context.inputBg;
+    final br        = widget.borderRadius ?? AppBorderRadius.mdAll;
+    final val       = _effectiveValue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,36 +121,38 @@ class _AppTimePickerInputState extends State<AppTimePickerInput> {
           color: Colors.transparent,
           child: InkWell(
             onTap: widget.enabled ? _pick : null,
-            borderRadius: AppBorderRadius.mdAll,
+            borderRadius: br,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: BoxDecoration(
-                color: context.inputBg,
-                borderRadius: AppBorderRadius.mdAll,
+                color: bgCol,
+                borderRadius: br,
                 border: Border.all(color: borderCol),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.access_time_rounded,
-                    size: 18,
-                    color: widget.enabled
-                        ? AppColors.textSecondary
-                        : AppColors.textSecondary.withValues(alpha: 0.5),
-                  ),
+                  widget.icon ??
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 18,
+                        color: widget.enabled
+                            ? AppColors.textSecondary
+                            : AppColors.textSecondary.withValues(alpha: 0.5),
+                      ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: AppText.bodyMd(
-                      _selected != null
-                          ? _format(_selected!)
-                          : (widget.hint ?? 'Select time'),
-                      color: _selected != null
+                      val != null ? _format(val) : (widget.hint ?? 'Select time'),
+                      color: val != null
                           ? (widget.enabled ? null : AppColors.textSecondary)
                           : AppColors.textHint,
                     ),
                   ),
-                  const Icon(Icons.keyboard_arrow_down_rounded,
-                      size: 18, color: AppColors.textSecondary),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ),
             ),
