@@ -106,10 +106,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     showManageSchedulesSheet(context);
   }
 
-  String _fmtSelectedDateHeader(DateTime d) {
-    if (DateFormatter.isSameDay(d, DateTime.now())) return 'Today';
-    return DateFormatter.weekdayMonthDay(d);
-  }
 
   @override
   Widget build(BuildContext context) {
