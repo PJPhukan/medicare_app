@@ -12,6 +12,22 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
   Future<EmergencyProfileEntity?> getProfile() => _ds.getProfile();
 
   @override
+  Future<EmergencyProfileEntity> updateProfile({
+    String? bloodGroup,
+    List<String> allergies = const [],
+    List<String> medications = const [],
+    List<String> conditions = const [],
+    String? notes,
+  }) =>
+      _ds.updateProfile(
+        bloodGroup: bloodGroup,
+        allergies: allergies,
+        medications: medications,
+        conditions: conditions,
+        notes: notes,
+      );
+
+  @override
   Future<List<EmergencyContactEntity>> getContacts() async {
     final List<EmergencyContactEntity> list = await _ds.getContacts();
     return list;

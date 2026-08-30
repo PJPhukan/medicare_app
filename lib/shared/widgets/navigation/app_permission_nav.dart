@@ -16,18 +16,18 @@ class NavPermissions {
   static const guest = NavPermissions(allowed: {'home', 'professionals'});
   static const patient = NavPermissions(allowed: {
     'home', 'medicines', 'vitals', 'schedule', 'professionals',
-    'messages', 'notifications', 'profile', 'community', 'insights',
-    'alerts', 'notes', 'emergency', 'support',
+    'messages', 'notifications', 'profile',
+    'alerts', 'emergency',
   });
   static const professionalUser = NavPermissions(allowed: {
     'home', 'medicines', 'vitals', 'schedule', 'professionals',
     'connections', 'messages', 'notifications',
-    'profile', 'community', 'insights', 'alerts', 'patients', 'reports',
-    'notes', 'emergency', 'support',
+    'profile', 'alerts', 'patients', 'reports',
+    'emergency',
   });
   static const caretaker = NavPermissions(allowed: {
     'home', 'patients', 'caretakers', 'schedule', 'messages',
-    'notifications', 'profile', 'support',
+    'notifications', 'profile',
   });
 }
 

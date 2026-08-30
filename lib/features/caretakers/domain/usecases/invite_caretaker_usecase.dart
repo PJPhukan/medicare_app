@@ -1,3 +1,4 @@
+import '../entities/caretaker_entity.dart';
 import '../repositories/caretakers_repository.dart';
 
 class InviteCaretakerUseCase {
@@ -5,14 +6,20 @@ class InviteCaretakerUseCase {
 
   final CaretakersRepository _repo;
 
-  Future<void> call({
-    required String phone,
-    required String relationshipId,
-    required List<String> permissions,
+  Future<InviteCaretakerResult> call({
+    required String name,
+    String? phone,
+    String? email,
+    required GranteeRole role,
+    required List<String> patientIds,
+    DateTime? expiresAt,
   }) =>
       _repo.inviteCaretaker(
+        name: name,
         phone: phone,
-        relationshipId: relationshipId,
-        permissions: permissions,
+        email: email,
+        role: role,
+        patientIds: patientIds,
+        expiresAt: expiresAt,
       );
 }

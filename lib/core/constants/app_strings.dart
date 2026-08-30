@@ -621,19 +621,6 @@ static const noCountriesFound     = 'No countries found';
   static const relationship = 'Relationship';
   static const addRelationship = 'Add Relationship';
 
-  // ─── Community ──────────────────────────────────────────────────────────────
-  static const community = 'Community';
-  static const posts = 'Posts';
-  static const createPost = 'Create Post';
-  static const noPosts = 'No posts yet';
-  static const like = 'Like';
-  static const likes = 'Likes';
-  static const comment = 'Comment';
-  static const comments = 'Comments';
-  static const reply = 'Reply';
-  static const reportPost = 'Report Post';
-  static const whatsOnYourMind = "What's on your mind?";
-
   // ─── Alerts ─────────────────────────────────────────────────────────────────
   static const alerts = 'Alerts';
   static const myAlerts = 'My Alerts';
@@ -643,13 +630,6 @@ static const noCountriesFound     = 'No countries found';
   static const threshold = 'Threshold';
   static const alertEnabled = 'Alert enabled';
   static const alertDisabled = 'Alert disabled';
-
-  // ─── Insights ───────────────────────────────────────────────────────────────
-  static const insights = 'Insights';
-  static const healthInsights = 'Health Insights';
-  static const noInsights = 'No insights yet';
-  static const weeklyReport = 'Weekly Report';
-  static const monthlyReport = 'Monthly Report';
 
   // ─── Reports ────────────────────────────────────────────────────────────────
   static const reports = 'Reports';
@@ -676,16 +656,6 @@ static const noCountriesFound     = 'No countries found';
   static const myReports = 'My Reports';
   static const selectReportToPreview = 'Tap a report to view details';
 
-  // ─── Notes ──────────────────────────────────────────────────────────────────
-  static const myNotes = 'My Notes';
-  static const addNote = 'Add Note';
-  static const editNote = 'Edit Note';
-  static const noteTitle = 'Title';
-  static const noteContent = 'Content';
-  static const noNotes = 'No notes yet';
-  static const noteDeleted = 'Note deleted';
-  static const noteSaved = 'Note saved';
-
   // ─── Emergency ──────────────────────────────────────────────────────────────
   static const emergency = 'Emergency';
   static const callEmergency = 'Call Emergency';
@@ -694,12 +664,6 @@ static const noCountriesFound     = 'No countries found';
   static const sos = 'SOS';
   static const callNow = 'Call Now';
 
-  // ─── Support ────────────────────────────────────────────────────────────────
-  static const support = 'Support';
-  static const helpCenter = 'Help Center';
-  static const contactUs = 'Contact Us';
-  static const faq = 'FAQ';
-  static const reportBug = 'Report a Bug';
   static const feedbackTitle = 'Send Feedback';
 
   // ─── Errors & States ────────────────────────────────────────────────────────
@@ -770,6 +734,11 @@ static const noCountriesFound     = 'No countries found';
   static const deleteContactBody    = 'They will no longer be notified when you trigger SOS.';
   static const emergencySubtitle2   = 'SOS · Critical health info · Emergency contacts';
   static const callDirect           = 'Call emergency services directly if needed.';
+  static const editHealthProfile    = 'Edit health profile';
+  static const bloodGroupHint       = 'e.g. O+, AB-';
+  static const criticalMedsHint     = 'Type a medication and press +';
+  static const notesLabel           = 'Notes for responders';
+  static const notesHint            = 'Anything else a responder should know';
 
   // ─── Professionals — connect / connections flow ─────────────────────────────
   static const selectPlanTitle         = 'Choose a Plan';
@@ -809,13 +778,6 @@ static const noCountriesFound     = 'No countries found';
   static const connectionAccepted      = 'Connection accepted!';
   static const connectionDeclined      = 'Declined';
   static const searchConnections       = 'Search connections…';
-
-  // ─── Notes ──────────────────────────────────────────────────────────────────
-  static const searchNotes         = 'Search notes…';
-  static const untitledNote        = 'Untitled Note';
-  static const noteColourLabel     = 'Note colour';
-  static const tapToEdit           = 'Tap to edit…';
-  static const deleteNoteConfirm   = 'Delete this note? This cannot be undone.';
 
   // ─── Insights ───────────────────────────────────────────────────────────────
   static const todaysAdherence     = "Today's Adherence";
@@ -925,14 +887,14 @@ static const noCountriesFound     = 'No countries found';
   static const deletePrescriptionConfirm = 'Delete this prescription?';
 
   // ─── Patients ────────────────────────────────────────────────────────────────
-  static const noPatientsDesc       = 'Patients who grant you access will appear here';
+  static const noPatientsDesc       = 'Add a family member or dependent to manage their medicines and care here';
   static const patientSince         = 'Patient since';
   static const viewPatientHistory   = 'View History';
   static const accessLevel          = 'Access Level';
   static const fullAccess           = 'Full Access';
   static const readOnly             = 'Read Only';
   static const removePatient        = 'Remove Patient';
-  static const removePatientConfirm = 'Remove this patient? They can re-invite you later.';
+  static const removePatientConfirm = 'Remove this patient? You can add them again later.';
   static const patientRemoved       = 'Patient removed';
 
   // ─── Caretakers ──────────────────────────────────────────────────────────────
@@ -950,27 +912,21 @@ static const noCountriesFound     = 'No countries found';
   static const permViewMeds         = 'View Medicines';
   static const permViewReports      = 'View Reports';
   static const permViewSchedule     = 'View Schedule';
+  static const inviteCaretakerTitle = 'Invite Caretaker';
+  static const caretakerAdded       = 'Caretaker added';
+  static const pendingInvites       = 'Pending Invites';
+  static const invitePending        = 'Pending';
+  static const cancelInvite         = 'Cancel Invite';
+  static const cancelInviteConfirm  = 'Cancel this pending invite?';
+  static const inviteCancelled      = 'Invite cancelled';
+  static const managePermissions    = 'Manage Permissions';
+  static const roleCaretaker        = 'Caretaker';
+  static const roleFamily           = 'Family';
+  static const noPermissionsAvailable = 'No grantable permissions configured yet';
+  static const permissionUpdateFailed = 'Could not update permission';
 
-  // ─── Support ─────────────────────────────────────────────────────────────────
-  static const contactSupport       = 'Contact Support';
-  static const submitTicket         = 'Submit a Ticket';
-  static const ticketSubject        = 'Subject';
-  static const ticketSubjectHint    = 'Briefly describe your issue';
-  static const ticketMessage        = 'Message';
-  static const ticketMessageHint    = 'Describe the issue in detail…';
-  static const ticketCategory       = 'Category';
-  static const ticketSubmitted      = 'Ticket submitted! We\'ll respond within 24h.';
-  static const submitTicketBtn      = 'Send Message';
   static const feedbackHint         = 'Tell us what you think…';
   static const feedbackSubmitted    = 'Thanks for your feedback!';
-  static const termsOfService       = 'Terms of Service';
-  static const appVersion           = 'App Version';
-  static const rateApp              = 'Rate MediForze';
-  static const followUs             = 'Follow Us';
-  static const catBug               = 'Bug Report';
-  static const catFeature           = 'Feature Request';
-  static const catAccount           = 'Account Issue';
-  static const catOtherTicket       = 'Other';
 
   // ─── Professional Profile ─────────────────────────────────────────────────────
   static const professionalProfile  = 'Professional Profile';

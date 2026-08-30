@@ -8,23 +8,58 @@ class CaretakersRepositoryImpl implements CaretakersRepository {
   final CaretakersRemoteDataSource _ds;
 
   @override
-  Future<List<CaretakerEntity>> getCaretakers() async {
-    final List<CaretakerEntity> list = await _ds.getCaretakers();
-    return list;
-  }
+  Future<List<CaretakerEntity>> getCaretakers() => _ds.getCaretakers();
 
   @override
-  Future<void> inviteCaretaker({
-    required String phone,
-    required String relationshipId,
-    required List<String> permissions,
+  Future<List<PendingCaretakerInviteEntity>> getPendingInvites() => _ds.getPendingInvites();
+
+  @override
+  Future<List<GrantableTabEntity>> getGrantableTabs() => _ds.getGrantableTabs();
+
+  @override
+  Future<List<ManageablePatientEntity>> getManageablePatients() => _ds.getManageablePatients();
+
+  @override
+  Future<InviteCaretakerResult> inviteCaretaker({
+    required String name,
+    String? phone,
+    String? email,
+    required GranteeRole role,
+    required List<String> patientIds,
+    DateTime? expiresAt,
   }) =>
       _ds.inviteCaretaker(
+        name: name,
         phone: phone,
-        relationshipId: relationshipId,
-        permissions: permissions,
+        email: email,
+        role: role,
+        patientIds: patientIds,
+        expiresAt: expiresAt,
       );
 
   @override
-  Future<void> removeCaretaker(String id) => _ds.removeCaretaker(id);
+  Future<void> cancelInvite(String inviteId) => _ds.cancelInvite(inviteId);
+
+  @override
+  Future<void> revokeCaretaker(String relationshipId) => _ds.revokeCaretaker(relationshipId);
+
+  @override
+  Future<void> saveTabGrant({
+    required String relationshipId,
+    required String tabId,
+    required bool opView,
+    required bool opAdd,
+    required bool opEdit,
+    required bool opDelete,
+    required bool opShare,
+  }) =>
+      _ds.saveTabGrant(
+        relationshipId: relationshipId,
+        tabId: tabId,
+        opView: opView,
+        opAdd: opAdd,
+        opEdit: opEdit,
+        opDelete: opDelete,
+        opShare: opShare,
+      );
 }

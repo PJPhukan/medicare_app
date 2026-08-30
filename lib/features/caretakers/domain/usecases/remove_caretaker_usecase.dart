@@ -5,5 +5,5 @@ class RemoveCaretakerUseCase {
 
   final CaretakersRepository _repo;
 
-  Future<void> call(String id) => _repo.removeCaretaker(id);
+  Future<void> call(String relationshipId) => _repo.revokeCaretaker(relationshipId);
 }

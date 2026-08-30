@@ -11,6 +11,7 @@ import '../../domain/usecases/add_contact_usecase.dart';
 import '../../domain/usecases/delete_contact_usecase.dart';
 import '../../domain/usecases/fetch_contacts_usecase.dart';
 import '../../domain/usecases/update_contact_usecase.dart';
+import '../../domain/usecases/update_profile_usecase.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 final _emergencyDsProvider = Provider<EmergencyRemoteDataSource>(
@@ -49,8 +50,8 @@ class _EmergencyState {
 }
 
 class _EmergencyNotifier extends StateNotifier<_EmergencyState> {
-  _EmergencyNotifier(
-      this._fetch, this._fetchProfile, this._add, this._update, this._delete)
+  _EmergencyNotifier(this._fetch, this._fetchProfile, this._add, this._update,
+      this._delete, this._updateProfile)
       : super(const _EmergencyState()) {
     load();
   }
@@ -60,6 +61,7 @@ class _EmergencyNotifier extends StateNotifier<_EmergencyState> {
   final AddContactUseCase _add;
   final UpdateContactUseCase _update;
   final DeleteContactUseCase _delete;
+  final UpdateProfileUseCase _updateProfile;
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true);
@@ -132,6 +134,31 @@ class _EmergencyNotifier extends StateNotifier<_EmergencyState> {
     }
   }
 
+  Future<void> updateProfile({
+    String? bloodGroup,
+    List<String> allergies = const [],
+    List<String> medications = const [],
+    List<String> conditions = const [],
+    String? notes,
+  }) async {
+    AppLogger.i('Emergency profile update', tag: 'Emergency');
+    try {
+      final updated = await _updateProfile(
+        bloodGroup: bloodGroup,
+        allergies: allergies,
+        medications: medications,
+        conditions: conditions,
+        notes: notes,
+      );
+      if (!mounted) return;
+      state = state.copyWith(profile: updated);
+      AppLogger.i('Emergency profile updated ✓', tag: 'Emergency');
+    } catch (e, s) {
+      AppLogger.e('Emergency profile update failed', tag: 'Emergency', error: e, stack: s);
+      rethrow;
+    }
+  }
+
   static List<EmergencyContactEntity> _sorted(List<EmergencyContactEntity> list) =>
       [...list]..sort((a, b) => a.priority.compareTo(b.priority));
 
@@ -160,5 +187,6 @@ final emergencyProvider =
     AddContactUseCase(repo),
     UpdateContactUseCase(repo),
     DeleteContactUseCase(repo),
+    UpdateProfileUseCase(repo),
   );
 });

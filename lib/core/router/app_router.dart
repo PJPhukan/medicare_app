@@ -26,9 +26,6 @@ import '../../features/professionals/presentation/screens/pro_hub_screen.dart';
 import '../../features/professionals/presentation/screens/service_areas_screen.dart';
 import '../../features/professionals/presentation/screens/payout_details_screen.dart';
 import '../../features/premium/presentation/screens/subscription_management_screen.dart';
-import '../../features/support/presentation/screens/support_screen.dart';
-import '../../features/support/presentation/screens/submit_ticket_screen.dart';
-import '../../features/support/presentation/screens/help_center_screen.dart';
 import '../../features/schedule/presentation/screens/schedule_screen.dart';
 import '../../features/vitals/presentation/screens/vital_history_screen.dart';
 import '../../features/vitals/presentation/screens/add_vital_screen.dart';
@@ -39,14 +36,10 @@ import '../../features/professionals/presentation/screens/professional_detail_sc
 import '../../features/professionals/presentation/screens/professional_connections_screen.dart' as pro_conn;
 import '../../features/professionals/presentation/screens/map_picker_screen.dart';
 import '../../features/message/presentation/screens/thread_screen.dart';
-import '../../features/notes/presentation/screens/notes_screen.dart' show NoteData;
-import '../../features/notes/presentation/screens/note_editor_screen.dart';
 import '../../features/caretakers/presentation/screens/invite_caretaker_screen.dart';
-import '../../features/community/presentation/screens/community_screen.dart';
-import '../../features/community/presentation/screens/create_post_screen.dart';
-import '../../features/community/presentation/screens/post_detail_screen.dart';
 import '../../features/connections/presentation/screens/chat_screen.dart';
 import '../../features/patients/presentation/screens/patient_detail_screen.dart';
+import '../../features/patients/domain/entities/patient_entity.dart';
 import '../../features/reports/presentation/screens/report_viewer_screen.dart';
 import '../../shared/widgets/feedback/not_found_page.dart';
 import 'route_args.dart';
@@ -75,10 +68,6 @@ abstract final class AppRoutes {
   static const settingsProHubPayout = '/settings/pro-hub/payout';
   static const settingsPremium = '/settings/premium';
 
-  static const support = '/support';
-  static const supportTicket = '/support/ticket';
-  static const supportHelpCenter = '/support/help-center';
-
   static const vitalHistory = '/vitals/history';
   static const vitalAdd = '/vitals/add';
 
@@ -93,20 +82,13 @@ abstract final class AppRoutes {
 
   static const thread = '/messages/thread';
 
-  static const noteEditor = '/notes/editor';
-
   static const caretakerInvite = '/caretakers/invite';
-
-  static const communityCreate = '/community/create';
-  static const communityPost = '/community/post';
 
   static const chat = '/connections/chat';
 
   static const patientDetail = '/patients/detail';
 
   static const reportViewer = '/reports/viewer';
-
-  static const community = '/community';
 }
 
 // ── Auth-guard refresh notifier ───────────────────────────────────────────────
@@ -280,37 +262,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(
-        path: AppRoutes.support,
-        builder: (context, state) => const SupportScreen(),
-        routes: [
-          GoRoute(
-            path: 'ticket',
-            builder: (context, state) => const SubmitTicketScreen(),
-          ),
-          GoRoute(
-            path: 'help-center',
-            builder: (context, state) => const HelpCenterScreen(),
-          ),
-        ],
-      ),
-      GoRoute(
-        path: AppRoutes.community,
-        builder: (context, state) => const CommunityScreen(),
-        routes: [
-          GoRoute(
-            path: 'create',
-            builder: (context, state) => const CreatePostScreen(),
-          ),
-          GoRoute(
-            path: 'post',
-            builder: (context, state) {
-              final args = state.extra as PostArgs;
-              return PostDetailScreen(post: args);
-            },
-          ),
-        ],
-      ),
 
       // ── Schedule ─────────────────────────────────────────────────────────────
       // Direct-push fallback for callers that switchToTab('schedule') when
@@ -382,15 +333,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // ── Notes ────────────────────────────────────────────────────────────────
-      GoRoute(
-        path: AppRoutes.noteEditor,
-        builder: (context, state) {
-          final args = state.extra as NoteData;
-          return NoteEditorScreen(note: args);
-        },
-      ),
-
       // ── Caretakers ───────────────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.caretakerInvite,
@@ -414,8 +356,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.patientDetail,
         builder: (context, state) {
-          final args = state.extra as PatientDetailArgs;
-          return PatientDetailScreen(patient: args);
+          final patient = state.extra as PatientEntity;
+          return PatientDetailScreen(patient: patient);
         },
       ),
 

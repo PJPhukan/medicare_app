@@ -1,5 +1,5 @@
-import '../../domain/entities/patient_detail_entity.dart';
 import '../../domain/entities/patient_entity.dart';
+import '../../domain/entities/patient_note_entity.dart';
 import '../../domain/repositories/patients_repository.dart';
 import '../datasources/patients_remote_datasource.dart';
 
@@ -9,15 +9,25 @@ class PatientsRepositoryImpl implements PatientsRepository {
   final PatientsRemoteDataSource _ds;
 
   @override
-  Future<List<PatientEntity>> getPatients() async {
-    final List<PatientEntity> list = await _ds.getPatients();
-    return list;
-  }
+  Future<List<PatientEntity>> getPatients() => _ds.getPatients();
 
   @override
-  Future<PatientDetailEntity> getPatientDetail(String patientId) async {
-    final PatientDetailEntity detail =
-        await _ds.getPatientDetail(patientId);
-    return detail;
-  }
+  Future<PatientEntity> addPatient({
+    required String name,
+    String? phone,
+    String? email,
+    String? relation,
+  }) =>
+      _ds.addPatient(name: name, phone: phone, email: email, relation: relation);
+
+  @override
+  Future<void> removePatient(String profileId) => _ds.removePatient(profileId);
+
+  @override
+  Future<List<PatientNoteEntity>> getNotes(String profileId) =>
+      _ds.getNotes(profileId);
+
+  @override
+  Future<PatientNoteEntity> addNote(String profileId, String note) =>
+      _ds.addNote(profileId, note);
 }

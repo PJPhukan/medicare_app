@@ -4,6 +4,15 @@ import '../entities/emergency_profile_entity.dart';
 abstract interface class EmergencyRepository {
   /// Null when no emergency profile has been created yet.
   Future<EmergencyProfileEntity?> getProfile();
+
+  /// Full-replace update — always send every field (empty list/null clears it).
+  Future<EmergencyProfileEntity> updateProfile({
+    String? bloodGroup,
+    List<String> allergies,
+    List<String> medications,
+    List<String> conditions,
+    String? notes,
+  });
   Future<List<EmergencyContactEntity>> getContacts();
   Future<EmergencyContactEntity> addContact({
     required String name,

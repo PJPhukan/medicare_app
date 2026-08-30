@@ -231,12 +231,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       title: AppStrings.supportTitle,
                       items: [
                         AppListTile(
-                          leading: _buildIconContainer(Icons.help_outline_rounded),
-                          title: AppStrings.helpCenter,
-                          showChevron: true,
-                          onTap: () => context.push(AppRoutes.support),
-                        ),
-                        AppListTile(
                           leading: _buildIconContainer(Icons.info_outline_rounded),
                           title: AppStrings.aboutCareDose,
                           showChevron: true,

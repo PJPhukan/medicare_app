@@ -1,34 +1,27 @@
-import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/extensions/context_extensions.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../../medicines/presentation/providers/medicines_provider.dart';
+import '../../../medicines/presentation/widgets/medicine_detail_sheet.dart';
+import '../../../medicines/presentation/widgets/medicine_list_row.dart';
+import '../../domain/entities/patient_entity.dart';
+import '../providers/patient_notes_provider.dart';
 
-// ─── Args ─────────────────────────────────────────────────────────────────────
-
-class PatientDetailArgs {
-  final String name;
-  final String condition;
-  final String since;
-  final Color avatarColor;
-  final String accessLevel;
-
-  const PatientDetailArgs({
-    required this.name,
-    required this.condition,
-    required this.since,
-    required this.avatarColor,
-    required this.accessLevel,
-  });
+String _fmtMonth(DateTime dt) {
+  const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return '${m[dt.month - 1]} ${dt.year}';
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 class PatientDetailScreen extends StatefulWidget {
-  final PatientDetailArgs patient;
+  final PatientEntity patient;
 
   const PatientDetailScreen({super.key, required this.patient});
 
@@ -55,8 +48,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
   @override
   Widget build(BuildContext context) {
     final p = widget.patient;
-    final isFullAccess = p.accessLevel == AppStrings.fullAccess;
-    final accessColor = isFullAccess ? AppColors.teal : AppColors.amber;
+    final statusColor = p.isJoined ? AppColors.teal : AppColors.amber;
+    final statusLabel = p.isJoined ? 'Joined' : 'Pending';
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: context.overlayStyle,
@@ -80,27 +73,27 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
                     padding: const EdgeInsets.fromLTRB(20, 56, 20, 0),
                     child: Column(
                       children: [
-                        AppAvatar(name: p.name, size: AppAvatarSize.xl),
+                        AppAvatar(name: p.name, imageUrl: p.avatarUrl, size: AppAvatarSize.xl),
                         const SizedBox(height: 12),
                         Text(
                           p.name,
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
-                        AppText.bodySm(p.condition, color: AppColors.textSecondary),
+                        AppText.bodySm(p.relation ?? 'Patient', color: AppColors.textSecondary),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             AppContainer.tinted(
-                              color: accessColor,
+                              color: statusColor,
                               borderRadius: AppBorderRadius.pill,
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              child: AppText.labelXs(p.accessLevel, color: accessColor),
+                              child: AppText.labelXs(statusLabel, color: statusColor),
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '· Since ${p.since}',
+                              '· Since ${_fmtMonth(p.createdAtDate)}',
                               style: const TextStyle(fontSize: 10, color: AppColors.textHint),
                             ),
                           ],
@@ -124,8 +117,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
                     unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                     tabs: const [
                       Tab(text: 'Overview'),
-                      Tab(text: 'Vitals'),
                       Tab(text: 'Medicines'),
+                      Tab(text: 'Notes'),
                     ],
                   ),
                 ),
@@ -136,8 +129,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
             controller: _tab,
             children: [
               _OverviewTab(patient: p),
-              _VitalsTab(isFullAccess: isFullAccess),
-              _MedicinesTab(isFullAccess: isFullAccess),
+              _MedicinesTab(patient: p),
+              _NotesTab(patient: p),
             ],
           ),
         ),
@@ -149,7 +142,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
 // ─── Overview tab ─────────────────────────────────────────────────────────────
 
 class _OverviewTab extends StatelessWidget {
-  final PatientDetailArgs patient;
+  final PatientEntity patient;
   const _OverviewTab({required this.patient});
 
   @override
@@ -161,13 +154,21 @@ class _OverviewTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _CardLabel('HEALTH SUMMARY'),
+                const _CardLabel('PROFILE'),
                 const SizedBox(height: 12),
-                _SummaryRow(icon: Icons.monitor_heart_outlined, color: AppColors.blue, label: 'Blood Pressure', value: '128/84 mmHg', status: 'Warning', statusColor: AppColors.amber),
-                const SizedBox(height: 8),
-                _SummaryRow(icon: Icons.water_drop_outlined, color: AppColors.teal, label: 'Blood Sugar', value: '142 mg/dL', status: 'High', statusColor: AppColors.error),
-                const SizedBox(height: 8),
-                _SummaryRow(icon: Icons.medication_rounded, color: AppColors.purple, label: 'Adherence', value: '82%', status: 'Good', statusColor: AppColors.green),
+                _InfoRow(icon: Icons.badge_outlined, label: 'Relation', value: patient.relation ?? '—'),
+                if (patient.age != null) ...[
+                  const SizedBox(height: 8),
+                  _InfoRow(icon: Icons.cake_outlined, label: 'Age', value: '${patient.age} years'),
+                ],
+                if (patient.bloodGroup != null) ...[
+                  const SizedBox(height: 8),
+                  _InfoRow(icon: Icons.bloodtype_outlined, label: 'Blood group', value: patient.bloodGroup!),
+                ],
+                if (patient.contact != null) ...[
+                  const SizedBox(height: 8),
+                  _InfoRow(icon: Icons.phone_outlined, label: 'Contact', value: patient.contact!),
+                ],
               ],
             ),
           ),
@@ -177,28 +178,13 @@ class _OverviewTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _CardLabel('RECENT ACTIVITY'),
-                const SizedBox(height: 12),
-                _ActivityRow(icon: Icons.check_circle_rounded, color: AppColors.green, text: 'Metformin 500mg taken at 8:00 AM', time: '2h ago'),
-                const SizedBox(height: 8),
-                _ActivityRow(icon: Icons.cancel_rounded, color: AppColors.error, text: 'Amlodipine 5mg missed at 12:00 PM', time: '4h ago'),
-                const SizedBox(height: 8),
-                _ActivityRow(icon: Icons.monitor_heart_rounded, color: AppColors.blue, text: 'Blood pressure logged: 128/84', time: '6h ago'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          AppCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _CardLabel('PERMISSIONS'),
+                const _CardLabel('STATUS'),
                 const SizedBox(height: 12),
                 Text(
-                  patient.accessLevel == AppStrings.fullAccess
-                      ? 'You have full access to view vitals, medicines, reports and schedule.'
-                      : 'You have read-only access to vitals and reports only.',
+                  patient.isJoined
+                      ? '${patient.name} has their own account. Notes and medicines you manage together sync in real time.'
+                      : '${patient.name} hasn\'t joined yet — you\'re managing their medicines directly. '
+                        'Once they sign up with the contact you added, their account links automatically.',
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6),
                 ),
               ],
@@ -208,82 +194,105 @@ class _OverviewTab extends StatelessWidget {
       );
 }
 
-// ─── Vitals tab ───────────────────────────────────────────────────────────────
-
-class _VitalsTab extends StatelessWidget {
-  final bool isFullAccess;
-  const _VitalsTab({required this.isFullAccess});
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow({required this.icon, required this.label, required this.value});
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+  Widget build(BuildContext context) => Row(
         children: [
-          AppCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _CardLabel('BLOOD PRESSURE'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _VitalChip(label: AppStrings.systolic, value: '128', unit: AppStrings.mmHg, color: AppColors.amber),
-                    const SizedBox(width: 10),
-                    _VitalChip(label: AppStrings.diastolic, value: '84', unit: AppStrings.mmHg, color: AppColors.blue),
-                    const SizedBox(width: 10),
-                    _VitalChip(label: AppStrings.heartRate, value: '76', unit: AppStrings.bpm, color: AppColors.purple),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                AppText.bodyXs('Logged today at 9:00 AM', color: AppColors.textHint),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          AppCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _CardLabel('BLOOD SUGAR'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _VitalChip(label: 'Fasting', value: '142', unit: AppStrings.mgDl, color: AppColors.error),
-                    const SizedBox(width: 10),
-                    _VitalChip(label: 'Post-meal', value: '198', unit: AppStrings.mgDl, color: AppColors.amber),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                AppText.bodyXs('Logged today at 7:30 AM', color: AppColors.textHint),
-              ],
-            ),
-          ),
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 10),
+          Expanded(child: AppText.bodySm(label, color: AppColors.textSecondary)),
+          AppText.bodySm(value, color: context.primaryText, fontWeight: FontWeight.w600),
         ],
       );
 }
 
 // ─── Medicines tab ────────────────────────────────────────────────────────────
 
-class _MedicinesTab extends StatelessWidget {
-  final bool isFullAccess;
-  const _MedicinesTab({required this.isFullAccess});
+class _MedicinesTab extends ConsumerWidget {
+  final PatientEntity patient;
+  const _MedicinesTab({required this.patient});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final st = ref.watch(medicinesProvider);
+    final meds = st.medicines.where((m) => m.patientProfileId == patient.id).toList();
+
+    if (st.isLoading && meds.isEmpty) {
+      return const Center(child: AppLoadingSpinner());
+    }
+    if (meds.isEmpty) {
+      return AppEmptyState(
+        icon: Icons.medication_outlined,
+        title: 'No medicines yet',
+        subtitle: '${patient.name}\'s medicines will show up here once you add one for them.',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      itemCount: meds.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (_, i) => MedicineListRow(
+        medicine: meds[i],
+        onTap: () => showMedicineDetailSheet(context, meds[i]),
+      ),
+    );
+  }
+}
+
+// ─── Notes tab ────────────────────────────────────────────────────────────────
+
+class _NotesTab extends ConsumerStatefulWidget {
+  final PatientEntity patient;
+  const _NotesTab({required this.patient});
+
+  @override
+  ConsumerState<_NotesTab> createState() => _NotesTabState();
+}
+
+class _NotesTabState extends ConsumerState<_NotesTab> {
+  final _noteCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addNote() async {
+    final text = _noteCtrl.text.trim();
+    if (text.isEmpty) return;
+    final ok = await ref
+        .read(patientNotesProvider(widget.patient.id).notifier)
+        .addNote(text);
+    if (!mounted) return;
+    if (ok) {
+      _noteCtrl.clear();
+      FocusScope.of(context).unfocus();
+    } else {
+      AppSnackbar.error(context, AppStrings.somethingWentWrong);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (!isFullAccess) {
+    if (!widget.patient.isJoined) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.lock_rounded, size: 48, color: AppColors.textHint),
+              const Icon(Icons.lock_clock_rounded, size: 48, color: AppColors.textHint),
               const SizedBox(height: 16),
-              const Text('Read-only access', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const Text('Waiting for them to join', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               AppText.bodySm(
-                'You need full access to view this patient\'s medicines.',
+                'Notes unlock once ${widget.patient.name} joins with their own account.',
                 color: AppColors.textSecondary,
                 textAlign: TextAlign.center,
               ),
@@ -292,57 +301,81 @@ class _MedicinesTab extends StatelessWidget {
         ),
       );
     }
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+
+    final st = ref.watch(patientNotesProvider(widget.patient.id));
+
+    return Column(
       children: [
-        _MedRow(name: 'Metformin 500mg', dose: '1 tablet · Morning', color: AppColors.teal, status: 'Active'),
-        const SizedBox(height: 10),
-        _MedRow(name: 'Amlodipine 5mg', dose: '1 tablet · Afternoon', color: AppColors.blue, status: 'Active'),
-        const SizedBox(height: 10),
-        _MedRow(name: 'Vitamin D3', dose: '1 capsule · Evening', color: AppColors.amber, status: 'Active'),
+        Expanded(
+          child: st.isLoading && st.notes.isEmpty
+              ? const Center(child: AppLoadingSpinner())
+              : st.notes.isEmpty
+                  ? AppEmptyState(
+                      icon: Icons.sticky_note_2_outlined,
+                      title: 'No notes yet',
+                      subtitle: 'Jot down anything worth remembering about ${widget.patient.name}\'s care.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                      itemCount: st.notes.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) {
+                        final n = st.notes[i];
+                        return AppCard(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(n.note, style: TextStyle(fontSize: 13, color: context.primaryText, height: 1.4)),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  if (n.authorName != null) ...[
+                                    AppText.bodyXs(n.authorName!, color: AppColors.textHint, fontWeight: FontWeight.w600),
+                                    const SizedBox(width: 6),
+                                    AppText.bodyXs('·', color: AppColors.textHint),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  AppText.bodyXs(_fmtMonth(n.createdAtDate), color: AppColors.textHint),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: AppTextField(
+                    controller: _noteCtrl,
+                    hint: 'Add a note…',
+                    maxLines: 3,
+                    minLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AppIconButton(
+                  icon: st.isSaving
+                      ? const AppLoadingSpinner(size: 16, strokeWidth: 2)
+                      : const Icon(Icons.send_rounded),
+                  color: AppColors.teal,
+                  backgroundColor: AppColors.teal.withValues(alpha: 0.1),
+                  onPressed: st.isSaving ? null : _addNote,
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
-}
-
-class _MedRow extends StatelessWidget {
-  final String name;
-  final String dose;
-  final Color color;
-  final String status;
-
-  const _MedRow({required this.name, required this.dose, required this.color, required this.status});
-
-  @override
-  Widget build(BuildContext context) => AppCard(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            AppContainer.tinted(
-              color: color,
-              borderRadius: AppBorderRadius.smAll,
-              padding: const EdgeInsets.all(9),
-              child: Icon(Icons.medication_rounded, size: 18, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppText.bodyMd(name, color: context.primaryText, fontWeight: FontWeight.w600),
-                  AppText.bodyXs(dose, color: AppColors.textSecondary),
-                ],
-              ),
-            ),
-            AppContainer.tinted(
-              color: AppColors.green,
-              borderRadius: AppBorderRadius.pill,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              child: AppText.labelXs(status, color: AppColors.green),
-            ),
-          ],
-        ),
-      );
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -359,92 +392,6 @@ class _CardLabel extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: AppColors.textHint,
           letterSpacing: 1,
-        ),
-      );
-}
-
-class _SummaryRow extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String label;
-  final String value;
-  final String status;
-  final Color statusColor;
-
-  const _SummaryRow({required this.icon, required this.color, required this.label, required this.value, required this.status, required this.statusColor});
-
-  @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 10),
-          Expanded(child: AppText.bodySm(label, color: AppColors.textSecondary)),
-          AppText.bodySm(value, color: context.primaryText, fontWeight: FontWeight.w600),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: AppBorderRadius.pill),
-            child: Text(status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
-          ),
-        ],
-      );
-}
-
-class _ActivityRow extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String text;
-  final String time;
-
-  const _ActivityRow({required this.icon, required this.color, required this.text, required this.time});
-
-  @override
-  Widget build(BuildContext context) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text, style: TextStyle(fontSize: 12, color: context.primaryText, height: 1.4)),
-          ),
-          const SizedBox(width: 8),
-          Text(time, style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
-        ],
-      );
-}
-
-class _VitalChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-
-  const _VitalChip({required this.label, required this.value, required this.unit, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: context.inputBg,
-            borderRadius: AppBorderRadius.mdAll,
-            border: Border.all(color: context.borderCol),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppText.bodyXs(label, color: AppColors.textSecondary, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 3),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(text: value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: color, height: 1)),
-                    TextSpan(text: ' $unit', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
       );
 }

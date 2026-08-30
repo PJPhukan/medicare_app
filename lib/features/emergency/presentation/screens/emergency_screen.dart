@@ -10,6 +10,7 @@ import '../../../../core/theme/app_border_radius.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/widgets/bottom_sheets/app_base_bottom_sheet.dart';
+import '../../../../shared/widgets/inputs/chip_tag_input.dart';
 import '../../domain/entities/emergency_contact_entity.dart';
 import '../../domain/entities/emergency_profile_entity.dart';
 import '../providers/emergency_provider.dart';
@@ -345,11 +346,16 @@ class _ActiveSosViewState extends ConsumerState<_ActiveSosView> {
 
         if (!sos.cancelled) ...[
           const SizedBox(height: 10),
+          // Deliberately amber/outline — must read as a distinct, calmer action
+          // from the solid-red STOP ALARM button above, since it does something
+          // STOP ALARM doesn't: tells contacts the alert was a false alarm.
           AppButton(
             label: lockRemaining > 0
                 ? '${AppStrings.sosCancelFalseAlarm} ($lockRemaining)'
                 : AppStrings.sosCancelFalseAlarm,
             variant: AppButtonVariant.outline,
+            color: AppColors.amber,
+            leading: const Icon(Icons.flag_outlined, size: 14, color: AppColors.amber),
             size: AppButtonSize.sm,
             onPressed: sos.canCancel ? () => notifier.cancel() : null,
           ),
@@ -377,12 +383,12 @@ class _ActiveSosViewState extends ConsumerState<_ActiveSosView> {
 
 // ─── Health Profile Card ──────────────────────────────────────────────────────
 
-class _HealthProfileCard extends StatelessWidget {
+class _HealthProfileCard extends ConsumerWidget {
   final EmergencyProfileEntity? profile;
   const _HealthProfileCard({required this.profile});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final profile = this.profile;
     if (profile == null || profile.isEmpty) {
       return AppCard(
@@ -390,7 +396,7 @@ class _HealthProfileCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppText.h3(AppStrings.healthProfileTitle),
+            _ProfileCardHeader(profile: profile, ref: ref),
             const SizedBox(height: 12),
             AppText.bodySm(AppStrings.emergencyDataNote,
                 color: AppColors.textHint),
@@ -403,7 +409,7 @@ class _HealthProfileCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppText.h3(AppStrings.healthProfileTitle),
+          _ProfileCardHeader(profile: profile, ref: ref),
           const SizedBox(height: 16),
 
           // Blood group
@@ -476,6 +482,166 @@ class _HealthProfileCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _ProfileCardHeader extends StatelessWidget {
+  final EmergencyProfileEntity? profile;
+  final WidgetRef ref;
+  const _ProfileCardHeader({required this.profile, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: AppText.h3(AppStrings.healthProfileTitle)),
+        GestureDetector(
+          onTap: () => _showProfileSheet(context, ref, existing: profile),
+          child: AppContainer.tinted(
+            color: AppColors.blue,
+            borderRadius: AppBorderRadius.lgAll,
+            padding: const EdgeInsets.all(8),
+            child: const Icon(Icons.edit_outlined, size: 16, color: AppColors.blue),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Edit health profile bottom sheet ─────────────────────────────────────────
+
+Future<void> _showProfileSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  EmergencyProfileEntity? existing,
+}) async {
+  await showAppBottomSheet<bool>(
+    context: context,
+    title: AppStrings.editHealthProfile,
+    child: _ProfileForm(existing: existing),
+  );
+}
+
+class _ProfileForm extends ConsumerStatefulWidget {
+  const _ProfileForm({this.existing});
+
+  final EmergencyProfileEntity? existing;
+
+  @override
+  ConsumerState<_ProfileForm> createState() => _ProfileFormState();
+}
+
+class _ProfileFormState extends ConsumerState<_ProfileForm> {
+  late final TextEditingController _bloodGroup;
+  late final TextEditingController _notes;
+  late List<String> _allergies;
+  late List<String> _conditions;
+  late List<String> _medications;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.existing;
+    _bloodGroup = TextEditingController(text: p?.bloodGroup ?? '');
+    _notes = TextEditingController(text: p?.notes ?? '');
+    _allergies = List.from(p?.allergies ?? const []);
+    _conditions = List.from(p?.conditions ?? const []);
+    _medications = List.from(p?.medications ?? const []);
+  }
+
+  @override
+  void dispose() {
+    _bloodGroup.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final bloodGroup = _bloodGroup.text.trim();
+      final notes = _notes.text.trim();
+      await ref.read(emergencyProvider.notifier).updateProfile(
+            bloodGroup: bloodGroup.isEmpty ? null : bloodGroup,
+            allergies: _allergies,
+            medications: _medications,
+            conditions: _conditions,
+            notes: notes.isEmpty ? null : notes,
+          );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = 'Could not save — please try again';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppTextField(
+          controller: _bloodGroup,
+          label: AppStrings.bloodGroup,
+          hint: AppStrings.bloodGroupHint,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 14),
+        AppChipTagInput(
+          label: AppStrings.allergiesLabel,
+          hint: AppStrings.allergiesHint,
+          color: AppColors.red,
+          initialTags: _allergies,
+          onChanged: (tags) => _allergies = tags,
+        ),
+        const SizedBox(height: 14),
+        AppChipTagInput(
+          label: AppStrings.conditionsLabel,
+          hint: AppStrings.conditionsHint,
+          color: AppColors.amber,
+          initialTags: _conditions,
+          onChanged: (tags) => _conditions = tags,
+        ),
+        const SizedBox(height: 14),
+        AppChipTagInput(
+          label: AppStrings.criticalMedsLabel,
+          hint: AppStrings.criticalMedsHint,
+          color: AppColors.blue,
+          initialTags: _medications,
+          onChanged: (tags) => _medications = tags,
+        ),
+        const SizedBox(height: 14),
+        AppTextField(
+          controller: _notes,
+          label: AppStrings.notesLabel,
+          hint: AppStrings.notesHint,
+          maxLines: 3,
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 10),
+          AppText.bodySm(_error!, color: AppColors.red),
+        ],
+        const SizedBox(height: 18),
+        AppButton(
+          label: AppStrings.save,
+          isFullWidth: true,
+          isLoading: _saving,
+          onPressed: _saving ? null : _save,
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

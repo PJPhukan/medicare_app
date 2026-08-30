@@ -15,19 +15,27 @@ class EmergencyRemoteDataSource {
     return data == null ? null : EmergencyProfile.fromJson(data);
   }
 
-  Future<void> updateProfile({
+  /// `null` for [bloodGroup]/[notes] clears the field; `null` for the list
+  /// fields is treated the same as an empty list (clears it). Omitted (not
+  /// passed) fields are left unchanged server-side.
+  Future<EmergencyProfile> updateProfile({
     String? bloodGroup,
     List<String>? allergies,
+    List<String>? medications,
     List<String>? conditions,
+    String? notes,
   }) async {
-    await _dio.patch<void>(
+    final res = await _dio.patch<Map<String, dynamic>>(
       ApiConstants.emergencyProfile,
       data: {
-        if (bloodGroup != null) 'bloodGroup': bloodGroup,
-        if (allergies != null) 'allergies': allergies,
-        if (conditions != null) 'conditions': conditions,
+        'bloodGroup': bloodGroup,
+        'allergies': allergies ?? const <String>[],
+        'medications': medications ?? const <String>[],
+        'conditions': conditions ?? const <String>[],
+        'notes': notes,
       },
     );
+    return EmergencyProfile.fromJson(res.data!['data'] as Map<String, dynamic>);
   }
 
   Future<List<EmergencyContact>> getContacts() async {

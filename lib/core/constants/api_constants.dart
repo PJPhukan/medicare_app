@@ -5,8 +5,8 @@ abstract class ApiConstants {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     // defaultValue: 'https://curaleecore-api-production.up.railway.app',
-      // defaultValue: 'http://192.168.29.210:4000', // Home
-       defaultValue: 'http://192.168.29.232:4000', // Ofice
+      defaultValue: 'http://192.168.29.210:4000', // Home
+      //  defaultValue: 'http://192.168.29.232:4000', // Ofice
   );
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -66,7 +66,17 @@ abstract class ApiConstants {
   // ── Patients ──────────────────────────────────────────────────────────────
   static const String patientProfiles = '/api/patients/profiles/mine';
   static const String addPatient = '/api/patients/add';
+  static String removePatient(String profileId) =>
+      '/api/patients/profiles/$profileId';
+  static String patientNotes(String profileId) =>
+      '/api/patients/profiles/$profileId/notes';
   static const String myCaretakers = '/api/patients/my-caretakers';
+  static const String caretakerInvites = '/api/patients/caretaker-invites';
+  static String revokeCaretaker(String relationshipId) =>
+      '/api/patients/relationships/$relationshipId/revoke';
+  static String cancelCaretakerInvite(String inviteId) =>
+      '/api/patients/caretaker-invites/$inviteId';
+  static const String manageablePatients = '/api/patients/manageable';
   static const String myMedicalProfile = '/api/patients/my-profile';
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
@@ -94,6 +104,9 @@ abstract class ApiConstants {
   static const String myTabs = '/api/users/tabs';
   static const String userProfile = '/api/users/me';
   static const String userAvatar = '/api/users/me/avatar';
+  static const String permissionTabGrants = '/api/users/permissions/tab-grants';
+  static String removeTabGrant(String relationshipId, String tabId) =>
+      '/api/users/permissions/tab-grants/$relationshipId/$tabId';
 
   // ── Emergency ─────────────────────────────────────────────────────────────
   static const String emergencyProfile  = '/api/emergency/profile';
@@ -104,7 +117,9 @@ abstract class ApiConstants {
   static const String conversations = '/api/messages/conversations';
 
   // ── Professional connections ──────────────────────────────────────────────
-  static const String professionalConnections = '/api/professional-connections';
+  // Connections/requests/chat all live under the professionals module's
+  // router, not a standalone endpoint.
+  static const String professionalConnections = '/api/professionals';
 
   // ── Event log ─────────────────────────────────────────────────────────────
   static const String events = '/api/events';
